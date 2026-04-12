@@ -1,0 +1,212 @@
+{
+  "tasks": [
+    {
+      "color": "Purple",
+      "hex_code": "#A855F7",
+      "title": "Shake Off",
+      "sort_order": 1,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Everyone opens the pedometer app on your phone",
+            "Shake your phone like crazy to get as many steps as possible!",
+            "You only have a few minutes - so shake fast!",
+            "Add up ALL your team's steps together",
+            "Your team needs to hit 4,000 steps total to win!",
+            "Show your phone screen to the marshal when done"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Black",
+      "hex_code": "#1F2937",
+      "title": "Body Power",
+      "sort_order": 2,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Your team needs to do: 50 push-ups + 50 sit-ups + 1 min plank",
+            "Anyone can do any number - split it however you want!",
+            "Record EVERYTHING on video - no pausing or editing!",
+            "Make sure the marshal can see proper form in the video",
+            "The video must be ONE continuous recording",
+            "Show the video to the marshal when you're done"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Blue",
+      "hex_code": "#3B82F6",
+      "title": "3D Cube Build",
+      "sort_order": 3,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Get the cube pieces from the marshal",
+            "Build the 3D cube so all sides match perfectly",
+            "Use ALL the pieces - no leftovers!",
+            "The cube must stand on its own - no holding it!",
+            "If it falls apart, fix it and try again",
+            "Show the finished cube to the marshal"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Orange",
+      "hex_code": "#F97316",
+      "title": "Zoomed Photo Hunt",
+      "sort_order": 4,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "You'll get a super zoomed-in photo of something nearby",
+            "Work together to figure out WHAT it is",
+            "Talk it out as a team - everyone must help decide!",
+            "Once you know what it is - go find it!",
+            "NO using Google or zooming tools - just your eyes and brain!",
+            "Write your answer on the sheet and give it to the marshal"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Red",
+      "hex_code": "#EF4444",
+      "title": "Copy Paste",
+      "sort_order": 5,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Look at the screen showing 6 body poses",
+            "Study the poses carefully - you CAN look at it again!",
+            "Copy ALL 6 poses exactly with your team members",
+            "Everyone must be in the right position and place",
+            "Take a photo showing all poses clearly",
+            "Submit the photo to the marshal for checking"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Green",
+      "hex_code": "#22C55E",
+      "title": "10 Items Hunt",
+      "sort_order": 6,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Get the hunt list from the marshal - it has 10 items to find",
+            "Split up and search for all 10 items!",
+            "You MUST find ALL 10 - missing even 1 means no points",
+            "Take ONE creative photo with ALL items + ALL team members",
+            "Everyone must be in the photo - no one left out!",
+            "Bring the items or photo to the marshal"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Yellow",
+      "hex_code": "#EAB308",
+      "title": "Hole Tarp Challenge",
+      "sort_order": 7,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Hold the tarp with BOTH hands - don't let go!",
+            "Roll the balls across the tarp into the bucket",
+            "You can ONLY use the tarp to move the balls - no hands on balls!",
+            "If a ball touches the ground - it doesn't count!",
+            "Talk to your team and move together!",
+            "Keep going until all balls are in the bucket"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Pink",
+      "hex_code": "#EC4899",
+      "title": "Mini Chair Stack",
+      "sort_order": 8,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Stack tiny chairs into a tower - one at a time!",
+            "Only ONE person places a chair per turn",
+            "Once you let go of a chair - you can't touch it again!",
+            "Try to stack 18 chairs without it falling",
+            "If the tower falls - start ALL over from zero!",
+            "Be patient, steady hands win this game!"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "Light Blue",
+      "hex_code": "#38BDF8",
+      "title": "Kendama Challenge",
+      "sort_order": 9,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Take turns catching the ball on the kendama cup or spike",
+            "Watch the marshal show you how to do it first!",
+            "Each person gets ONE try then pass it on",
+            "You must hold the catch steady for the marshal to see",
+            "If you miss - no worries, next person tries!",
+            "Keep going until your team gets enough catches"
+          ]
+        }
+      ]
+    },
+    {
+      "color": "White",
+      "hex_code": "#94A3B8",
+      "title": "Colour Hunt",
+      "sort_order": 10,
+      "pages": [
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Find and photograph 6 colours: Red, Blue, Yellow, Green, Purple, Orange",
+            "Each colour needs 4 DIFFERENT photos!",
+            "Every photo must have at least 2 team members in it",
+            "No repeating the same thing or place for photos!"
+          ]
+        },
+        {
+          "media_url": "",
+          "media_type": null,
+          "pointers": [
+            "Split up your team to find colours faster!",
+            "Combine ALL your photos into ONE big collage",
+            "Make sure the main colour is super obvious in each photo",
+            "Submit the collage to the marshal when done"
+          ]
+        }
+      ]
+    }
+  ]
+}
