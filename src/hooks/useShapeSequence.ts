@@ -10,6 +10,7 @@ export interface ShapeRound {
   shapes: Shape[]
   is_active: boolean
   results_visible: boolean
+  accepting_submissions: boolean
   created_at: string
 }
 
@@ -21,9 +22,16 @@ export interface ShapeResult {
   created_at: string
 }
 
+export interface ShapeFacilitator {
+  id: string
+  group_name: string
+  created_at: string
+}
+
 export function useShapeSequence() {
   const [rounds, setRounds] = useState<ShapeRound[]>([])
   const [results, setResults] = useState<ShapeResult[]>([])
+  const [facilitators, setFacilitators] = useState<ShapeFacilitator[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchRounds = useCallback(async () => {
@@ -45,18 +53,29 @@ export function useShapeSequence() {
     setLoading(false)
   }, [])
 
+  const fetchFacilitators = useCallback(async () => {
+    if (!isSupabaseConfigured) return
+    const { data } = await supabase
+      .from('shape_facilitators')
+      .select('*')
+      .order('created_at')
+    if (data) setFacilitators(data)
+  }, [])
+
   useEffect(() => {
     fetchRounds()
     fetchResults()
+    fetchFacilitators()
 
     const channel = supabase
       .channel('shape-sequence-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shape_rounds' }, fetchRounds)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shape_results' }, fetchResults)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shape_facilitators' }, fetchFacilitators)
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [fetchRounds, fetchResults])
+  }, [fetchRounds, fetchResults, fetchFacilitators])
 
   const upsertRound = async (
     roundNumber: number,
@@ -72,6 +91,7 @@ export function useShapeSequence() {
         shapes: [],
         is_active: false,
         results_visible: false,
+        accepting_submissions: false,
         ...updates,
       })
     }
@@ -82,9 +102,20 @@ export function useShapeSequence() {
     for (const r of rounds) {
       await supabase
         .from('shape_rounds')
-        .update({ is_active: r.round_number === roundNumber })
+        .update({
+          is_active: r.round_number === roundNumber,
+          accepting_submissions: false,
+        })
         .eq('id', r.id)
     }
+    await fetchRounds()
+  }
+
+  const endRound = async (roundId: string) => {
+    await supabase
+      .from('shape_rounds')
+      .update({ is_active: false, accepting_submissions: true })
+      .eq('id', roundId)
     await fetchRounds()
   }
 
@@ -112,16 +143,47 @@ export function useShapeSequence() {
     await fetchResults()
   }
 
+  // Facilitator management
+  const addFacilitator = async (groupName: string): Promise<ShapeFacilitator | null> => {
+    const { data, error } = await supabase
+      .from('shape_facilitators')
+      .insert({ group_name: groupName.trim() })
+      .select()
+      .single()
+    if (error) throw error
+    await fetchFacilitators()
+    return data
+  }
+
+  const renameFacilitator = async (id: string, newName: string) => {
+    const { error } = await supabase
+      .from('shape_facilitators')
+      .update({ group_name: newName.trim() })
+      .eq('id', id)
+    if (error) throw error
+    await fetchFacilitators()
+  }
+
+  const deleteFacilitator = async (id: string) => {
+    await supabase.from('shape_facilitators').delete().eq('id', id)
+    await fetchFacilitators()
+  }
+
   return {
     rounds,
     results,
+    facilitators,
     loading,
     upsertRound,
     setActiveRound,
+    endRound,
     toggleResultsVisible,
     addResult,
     updateResult,
     deleteResult,
+    addFacilitator,
+    renameFacilitator,
+    deleteFacilitator,
     refetch: fetchRounds,
   }
 }

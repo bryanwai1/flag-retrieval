@@ -30,12 +30,13 @@ export function ShapeSequenceFacilitator() {
 
   const activeRound     = rounds.find(r => r.is_active)
   const collectingRound = rounds.find(r => r.accepting_submissions)
+  const currentRound    = collectingRound ?? activeRound
 
   // Reset time inputs when round changes
   useEffect(() => {
     setTimeInputs({})
     setSubmitErrors({})
-  }, [collectingRound?.id])
+  }, [currentRound?.id])
 
   // Persist group list to localStorage
   useEffect(() => {
@@ -75,7 +76,7 @@ export function ShapeSequenceFacilitator() {
   }
 
   const submitTime = async (group: string) => {
-    if (!collectingRound) return
+    if (!currentRound) return
     const secs = parseFloat(timeInputs[group] ?? '')
     if (isNaN(secs) || secs <= 0) {
       setSubmitErrors(p => ({ ...p, [group]: 'Enter a valid time in seconds (e.g. 83.4)' }))
@@ -83,7 +84,7 @@ export function ShapeSequenceFacilitator() {
     }
     setSubmitting(p => ({ ...p, [group]: true }))
     try {
-      await addResult(collectingRound.id, group, secs)
+      await addResult(currentRound.id, group, secs)
     } catch {
       setSubmitErrors(p => ({ ...p, [group]: 'Failed to submit. Try again.' }))
     } finally {
@@ -204,11 +205,11 @@ export function ShapeSequenceFacilitator() {
           )}
 
           {myGroups.map(group => {
-            const submitted = collectingRound
-              ? results.some(r => r.round_id === collectingRound.id && r.team_name === group)
+            const submitted = currentRound
+              ? results.some(r => r.round_id === currentRound.id && r.team_name === group)
               : false
-            const myResult = collectingRound
-              ? results.find(r => r.round_id === collectingRound.id && r.team_name === group)
+            const myResult = currentRound
+              ? results.find(r => r.round_id === currentRound.id && r.team_name === group)
               : null
 
             return (
@@ -233,8 +234,8 @@ export function ShapeSequenceFacilitator() {
                   )}
                 </div>
 
-                {/* Time input when collecting */}
-                {collectingRound && !submitted && (
+                {/* Time input when round is active or collecting */}
+                {currentRound && !submitted && (
                   <div className="flex flex-col gap-1.5 pt-1">
                     <input
                       type="number"
@@ -265,7 +266,7 @@ export function ShapeSequenceFacilitator() {
                 )}
 
                 {/* Already submitted */}
-                {collectingRound && submitted && myResult && (
+                {currentRound && submitted && myResult && (
                   <div
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold"
                     style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80' }}
@@ -398,7 +399,7 @@ function RoundRunning({ roundNumber }: { roundNumber: number }) {
       <div className="text-4xl">🏃</div>
       <div>
         <p className="text-blue-300 font-black text-lg uppercase tracking-wider">Round {roundNumber} In Progress…</p>
-        <p className="text-white/35 text-sm mt-1">Time your groups — submit when admin ends the round.</p>
+        <p className="text-white/35 text-sm mt-1">Time your groups — enter and submit times below anytime.</p>
       </div>
       <div className="flex gap-1 mt-1">
         {[0, 1, 2].map(i => (

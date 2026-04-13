@@ -8,6 +8,9 @@ import { ParticipantView } from './pages/ParticipantView'
 import { InstructionsSlide } from './pages/InstructionsSlide'
 import { ShapeSequenceProjector } from './pages/ShapeSequenceProjector'
 import { ShapeSequenceAdmin } from './pages/ShapeSequenceAdmin'
+import { ShapeSequenceFacilitator } from './pages/ShapeSequenceFacilitator'
+import { EventSlide } from './pages/EventSlide'
+import { GroupingSlide } from './pages/GroupingSlide'
 
 export default function App() {
   return (
@@ -22,6 +25,9 @@ export default function App() {
         <Route path="/task/:taskId" element={<ParticipantView />} />
         <Route path="/shape-sequence" element={<ShapeSequenceProjector />} />
         <Route path="/shape-sequence/admin" element={<ShapeSequenceAdmin />} />
+        <Route path="/shape-sequence/facilitator" element={<ShapeSequenceFacilitator />} />
+        <Route path="/event" element={<EventSlide />} />
+        <Route path="/event/grouping" element={<GroupingSlide />} />
       </Routes>
     </BrowserRouter>
   )

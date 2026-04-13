@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useShapeSequence, type Shape, type ShapeRound } from '../hooks/useShapeSequence'
 import {
   ShapeIcon,
@@ -12,9 +13,10 @@ const ROUND_COUNT = 3
 
 export function ShapeSequenceAdmin() {
   const {
-    rounds, results,
-    upsertRound, setActiveRound,
+    rounds, results, facilitators,
+    upsertRound, setActiveRound, endRound,
     toggleResultsVisible, addResult, deleteResult,
+    addFacilitator, renameFacilitator, deleteFacilitator,
   } = useShapeSequence()
 
   const [selectedRound, setSelectedRound] = useState(1)
@@ -24,10 +26,22 @@ export function ShapeSequenceAdmin() {
   const [timeInput, setTimeInput] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Facilitator management state
+  const [showFacilitatorPanel, setShowFacilitatorPanel] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [addingFacilitator, setAddingFacilitator] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+
+  const facilitatorUrl = `${import.meta.env.VITE_APP_URL || window.location.origin}/shape-sequence/facilitator`
+
   const round: ShapeRound | undefined = rounds.find(r => r.round_number === selectedRound)
 
   // Sync local state when selected round loads/changes
-  useEffect(() => {
+  const [lastRoundId, setLastRoundId] = useState<string | undefined>(undefined)
+  if (round?.id !== lastRoundId) {
+    setLastRoundId(round?.id)
     if (round) {
       const count = (round.circle_count === 30 ? 30 : 20) as 20 | 30
       setLocalCircleCount(count)
@@ -36,9 +50,8 @@ export function ShapeSequenceAdmin() {
       setLocalCircleCount(20)
       setLocalShapes(Array(20).fill('circle'))
     }
-  }, [round?.id, selectedRound]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
-  // When circle count changes locally, resize shapes array
   const handleCircleCountChange = (count: 20 | 30) => {
     setLocalCircleCount(count)
     setLocalShapes(prev => padShapes(prev, count))
@@ -53,9 +66,7 @@ export function ShapeSequenceAdmin() {
     })
   }
 
-  const fillAll = (shape: Shape) => {
-    setLocalShapes(Array(localCircleCount).fill(shape))
-  }
+  const fillAll = (shape: Shape) => setLocalShapes(Array(localCircleCount).fill(shape))
 
   const randomize = () => {
     setLocalShapes(
@@ -67,16 +78,18 @@ export function ShapeSequenceAdmin() {
 
   const handleSaveConfig = async () => {
     setSaving(true)
-    await upsertRound(selectedRound, {
-      circle_count: localCircleCount,
-      shapes: localShapes,
-    })
+    await upsertRound(selectedRound, { circle_count: localCircleCount, shapes: localShapes })
     setSaving(false)
   }
 
   const handleActivate = async () => {
     await handleSaveConfig()
     await setActiveRound(selectedRound)
+  }
+
+  const handleEndRound = async () => {
+    if (!round) return
+    await endRound(round.id)
   }
 
   const handleAddResult = async () => {
@@ -88,12 +101,38 @@ export function ShapeSequenceAdmin() {
     setTimeInput('')
   }
 
+  const handleAddFacilitator = async () => {
+    const name = newGroupName.trim()
+    if (!name) return
+    setAddingFacilitator(true)
+    try {
+      await addFacilitator(name)
+      setNewGroupName('')
+    } catch {
+      alert('That group name already exists.')
+    } finally {
+      setAddingFacilitator(false)
+    }
+  }
+
+  const handleRename = async (id: string) => {
+    const name = editingName.trim()
+    if (!name) return
+    try {
+      await renameFacilitator(id, name)
+      setEditingId(null)
+    } catch {
+      alert('Could not rename. Name may already be taken.')
+    }
+  }
+
   const roundResults = round
     ? [...results.filter(r => r.round_id === round.id)].sort((a, b) => a.completion_time - b.completion_time)
     : []
 
   const cols = localCircleCount === 20 ? 10 : 15
   const isActive = round?.is_active ?? false
+  const isCollecting = round?.accepting_submissions ?? false
   const resultsVisible = round?.results_visible ?? false
 
   return (
@@ -104,15 +143,120 @@ export function ShapeSequenceAdmin() {
           <a href="/" className="text-white/50 hover:text-white text-sm transition-colors">← Home</a>
           <h1 className="text-xl font-black tracking-tight">SHAPE SEQUENCE — Admin</h1>
         </div>
-        <a
-          href="/shape-sequence"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold transition-colors"
-        >
-          ↗ Open Projector
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowQR(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-bold transition-colors"
+          >
+            📱 Facilitator QR
+          </button>
+          <button
+            onClick={() => setShowFacilitatorPanel(!showFacilitatorPanel)}
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors"
+          >
+            👥 Groups ({facilitators.length})
+          </button>
+          <a
+            href="/shape-sequence"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-bold transition-colors"
+          >
+            ↗ Projector
+          </a>
+        </div>
       </header>
+
+      {/* QR Modal */}
+      {showQR && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          onClick={() => setShowQR(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-10 flex flex-col items-center gap-5 max-w-md mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="text-3xl mb-1">📱</div>
+              <h2 className="text-2xl font-black text-gray-900">Facilitator Check-In</h2>
+              <p className="text-gray-400 text-sm mt-1">Facilitators scan to register their group</p>
+            </div>
+            <div className="bg-white p-3 rounded-2xl border border-gray-100">
+              <QRCodeSVG value={facilitatorUrl} size={280} level="H" />
+            </div>
+            <p className="text-gray-400 text-xs text-center break-all">{facilitatorUrl}</p>
+            <button
+              onClick={() => setShowQR(false)}
+              className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-700 transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Facilitator panel */}
+      {showFacilitatorPanel && (
+        <div className="bg-indigo-950 border-b border-indigo-800 px-6 py-5">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-white font-black text-sm uppercase tracking-wider mb-4">Facilitator Groups</h2>
+            <div className="flex flex-wrap gap-3 mb-4">
+              {facilitators.length === 0 && (
+                <p className="text-indigo-300/50 text-sm">No groups registered yet. Share the QR code above.</p>
+              )}
+              {facilitators.map(f => (
+                <div key={f.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
+                  {editingId === f.id ? (
+                    <>
+                      <input
+                        value={editingName}
+                        onChange={e => setEditingName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRename(f.id); if (e.key === 'Escape') setEditingId(null) }}
+                        className="px-2 py-0.5 rounded bg-white/20 text-white text-sm font-bold focus:outline-none w-32"
+                        autoFocus
+                      />
+                      <button onClick={() => handleRename(f.id)} className="text-green-400 text-xs font-bold">✓</button>
+                      <button onClick={() => setEditingId(null)} className="text-white/40 text-xs">✕</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-white font-bold text-sm">{f.group_name}</span>
+                      <button
+                        onClick={() => { setEditingId(f.id); setEditingName(f.group_name) }}
+                        className="text-white/30 hover:text-white/70 text-xs transition-colors"
+                        title="Rename"
+                      >✏️</button>
+                      <button
+                        onClick={() => { if (confirm(`Remove "${f.group_name}"?`)) deleteFacilitator(f.id) }}
+                        className="text-white/30 hover:text-red-400 text-xs transition-colors"
+                        title="Remove"
+                      >✕</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add group manually…"
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddFacilitator()}
+                className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/30 text-sm focus:outline-none focus:border-indigo-400 transition-colors"
+              />
+              <button
+                onClick={handleAddFacilitator}
+                disabled={addingFacilitator || !newGroupName.trim()}
+                className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-white text-sm font-bold disabled:opacity-40 transition-colors"
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
 
@@ -121,6 +265,7 @@ export function ShapeSequenceAdmin() {
           {Array.from({ length: ROUND_COUNT }, (_, i) => i + 1).map(n => {
             const r = rounds.find(r => r.round_number === n)
             const active = r?.is_active
+            const collecting = r?.accepting_submissions
             return (
               <button
                 key={n}
@@ -133,9 +278,8 @@ export function ShapeSequenceAdmin() {
                 }}
               >
                 Round {n}
-                {active && (
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Active on projector" />
-                )}
+                {active && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Active" />}
+                {collecting && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Collecting" />}
               </button>
             )
           })}
@@ -145,7 +289,6 @@ export function ShapeSequenceAdmin() {
 
           {/* Left: Shape grid editor */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col gap-5">
-            {/* Circle count */}
             <div className="flex items-center gap-4">
               <span className="font-bold text-gray-700 text-sm">Circles:</span>
               {([20, 30] as const).map(n => (
@@ -163,7 +306,6 @@ export function ShapeSequenceAdmin() {
               ))}
             </div>
 
-            {/* Quick fill buttons */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Fill all:</span>
               {SHAPE_CYCLE.map(shape => (
@@ -185,14 +327,8 @@ export function ShapeSequenceAdmin() {
               </button>
             </div>
 
-            {/* Shape grid */}
-            <div
-              className="rounded-xl p-4 bg-gray-900 overflow-x-auto"
-            >
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}
-              >
+            <div className="rounded-xl p-4 bg-gray-900 overflow-x-auto">
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}>
                 {localShapes.map((shape, i) => (
                   <button
                     key={i}
@@ -230,14 +366,24 @@ export function ShapeSequenceAdmin() {
 
               <button
                 onClick={handleActivate}
-                className="w-full py-3 rounded-xl font-black text-sm transition-all"
+                disabled={isActive}
+                className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-60"
                 style={{
                   background: isActive ? '#16a34a' : '#1d4ed8',
                   color: '#fff',
                   boxShadow: isActive ? '0 0 20px rgba(22,163,74,0.4)' : '0 0 20px rgba(29,78,216,0.3)',
                 }}
               >
-                {isActive ? '✅ Active on Projector' : '▶ Activate on Projector'}
+                {isActive ? '✅ Round Active' : '▶ Start Round'}
+              </button>
+
+              <button
+                onClick={handleEndRound}
+                disabled={!isActive || !round}
+                className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40"
+                style={{ background: '#dc2626', color: '#fff' }}
+              >
+                🛑 End Round — Collect Times
               </button>
 
               <button
@@ -245,18 +391,24 @@ export function ShapeSequenceAdmin() {
                 disabled={!round}
                 className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40"
                 style={{
-                  background: resultsVisible ? '#dc2626' : '#7c3aed',
+                  background: resultsVisible ? '#7c3aed' : '#7c3aed',
                   color: '#fff',
+                  opacity: !round ? 0.4 : 1,
                 }}
               >
                 {resultsVisible ? '🙈 Hide Results' : '👁 Show Results'}
               </button>
+
+              {isCollecting && (
+                <div className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-center font-medium">
+                  ⏳ Waiting for facilitators to submit times…
+                </div>
+              )}
             </div>
 
-            {/* Add result */}
+            {/* Add result manually */}
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col gap-3">
-              <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">Add Team Result</h3>
-
+              <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">Add Result Manually</h3>
               <input
                 type="text"
                 placeholder="Team name…"
@@ -311,7 +463,97 @@ export function ShapeSequenceAdmin() {
             )}
           </div>
         </div>
+
+        {/* Full cross-round scoreboard */}
+        <FullScoreboardAdmin rounds={rounds} results={results} onDelete={deleteResult} />
+
       </main>
+    </div>
+  )
+}
+
+function FullScoreboardAdmin({
+  rounds,
+  results,
+  onDelete,
+}: {
+  rounds: import('../hooks/useShapeSequence').ShapeRound[]
+  results: import('../hooks/useShapeSequence').ShapeResult[]
+  onDelete: (id: string) => void
+}) {
+  const sortedRounds = [...rounds].sort((a, b) => a.round_number - b.round_number)
+  const allTeams = Array.from(new Set(results.map(r => r.team_name))).sort()
+
+  if (allTeams.length === 0) return null
+
+  type Cell = { resultId: string; time: number } | null
+  type TeamRow = { name: string; cells: Cell[]; total: number }
+
+  const rows: TeamRow[] = allTeams.map(team => {
+    const cells = sortedRounds.map(round => {
+      const r = results.find(res => res.round_id === round.id && res.team_name === team)
+      return r ? { resultId: r.id, time: r.completion_time } : null
+    })
+    const total = cells.reduce<number>((sum, c) => sum + (c?.time ?? 0), 0)
+    return { name: team, cells, total }
+  })
+
+  rows.sort((a, b) => {
+    const aNulls = a.cells.filter(c => c === null).length
+    const bNulls = b.cells.filter(c => c === null).length
+    if (aNulls !== bNulls) return aNulls - bNulls
+    return a.total - b.total
+  })
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 className="font-black text-gray-900 text-sm uppercase tracking-wider">All Teams — Full Scoreboard</h2>
+        <span className="text-xs text-gray-400">{allTeams.length} teams</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="text-left px-6 py-3 text-gray-400 font-bold uppercase tracking-wider text-xs w-8">#</th>
+              <th className="text-left px-4 py-3 text-gray-400 font-bold uppercase tracking-wider text-xs">Team</th>
+              {sortedRounds.map(r => (
+                <th key={r.id} className="text-center px-4 py-3 text-blue-500 font-bold uppercase tracking-wider text-xs">
+                  Round {r.round_number}
+                </th>
+              ))}
+              <th className="text-center px-4 py-3 text-yellow-600 font-bold uppercase tracking-wider text-xs">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={row.name} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-3 text-gray-400 font-bold text-center">{i + 1}</td>
+                <td className="px-4 py-3 font-bold text-gray-800">{row.name}</td>
+                {row.cells.map((cell, ri) => (
+                  <td key={ri} className="px-4 py-3 text-center tabular-nums">
+                    {cell ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-blue-600 font-black">{formatTime(cell.time)}</span>
+                        <button
+                          onClick={() => { if (confirm(`Delete ${row.name}'s Round ${ri + 1} time?`)) onDelete(cell.resultId) }}
+                          className="text-red-300 hover:text-red-500 text-xs transition-colors"
+                          title="Delete"
+                        >✕</button>
+                      </span>
+                    ) : (
+                      <span className="text-gray-200 font-bold">—</span>
+                    )}
+                  </td>
+                ))}
+                <td className="px-4 py-3 text-center font-black tabular-nums" style={{ color: i === 0 ? '#d97706' : '#374151' }}>
+                  {row.total > 0 ? formatTime(row.total) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

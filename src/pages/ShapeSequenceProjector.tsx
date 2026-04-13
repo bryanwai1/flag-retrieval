@@ -5,14 +5,10 @@ export function ShapeSequenceProjector() {
   const { rounds, results } = useShapeSequence()
 
   const activeRound = rounds.find(r => r.is_active) ?? null
-  const roundResults = activeRound
-    ? [...results.filter(r => r.round_id === activeRound.id)].sort(
-        (a, b) => a.completion_time - b.completion_time
-      )
-    : []
+  const showScoreboard = activeRound?.results_visible && results.length > 0
 
   return (
-    <div className="h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-6">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-6 py-6">
       <ParticleBackground />
 
       {/* Nav */}
@@ -30,11 +26,11 @@ export function ShapeSequenceProjector() {
       </a>
 
       {/* Header */}
-      <div className="relative z-10 text-center mb-8">
-        <h1 className="text-6xl font-black text-white tracking-tight animate-slide-up">
+      <div className="relative z-10 text-center mb-6">
+        <h1 className="text-5xl font-black text-white tracking-tight animate-slide-up">
           SHAPE SEQUENCE
         </h1>
-        {activeRound && (
+        {activeRound && !showScoreboard && (
           <div className="mt-2 text-blue-400 font-bold text-xl animate-slide-up" style={{ animationDelay: '0.1s' }}>
             ROUND {activeRound.round_number} &bull; {activeRound.circle_count} CIRCLES
           </div>
@@ -45,13 +41,10 @@ export function ShapeSequenceProjector() {
       <div className="relative z-10 w-full max-w-[1700px] flex flex-col items-center gap-6">
         {!activeRound ? (
           <WaitingState />
+        ) : showScoreboard ? (
+          <FullScoreboard rounds={rounds} results={results} />
         ) : (
-          <>
-            <ShapeGrid round={activeRound} />
-            {activeRound.results_visible && roundResults.length > 0 && (
-              <ResultsBoard results={roundResults} roundNumber={activeRound.round_number} />
-            )}
-          </>
+          <ShapeGrid round={activeRound} />
         )}
       </div>
     </div>
@@ -106,53 +99,94 @@ function ShapeGrid({ round }: { round: ShapeRound }) {
   )
 }
 
-function ResultsBoard({ results, roundNumber }: { results: ShapeResult[]; roundNumber: number }) {
+function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: ShapeResult[] }) {
+  const sortedRounds = [...rounds].sort((a, b) => a.round_number - b.round_number)
+
+  // Collect all unique teams across all results
+  const allTeams = Array.from(new Set(results.map(r => r.team_name)))
+
+  // Build per-team data
+  type TeamRow = { name: string; times: (number | null)[]; total: number }
+  const rows: TeamRow[] = allTeams.map(team => {
+    const times = sortedRounds.map(round => {
+      const r = results.find(res => res.round_id === round.id && res.team_name === team)
+      return r ? r.completion_time : null
+    })
+    const total = times.reduce<number>((sum, t) => sum + (t ?? 0), 0)
+    return { name: team, times, total }
+  })
+
+  // Sort: teams with all rounds filled first, then by total ascending
+  rows.sort((a, b) => {
+    const aNulls = a.times.filter(t => t === null).length
+    const bNulls = b.times.filter(t => t === null).length
+    if (aNulls !== bNulls) return aNulls - bNulls
+    return a.total - b.total
+  })
+
   const medals = ['🥇', '🥈', '🥉']
+
   return (
     <div
-      className="w-full max-w-3xl animate-slide-up rounded-3xl p-6"
+      className="w-full animate-slide-up rounded-3xl overflow-hidden"
       style={{
-        background: 'rgba(0,0,0,0.7)',
+        background: 'rgba(0,0,0,0.75)',
         border: '2px solid rgba(96,165,250,0.4)',
         backdropFilter: 'blur(20px)',
         boxShadow: '0 0 60px rgba(96,165,250,0.2)',
       }}
     >
-      <h2 className="text-center text-2xl font-black text-white mb-5 tracking-wide">
-        ROUND {roundNumber} RESULTS
+      <h2 className="text-center text-3xl font-black text-white py-4 tracking-widest uppercase border-b border-white/10">
+        Scoreboard
       </h2>
-      <div className="flex flex-col gap-3">
-        {results.map((r, i) => (
-          <div
-            key={r.id}
-            className="flex items-center gap-4 px-5 py-3 rounded-2xl animate-pop-in"
-            style={{
-              animationDelay: `${i * 0.08}s`,
-              animationFillMode: 'backwards',
-              background: i === 0
-                ? 'linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))'
-                : 'rgba(255,255,255,0.05)',
-              border: i === 0
-                ? '1.5px solid rgba(251,191,36,0.5)'
-                : '1.5px solid rgba(255,255,255,0.08)',
-            }}
-          >
-            <span className="text-3xl w-10 text-center">{medals[i] ?? `#${i + 1}`}</span>
-            <span
-              className="flex-1 text-xl font-black"
-              style={{ color: i === 0 ? '#fbbf24' : i === 1 ? '#e5e7eb' : i === 2 ? '#d97706' : '#9ca3af' }}
-            >
-              {r.team_name}
-            </span>
-            <span
-              className="text-2xl font-black tabular-nums"
-              style={{ color: i === 0 ? '#fbbf24' : '#d1d5db' }}
-            >
-              {formatTime(r.completion_time)}
-            </span>
-          </div>
-        ))}
-      </div>
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <th className="text-left px-6 py-3 text-white/40 text-sm font-bold uppercase tracking-widest w-12">#</th>
+            <th className="text-left px-4 py-3 text-white/40 text-sm font-bold uppercase tracking-widest">Team</th>
+            {sortedRounds.map(r => (
+              <th key={r.id} className="text-center px-4 py-3 text-blue-400/70 text-sm font-bold uppercase tracking-widest">
+                R{r.round_number}
+              </th>
+            ))}
+            <th className="text-center px-4 py-3 text-yellow-400/80 text-sm font-bold uppercase tracking-widest">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const isTop = i === 0
+            return (
+              <tr
+                key={row.name}
+                className="animate-pop-in border-t border-white/5"
+                style={{
+                  animationDelay: `${i * 0.06}s`,
+                  animationFillMode: 'backwards',
+                  background: isTop
+                    ? 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.06))'
+                    : i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                }}
+              >
+                <td className="px-6 py-4 text-2xl text-center">{medals[i] ?? <span className="text-white/30 text-lg font-bold">#{i + 1}</span>}</td>
+                <td
+                  className="px-4 py-4 text-xl font-black"
+                  style={{ color: isTop ? '#fbbf24' : i === 1 ? '#e5e7eb' : i === 2 ? '#f59e0b' : '#d1d5db' }}
+                >
+                  {row.name}
+                </td>
+                {row.times.map((t, ri) => (
+                  <td key={ri} className="px-4 py-4 text-center text-lg font-bold tabular-nums" style={{ color: t ? '#93c5fd' : '#ffffff20' }}>
+                    {t !== null ? formatTime(t) : '—'}
+                  </td>
+                ))}
+                <td className="px-4 py-4 text-center text-xl font-black tabular-nums" style={{ color: isTop ? '#fbbf24' : '#e5e7eb' }}>
+                  {formatTime(row.total)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

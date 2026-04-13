@@ -7,7 +7,8 @@ interface QRCodeModalProps {
 }
 
 export function QRCodeModal({ task, onClose }: QRCodeModalProps) {
-  const url = `${window.location.origin}/task/${task.id}`
+  const base = import.meta.env.VITE_APP_URL || window.location.origin
+  const url = `${base}/task/${task.id}`
 
   return (
     <div

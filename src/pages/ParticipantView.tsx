@@ -3,20 +3,41 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCurrentTeam } from '../hooks/useCurrentTeam'
 import { useTaskPages } from '../hooks/useTaskPages'
+import { useTaskPhotos } from '../hooks/useTaskPhotos'
 import { useTeamScans } from '../hooks/useTeamScans'
 import { TeamRegistration } from '../components/TeamRegistration'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
+import { PhotoGalleryView } from '../components/PhotoGalleryView'
+import { ParticleBackground } from '../components/ParticleBackground'
 import type { Task } from '../types/database'
 
 export function ParticipantView() {
   const { taskId } = useParams<{ taskId: string }>()
-  const { team, loading: teamLoading, isRegistered, register } = useCurrentTeam()
+  const { team, memberName, loading: teamLoading, isRegistered, createTribe, joinTribe, searchTribes, leaveTribe } = useCurrentTeam()
   const { pages, loading: pagesLoading } = useTaskPages(taskId)
-  const { recordScan } = useTeamScans()
+  const { photos, loading: photosLoading } = useTaskPhotos(taskId)
+  const { recordScan, toggleComplete } = useTeamScans()
   const [task, setTask] = useState<Task | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const [scanRecorded, setScanRecorded] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
+  const [scanRecord, setScanRecord] = useState<{ id: string; completed: boolean } | null>(null)
+  const [completing, setCompleting] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+
+  const handleLeave = async () => {
+    setLeaving(true)
+    try {
+      await leaveTribe()
+      setScanRecorded(false)
+      setScanRecord(null)
+      setShowLeaveConfirm(false)
+    } finally {
+      setLeaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!taskId) return
@@ -27,7 +48,10 @@ export function ParticipantView() {
 
   useEffect(() => {
     if (team && taskId && !scanRecorded) {
-      recordScan(team.id, taskId).then(() => setScanRecorded(true))
+      recordScan(team.id, taskId).then((scan) => {
+        setScanRecorded(true)
+        if (scan) setScanRecord({ id: scan.id, completed: scan.completed })
+      })
     }
   }, [team, taskId, scanRecorded, recordScan])
 
@@ -42,14 +66,16 @@ export function ParticipantView() {
   if (!isRegistered) {
     return (
       <TeamRegistration
-        onRegister={async (name) => { await register(name) }}
+        onCreateTribe={createTribe}
+        onJoinTribe={joinTribe}
+        onSearchTribes={searchTribes}
         hexCode={task.hex_code}
         taskTitle={task.title}
       />
     )
   }
 
-  if (pagesLoading) {
+  if (pagesLoading || photosLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-gray-400 text-xl font-bold animate-pulse">Loading instructions...</div>
@@ -57,45 +83,201 @@ export function ParticipantView() {
     )
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header
-        className="px-6 py-5 text-white relative overflow-hidden"
+  // Full-screen splash on first load
+  if (showSplash) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white overflow-hidden"
         style={{ backgroundColor: task.hex_code }}
+        onClick={() => setShowSplash(false)}
       >
+        {/* Background effects */}
         <div className="absolute inset-0 bg-black/10" />
-        <div className="max-w-lg mx-auto relative z-10">
-          <p className="text-sm font-bold opacity-80 uppercase tracking-wider">Team: {team?.name}</p>
-          <h1 className="text-3xl font-black tracking-tight">{task.title}</h1>
-          <div className="text-sm opacity-70 mt-1 uppercase tracking-wider">{task.color} Flag Challenge</div>
+        <div className="absolute -top-32 -left-32 w-64 h-64 bg-white/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
+
+        {/* Content */}
+        <div className="relative z-10 text-center px-8 animate-bounce-in">
+          <div className="text-6xl mb-6">🚩</div>
+          <p className="text-sm font-bold opacity-70 uppercase tracking-[0.2em] mb-2">
+            {task.color} Flag
+          </p>
+          <h1 className="text-5xl font-black tracking-tight mb-4 leading-tight">
+            {task.title}
+          </h1>
+          <div className="w-16 h-1 bg-white/40 rounded-full mx-auto mb-6" />
+          <p className="text-lg opacity-80 font-medium mb-2">
+            {memberName} · {team?.name}
+          </p>
+        </div>
+
+        {/* Start button */}
+        <button
+          className="relative z-10 mt-8 px-10 py-4 bg-white/20 backdrop-blur-sm rounded-2xl text-xl font-black uppercase tracking-wider border-2 border-white/30 hover:bg-white/30 active:scale-95 transition-all animate-slide-up"
+          style={{ animationDelay: '0.4s' }}
+          onClick={(e) => { e.stopPropagation(); setShowSplash(false) }}
+        >
+          Start Challenge
+        </button>
+
+        <p className="relative z-10 mt-4 text-sm opacity-50 animate-pulse">
+          Tap anywhere to begin
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen relative overflow-x-hidden" style={{ backgroundColor: `color-mix(in srgb, ${task.hex_code} 50%, #0a0a0a)` }}>
+      <ParticleBackground hexCode={task.hex_code} />
+
+      {/* Header */}
+      <header className="px-6 py-5 text-white relative z-10 overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: task.hex_code, opacity: 0.35 }}
+        />
+        <div className="absolute inset-0 bg-black/30" />
+        <div className="max-w-lg mx-auto relative z-10 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold opacity-80 uppercase tracking-wider">{memberName} · {team?.name}</p>
+            <h1 className="text-3xl font-black tracking-tight">{task.title}</h1>
+            <div className="text-sm opacity-70 mt-1 uppercase tracking-wider">{task.color} Flag Challenge</div>
+          </div>
+          <div className="flex-shrink-0 mt-1">
+            {!showLeaveConfirm ? (
+              <button
+                onClick={() => setShowLeaveConfirm(true)}
+                className="text-xs text-white/40 hover:text-white/70 transition-colors"
+              >
+                Leave
+              </button>
+            ) : (
+              <div className="flex flex-col items-end gap-1">
+                <p className="text-xs text-white/60">Leave tribe?</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowLeaveConfirm(false)}
+                    className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleLeave}
+                    disabled={leaving}
+                    className="text-xs text-red-400 hover:text-red-300 font-bold transition-colors disabled:opacity-50"
+                  >
+                    {leaving ? '...' : 'Yes, leave'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-6 py-8">
-        {pages.length === 0 ? (
+      <main className="max-w-lg mx-auto px-6 py-8 relative z-10">
+        {pages.length === 0 && photos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             No instructions available for this task yet.
           </div>
         ) : (
           <>
-            <InstructionPage page={pages[currentPage]} hexCode={task.hex_code} />
-            <PageNavigator
-              current={currentPage}
-              total={pages.length}
-              onPrev={() => setCurrentPage((p) => Math.max(0, p - 1))}
-              onNext={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
-              hexCode={task.hex_code}
-            />
-            {currentPage === pages.length - 1 && (
-              <div className="mt-8 text-center p-6 rounded-2xl border-2 animate-slide-up" style={{ backgroundColor: `${task.hex_code}11`, borderColor: `${task.hex_code}33` }}>
-                <p className="text-2xl font-black mb-2" style={{ color: task.hex_code }}>
-                  You're done!
-                </p>
-                <p className="text-gray-600 font-medium">
-                  Go back to the marshal with your completion card to finish this challenge!
-                </p>
+            {pages.length > 0 && (
+              <>
+                <InstructionPage page={pages[currentPage]} hexCode={task.hex_code} />
+                <PageNavigator
+                  current={currentPage}
+                  total={pages.length}
+                  onPrev={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                  onNext={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
+                  hexCode={task.hex_code}
+                />
+              </>
+            )}
+
+            {/* Photo clue gallery */}
+            {photos.length > 0 && (
+              <div className={pages.length > 0 ? 'mt-8' : ''}>
+                <PhotoGalleryView
+                  photos={photos}
+                  hexCode={task.hex_code}
+                />
               </div>
             )}
+
+            {/* Complete Activity Section */}
+            <div className="mt-8 animate-slide-up">
+              {scanRecord?.completed ? (
+                <div className="text-center">
+                  <div
+                    className="p-6 rounded-2xl border-2"
+                    style={{ backgroundColor: `${task.hex_code}25`, borderColor: `${task.hex_code}66` }}
+                  >
+                    <div className="text-4xl mb-2">🎉</div>
+                    <p className="text-2xl font-black mb-1 text-white">
+                      Activity Complete!
+                    </p>
+                    <p className="text-white/60 text-sm font-medium">
+                      Great job, {team?.name} 🎉
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!scanRecord) return
+                      setCompleting(true)
+                      try {
+                        await toggleComplete(scanRecord.id, false)
+                        setScanRecord({ ...scanRecord, completed: false })
+                      } finally { setCompleting(false) }
+                    }}
+                    disabled={completing}
+                    className="mt-3 px-4 py-2 text-sm text-white/40 hover:text-red-400 transition-colors"
+                  >
+                    Undo completion
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="rounded-3xl p-5 border-2 animate-pulse-border"
+                  style={{
+                    borderColor: `${task.hex_code}99`,
+                    backgroundColor: `${task.hex_code}18`,
+                    boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
+                  }}
+                >
+                  {/* Animated warning */}
+                  <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
+                    <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                      <span className="text-2xl">👮</span>
+                      <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
+                    </div>
+                    <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
+                      Only tap Complete <span className="text-yellow-300 underline underline-offset-2">after</span> receiving your Completion Card from the Marshal!
+                    </p>
+                    <span className="text-2xl flex-shrink-0">🛑</span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!scanRecord) return
+                      setCompleting(true)
+                      try {
+                        await toggleComplete(scanRecord.id, true)
+                        setScanRecord({ ...scanRecord, completed: true })
+                      } finally { setCompleting(false) }
+                    }}
+                    disabled={completing || !scanRecord}
+                    className="w-full py-4 rounded-2xl text-white text-xl font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
+                    style={{
+                      backgroundColor: task.hex_code,
+                      boxShadow: `0 6px 0 ${task.hex_code}88, 0 8px 20px ${task.hex_code}44`,
+                    }}
+                  >
+                    {completing ? 'Completing...' : 'Complete Activity ✅'}
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </main>

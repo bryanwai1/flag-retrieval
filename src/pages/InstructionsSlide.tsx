@@ -144,7 +144,8 @@ const slides: Slide[] = [
     titleColor: '#e9d5ff',
     points: [
       { icon: '🔄', text: 'Repeat STEPS 1 to 5', sub: 'For every new flag color' },
-      { icon: '🏆', text: 'Most COMPLETION CARDS wins!', sub: 'Collect as many as you can!' },
+      { icon: '🏆', text: 'Most CARDS / POINTS wins!', sub: 'Collect as many completion cards as you can!' },
+      { icon: '⏱️', text: 'TIME matters too!', sub: 'Fastest tribe wins in a tie — so hustle!' },
     ],
   },
 ]

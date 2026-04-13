@@ -30,5 +30,18 @@ export function useTeams() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchTeams])
 
-  return { teams, loading, refetch: fetchTeams }
+  const renameTeam = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setTeams(prev => prev.map(t => t.id === id ? { ...t, name: trimmed } : t))
+    await supabase.from('teams').update({ name: trimmed }).eq('id', id)
+  }, [])
+
+  const deleteTeam = useCallback(async (id: string) => {
+    setTeams(prev => prev.filter(t => t.id !== id))
+    await supabase.from('team_scans').delete().eq('team_id', id)
+    await supabase.from('teams').delete().eq('id', id)
+  }, [])
+
+  return { teams, loading, refetch: fetchTeams, renameTeam, deleteTeam }
 }

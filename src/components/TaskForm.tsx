@@ -3,19 +3,33 @@ import type { Task } from '../types/database'
 
 interface TaskFormProps {
   initial?: Partial<Task>
-  onSave: (data: { color: string; hex_code: string; title: string; sort_order: number }) => Promise<void>
+  onSave: (data: { color: string; hex_code: string; title: string; sort_order: number; points: number }) => Promise<void>
   onCancel: () => void
 }
 
 const PRESET_COLORS = [
   { name: 'Red', hex: '#EF4444' },
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Green', hex: '#22C55E' },
-  { name: 'Yellow', hex: '#EAB308' },
-  { name: 'Purple', hex: '#A855F7' },
   { name: 'Orange', hex: '#F97316' },
-  { name: 'Pink', hex: '#EC4899' },
+  { name: 'Amber', hex: '#F59E0B' },
+  { name: 'Yellow', hex: '#EAB308' },
+  { name: 'Lime', hex: '#84CC16' },
+  { name: 'Green', hex: '#22C55E' },
+  { name: 'Emerald', hex: '#10B981' },
   { name: 'Teal', hex: '#14B8A6' },
+  { name: 'Cyan', hex: '#06B6D4' },
+  { name: 'Sky Blue', hex: '#38BDF8' },
+  { name: 'Blue', hex: '#3B82F6' },
+  { name: 'Indigo', hex: '#6366F1' },
+  { name: 'Violet', hex: '#8B5CF6' },
+  { name: 'Purple', hex: '#A855F7' },
+  { name: 'Fuchsia', hex: '#D946EF' },
+  { name: 'Pink', hex: '#EC4899' },
+  { name: 'Rose', hex: '#F43F5E' },
+  { name: 'Brown', hex: '#92400E' },
+  { name: 'Dark Gray', hex: '#374151' },
+  { name: 'Black', hex: '#111111' },
+  { name: 'Silver', hex: '#94A3B8' },
+  { name: 'White', hex: '#F1F5F9' },
 ]
 
 export function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
@@ -23,6 +37,7 @@ export function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
   const [hexCode, setHexCode] = useState(initial?.hex_code || '#EF4444')
   const [title, setTitle] = useState(initial?.title || '')
   const [sortOrder, setSortOrder] = useState(initial?.sort_order ?? 0)
+  const [points, setPoints] = useState(initial?.points ?? 0)
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +45,7 @@ export function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
     if (!color.trim() || !title.trim()) return
     setSaving(true)
     try {
-      await onSave({ color: color.trim(), hex_code: hexCode, title: title.trim(), sort_order: sortOrder })
+      await onSave({ color: color.trim(), hex_code: hexCode, title: title.trim(), sort_order: sortOrder, points })
     } finally {
       setSaving(false)
     }
@@ -87,14 +102,26 @@ export function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
           />
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-        <input
-          type="number"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(Number(e.target.value))}
-          className="w-24 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="flex gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+          <input
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(Number(e.target.value))}
+            className="w-24 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
+          <input
+            type="number"
+            value={points}
+            onChange={(e) => setPoints(Number(e.target.value))}
+            className="w-24 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min={0}
+          />
+        </div>
       </div>
       <div className="flex gap-3 mt-2">
         <button
