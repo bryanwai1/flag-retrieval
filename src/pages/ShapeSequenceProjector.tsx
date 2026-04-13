@@ -5,7 +5,7 @@ export function ShapeSequenceProjector() {
   const { rounds, results } = useShapeSequence()
 
   const activeRound = rounds.find(r => r.is_active) ?? null
-  const showScoreboard = activeRound?.results_visible && results.length > 0
+  const hasResults = results.length > 0
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-6 py-6">
@@ -30,7 +30,7 @@ export function ShapeSequenceProjector() {
         <h1 className="text-5xl font-black text-white tracking-tight animate-slide-up">
           SHAPE SEQUENCE
         </h1>
-        {activeRound && !showScoreboard && (
+        {activeRound && (
           <div className="mt-2 text-blue-400 font-bold text-xl animate-slide-up" style={{ animationDelay: '0.1s' }}>
             ROUND {activeRound.round_number} &bull; {activeRound.circle_count} CIRCLES
           </div>
@@ -40,11 +40,15 @@ export function ShapeSequenceProjector() {
       {/* Main content */}
       <div className="relative z-10 w-full max-w-[1700px] flex flex-col items-center gap-6">
         {!activeRound ? (
-          <WaitingState />
-        ) : showScoreboard ? (
-          <FullScoreboard rounds={rounds} results={results} />
+          <>
+            <WaitingState />
+            {hasResults && <FullScoreboard rounds={rounds} results={results} />}
+          </>
         ) : (
-          <ShapeGrid round={activeRound} />
+          <>
+            <ShapeGrid round={activeRound} />
+            {hasResults && <FullScoreboard rounds={rounds} results={results} />}
+          </>
         )}
       </div>
     </div>

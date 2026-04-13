@@ -118,6 +118,21 @@ create policy "shape_results: admin update"
 create policy "shape_results: admin delete"
   on shape_results for delete using (auth.role() = 'authenticated');
 
+-- ── task_photos ──────────────────────────────────────────────
+alter table task_photos enable row level security;
+
+create policy "task_photos: public read"
+  on task_photos for select using (true);
+
+create policy "task_photos: admin write"
+  on task_photos for insert with check (auth.role() = 'authenticated');
+
+create policy "task_photos: admin update"
+  on task_photos for update using (auth.role() = 'authenticated');
+
+create policy "task_photos: admin delete"
+  on task_photos for delete using (auth.role() = 'authenticated');
+
 -- ── shape_facilitators ───────────────────────────────────────
 alter table shape_facilitators enable row level security;
 

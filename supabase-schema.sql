@@ -66,6 +66,7 @@ create table task_photos (
   photo_order int not null default 0,
   position_x float not null default 50,
   position_y float not null default 50,
+  caption text,
   created_at timestamptz default now()
 );
 
