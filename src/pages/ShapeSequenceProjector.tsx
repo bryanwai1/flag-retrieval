@@ -5,7 +5,7 @@ export function ShapeSequenceProjector() {
   const { rounds, results } = useShapeSequence()
 
   const activeRound = rounds.find(r => r.is_active) ?? null
-  const hasResults = results.length > 0
+  const showScoreboard = rounds.some(r => r.results_visible) && results.length > 0
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-6 py-6">
@@ -42,12 +42,12 @@ export function ShapeSequenceProjector() {
         {!activeRound ? (
           <>
             <WaitingState />
-            {hasResults && <FullScoreboard rounds={rounds} results={results} />}
+            {showScoreboard && <FullScoreboard rounds={rounds} results={results} />}
           </>
         ) : (
           <>
             <ShapeGrid round={activeRound} />
-            {hasResults && <FullScoreboard rounds={rounds} results={results} />}
+            {showScoreboard && <FullScoreboard rounds={rounds} results={results} />}
           </>
         )}
       </div>
