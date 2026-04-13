@@ -2,7 +2,7 @@ import { ParticleBackground } from '../components/ParticleBackground'
 
 export function GameSelector() {
   return (
-    <div className="h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-x-hidden py-12">
       <ParticleBackground />
 
       <div className="relative z-10 text-center mb-14">
@@ -17,15 +17,16 @@ export function GameSelector() {
         </p>
       </div>
 
-      <div className="relative z-10 flex flex-row gap-10 justify-center px-8">
+      <div className="relative z-10 flex flex-row gap-10 justify-center px-8 flex-wrap">
+        <EventCard delay="0.2s" />
         <GameCard
-          href="/flag-retrieval"
+          href="/projector"
           adminHref="/admin"
           icon="🚩"
           title="FLAG RETRIEVAL"
           description="Hunt flags · Scan QR codes · Complete challenges"
           accent="#f59e0b"
-          delay="0.2s"
+          delay="0.3s"
         />
         <GameCard
           href="/shape-sequence"
@@ -34,8 +35,45 @@ export function GameSelector() {
           title="SHAPE SEQUENCE"
           description="Match the pattern · Race against the clock · 3 rounds"
           accent="#60a5fa"
-          delay="0.3s"
+          delay="0.4s"
         />
+      </div>
+    </div>
+  )
+}
+
+function EventCard({ delay }: { delay: string }) {
+  return (
+    <div
+      className="animate-bounce-in flex flex-col items-center gap-5 px-12 py-10 rounded-3xl w-80"
+      style={{
+        animationDelay: delay,
+        opacity: 0,
+        animationFillMode: 'forwards',
+        background: 'rgba(255,255,255,0.04)',
+        border: '2px solid rgba(167,139,250,0.2)',
+      }}
+    >
+      <div className="text-7xl animate-float">🎪</div>
+      <div className="text-center">
+        <h2 className="text-2xl font-black text-white tracking-tight">EVENT SLIDES</h2>
+        <p className="text-gray-400 text-sm mt-2 leading-relaxed">Welcome slide · Team groupings · Client branding</p>
+      </div>
+      <div className="flex flex-col gap-2 w-full mt-2">
+        <a
+          href="/event"
+          className="w-full py-3 rounded-xl font-black text-center text-sm tracking-wider transition-all hover:scale-105"
+          style={{ background: '#a78bfa', color: '#000' }}
+        >
+          ▶ EVENT SLIDE
+        </a>
+        <a
+          href="/event/grouping"
+          className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+          style={{ color: '#a78bfa', border: '1.5px solid rgba(167,139,250,0.27)' }}
+        >
+          👥 Team Groupings
+        </a>
       </div>
     </div>
   )
