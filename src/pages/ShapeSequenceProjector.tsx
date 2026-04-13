@@ -128,6 +128,12 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
     return a.total - b.total
   })
 
+  // Best time per round (index matches sortedRounds)
+  const bestPerRound = sortedRounds.map((_, ri) => {
+    const times = rows.map(r => r.times[ri]).filter((t): t is number => t !== null)
+    return times.length > 0 ? Math.min(...times) : null
+  })
+
   const medals = ['🥇', '🥈', '🥉']
 
   return (
@@ -178,11 +184,21 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
                 >
                   {row.name}
                 </td>
-                {row.times.map((t, ri) => (
-                  <td key={ri} className="px-4 py-4 text-center text-lg font-bold tabular-nums" style={{ color: t ? '#93c5fd' : '#ffffff20' }}>
-                    {t !== null ? formatTime(t) : '—'}
-                  </td>
-                ))}
+                {row.times.map((t, ri) => {
+                  const isRoundWinner = t !== null && t === bestPerRound[ri]
+                  return (
+                    <td
+                      key={ri}
+                      className="px-4 py-4 text-center text-lg font-bold tabular-nums"
+                      style={{
+                        color: isRoundWinner ? '#34d399' : t ? '#93c5fd' : '#ffffff20',
+                        textShadow: isRoundWinner ? '0 0 12px rgba(52,211,153,0.9), 0 0 24px rgba(52,211,153,0.5)' : undefined,
+                      }}
+                    >
+                      {t !== null ? formatTime(t) : '—'}
+                    </td>
+                  )
+                })}
                 <td className="px-4 py-4 text-center text-xl font-black tabular-nums" style={{ color: isTop ? '#fbbf24' : '#e5e7eb' }}>
                   {formatTime(row.total)}
                 </td>
