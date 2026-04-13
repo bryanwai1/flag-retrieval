@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useShapeSequence, type Shape, type ShapeRound } from '../hooks/useShapeSequence'
 import {
@@ -39,9 +39,7 @@ export function ShapeSequenceAdmin() {
   const round: ShapeRound | undefined = rounds.find(r => r.round_number === selectedRound)
 
   // Sync local state when selected round loads/changes
-  const [lastRoundId, setLastRoundId] = useState<string | undefined>(undefined)
-  if (round?.id !== lastRoundId) {
-    setLastRoundId(round?.id)
+  useEffect(() => {
     if (round) {
       const count = (round.circle_count === 30 ? 30 : 20) as 20 | 30
       setLocalCircleCount(count)
@@ -50,7 +48,7 @@ export function ShapeSequenceAdmin() {
       setLocalCircleCount(20)
       setLocalShapes(Array(20).fill('circle'))
     }
-  }
+  }, [round?.id, selectedRound]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCircleCountChange = (count: 20 | 30) => {
     setLocalCircleCount(count)
