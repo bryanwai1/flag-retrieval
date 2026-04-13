@@ -152,59 +152,61 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
       <table className="w-full table-fixed border-collapse">
         <thead>
           <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
-            <th className="text-left px-6 py-3 text-white/40 text-sm font-bold uppercase tracking-widest w-12">#</th>
-            <th className="text-left px-4 py-3 text-white/40 text-sm font-bold uppercase tracking-widest">Team</th>
-            {sortedRounds.map(r => (
-              <th key={r.id} className="text-center px-4 py-3 text-blue-400/70 text-sm font-bold uppercase tracking-widest">
-                R{r.round_number}
+            <th className="text-left px-6 py-3 text-blue-400/70 text-sm font-bold uppercase tracking-widest w-24">Round</th>
+            {rows.map((row, i) => (
+              <th
+                key={row.name}
+                className="text-center px-4 py-3 text-sm font-bold uppercase tracking-widest"
+                style={{ color: i === 0 ? '#fbbf24' : i === 1 ? '#e5e7eb' : i === 2 ? '#f59e0b' : '#d1d5db' }}
+              >
+                {medals[i] ?? <span className="text-white/30">#{i + 1}</span>} {row.name}
               </th>
             ))}
-            <th className="text-center px-4 py-3 text-yellow-400/80 text-sm font-bold uppercase tracking-widest">Total</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => {
-            const isTop = i === 0
-            return (
-              <tr
+          {sortedRounds.map((round, ri) => (
+            <tr
+              key={round.id}
+              className="animate-pop-in border-t border-white/5"
+              style={{
+                animationDelay: `${ri * 0.06}s`,
+                animationFillMode: 'backwards',
+                background: ri % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+              }}
+            >
+              <td className="px-6 py-4 text-blue-400 text-lg font-bold">R{round.round_number}</td>
+              {rows.map((row, i) => {
+                const t = row.times[ri]
+                const isRoundWinner = t !== null && t === bestPerRound[ri]
+                return (
+                  <td
+                    key={row.name}
+                    className="px-4 py-4 text-center text-lg font-bold tabular-nums"
+                    style={{
+                      color: isRoundWinner ? '#34d399' : t ? '#93c5fd' : '#ffffff20',
+                      textShadow: isRoundWinner ? '0 0 12px rgba(52,211,153,0.9), 0 0 24px rgba(52,211,153,0.5)' : undefined,
+                    }}
+                  >
+                    {t !== null ? formatTime(t) : '—'}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+          {/* Total row */}
+          <tr className="border-t-2 border-white/20" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <td className="px-6 py-4 text-yellow-400/80 text-sm font-bold uppercase tracking-widest">Total</td>
+            {rows.map((row, i) => (
+              <td
                 key={row.name}
-                className="animate-pop-in border-t border-white/5"
-                style={{
-                  animationDelay: `${i * 0.06}s`,
-                  animationFillMode: 'backwards',
-                  background: isTop
-                    ? 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.06))'
-                    : i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
-                }}
+                className="px-4 py-4 text-center text-xl font-black tabular-nums"
+                style={{ color: i === 0 ? '#fbbf24' : '#e5e7eb' }}
               >
-                <td className="px-6 py-4 text-2xl text-center">{medals[i] ?? <span className="text-white/30 text-lg font-bold">#{i + 1}</span>}</td>
-                <td
-                  className="px-4 py-4 text-xl font-black"
-                  style={{ color: isTop ? '#fbbf24' : i === 1 ? '#e5e7eb' : i === 2 ? '#f59e0b' : '#d1d5db' }}
-                >
-                  {row.name}
-                </td>
-                {row.times.map((t, ri) => {
-                  const isRoundWinner = t !== null && t === bestPerRound[ri]
-                  return (
-                    <td
-                      key={ri}
-                      className="px-4 py-4 text-center text-lg font-bold tabular-nums"
-                      style={{
-                        color: isRoundWinner ? '#34d399' : t ? '#93c5fd' : '#ffffff20',
-                        textShadow: isRoundWinner ? '0 0 12px rgba(52,211,153,0.9), 0 0 24px rgba(52,211,153,0.5)' : undefined,
-                      }}
-                    >
-                      {t !== null ? formatTime(t) : '—'}
-                    </td>
-                  )
-                })}
-                <td className="px-4 py-4 text-center text-xl font-black tabular-nums" style={{ color: isTop ? '#fbbf24' : '#e5e7eb' }}>
-                  {formatTime(row.total)}
-                </td>
-              </tr>
-            )
-          })}
+                {formatTime(row.total)}
+              </td>
+            ))}
+          </tr>
         </tbody>
       </table>
     </div>
