@@ -176,7 +176,7 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
               }}
             >
               <td className="px-6 py-4 text-blue-400 text-lg font-bold">R{round.round_number}</td>
-              {rows.map((row, i) => {
+              {rows.map((row) => {
                 const t = row.times[ri]
                 const isRoundWinner = t !== null && t === bestPerRound[ri]
                 return (
