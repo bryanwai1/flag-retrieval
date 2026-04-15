@@ -135,3 +135,37 @@ export interface BingoScan {
   completed: boolean
   completed_at: string | null
 }
+
+// ── Snake and Ladder ──────────────────────────────────────────
+
+export interface SnakeGame {
+  id: string
+  name: string
+  snakes: Record<string, number>   // head -> tail
+  ladders: Record<string, number>  // bottom -> top
+  created_at: string
+}
+
+export interface SnakeTile {
+  id: string
+  game_id: string
+  tile_number: number
+  task_id: string | null
+  created_at: string
+}
+
+export interface SnakeTeam {
+  id: string
+  game_id: string
+  name: string
+  hex_code: string
+  emoji: string | null
+  position: number
+  sort_order: number
+  created_at: string
+}
+
+export interface SnakeSettings {
+  id: string
+  active_game_id: string | null
+}

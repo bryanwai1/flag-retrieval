@@ -48,6 +48,16 @@ export function GameSelector() {
           delay="0.5s"
           primaryLabel="PLAYER BOARD"
         />
+        <GameCard
+          href="/snake-ladder"
+          adminHref="/snake-ladder/admin"
+          icon="🐍"
+          title="SNAKE & LADDER"
+          description="Roll the die · Climb ladders · Dodge snakes · 100 activity tiles"
+          accent="#f59e0b"
+          delay="0.6s"
+          primaryLabel="GAME BOARD"
+        />
       </div>
     </div>
   )

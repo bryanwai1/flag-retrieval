@@ -19,6 +19,8 @@ const BingoDashParticipant  = lazy(() => import('./pages/BingoDashParticipant').
 const BingoDashAdmin        = lazy(() => import('./pages/BingoDashAdmin').then(m => ({ default: m.BingoDashAdmin })))
 const BingoDashTaskEdit     = lazy(() => import('./pages/BingoDashTaskEdit').then(m => ({ default: m.BingoDashTaskEdit })))
 const BingoDashProjector    = lazy(() => import('./pages/BingoDashProjector').then(m => ({ default: m.BingoDashProjector })))
+const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
+const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 
 export default function App() {
   return (
@@ -43,6 +45,8 @@ export default function App() {
           <Route path="/bingo-dash/admin" element={<BingoDashAdmin />} />
           <Route path="/bingo-dash/admin/task/:taskId" element={<BingoDashTaskEdit />} />
           <Route path="/bingo-dash/projector" element={<BingoDashProjector />} />
+          <Route path="/snake-ladder" element={<SnakeLadderBoard />} />
+          <Route path="/snake-ladder/admin" element={<SnakeLadderAdmin />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
