@@ -177,8 +177,8 @@ export function SnakeLadderBoard() {
                 const task = data?.task
                 const isSnakeHead = snakes[n] != null || snakes[String(n)] != null
                 const isLadderBottom = ladders[n] != null || ladders[String(n)] != null
-                // Alternating pastel palette for empty tiles (matches image style)
-                const palette = ['#fde68a', '#fbcfe8', '#c7d2fe', '#bbf7d0', '#fed7aa', '#a5f3fc']
+                // Vibrant classic snakes-and-ladders palette
+                const palette = ['#ec4899', '#f97316', '#a855f7', '#14b8a6', '#fbbf24', '#60a5fa', '#f472b6', '#fde68a']
                 const emptyBg = palette[(Math.floor((n - 1) / BOARD_SIZE) + ((n - 1) % BOARD_SIZE)) % palette.length]
                 const bg = task?.hex_code ?? emptyBg
                 return (
@@ -190,7 +190,8 @@ export function SnakeLadderBoard() {
                       gridRow,
                       gridColumn: gridCol,
                       backgroundColor: bg,
-                      color: task ? '#fff' : '#1f2937',
+                      color: '#fff',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.35)',
                       borderRight: gridCol < BOARD_SIZE ? '1px solid rgba(0,0,0,0.08)' : undefined,
                       borderBottom: gridRow < BOARD_SIZE ? '1px solid rgba(0,0,0,0.08)' : undefined,
                     }}

@@ -22,7 +22,7 @@ export function SnakeLadderAdmin() {
 
   const [tileEditing, setTileEditing] = useState<number | null>(null)
   const [librarySearch, setLibrarySearch] = useState('')
-  const [librarySection, setLibrarySection] = useState<'all' | 'snake-ladder' | string>('snake-ladder')
+  const [librarySection, setLibrarySection] = useState<'all' | string>('all')
 
   // Create-card inline form (in tile editor)
   const [createTitle, setCreateTitle] = useState('')
@@ -175,8 +175,7 @@ export function SnakeLadderAdmin() {
     const search = librarySearch.trim().toLowerCase()
     let list = tasks
     if (librarySection !== 'all') {
-      const secId = sections.find(s => s.slug === librarySection)?.id ?? librarySection
-      list = list.filter(t => t.section_id === secId)
+      list = list.filter(t => t.section_id === librarySection)
     }
     if (search) {
       list = list.filter(t =>
@@ -387,14 +386,18 @@ function BoardTab({
           const task = tile?.task_id ? taskById.get(tile.task_id) ?? null : null
           const snake = activeGame.snakes[n] ?? activeGame.snakes[String(n)]
           const ladder = activeGame.ladders[n] ?? activeGame.ladders[String(n)]
+          const palette = ['#ec4899', '#f97316', '#a855f7', '#14b8a6', '#fbbf24', '#60a5fa', '#f472b6', '#fde68a']
+          const row = Math.floor((n - 1) / 10)
+          const col = (n - 1) % 10
+          const emptyBg = palette[(row + col) % palette.length]
           return (
             <button
               key={n}
               onClick={() => onEdit(n)}
               className="aspect-square rounded flex items-center justify-center text-[10px] font-black relative hover:ring-2 hover:ring-amber-500 transition"
               style={{
-                backgroundColor: task?.hex_code ?? '#f3f4f6',
-                color: task ? '#fff' : '#374151',
+                backgroundColor: task?.hex_code ?? emptyBg,
+                color: '#fff',
               }}
               title={task ? task.title : '(empty)'}
             >
