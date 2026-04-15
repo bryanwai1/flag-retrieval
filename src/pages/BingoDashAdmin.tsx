@@ -1309,7 +1309,7 @@ export function BingoDashAdmin() {
             </p>
           ) : (
             <div className="flex flex-col gap-10">
-              {groupedLibrary.map(({ section, categories, totalTasks }) => (
+              {groupedLibrary.map(({ section, categories: categoryGroups, totalTasks }) => (
                 <div key={section.id}>
                   {/* Compartment header */}
                   <div className="flex items-center gap-3 mb-3">
@@ -1393,10 +1393,10 @@ export function BingoDashAdmin() {
 
                   {/* Categories within this compartment */}
                   <div className="flex flex-col gap-8">
-                    {categories.length === 0 ? (
+                    {categoryGroups.length === 0 ? (
                       <p className="text-gray-300 text-sm pl-4">No cards in this compartment.</p>
                     ) : (
-                      categories.map(group => (
+                      categoryGroups.map(group => (
                         <div key={group.key}>
                           {/* Category subheader */}
                           <div className="flex items-center gap-3 mb-3 pl-4">
