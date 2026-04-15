@@ -61,3 +61,57 @@ export interface TeamScan {
   completed: boolean
   completed_at: string | null
 }
+
+// ── Bingo Dash ────────────────────────────────────────────────
+
+export interface BingoSection {
+  id: string
+  name: string
+  slug: string
+  sort_order: number
+  created_at: string
+}
+
+export interface BingoTask {
+  id: string
+  section_id: string
+  title: string
+  color: string
+  hex_code: string
+  sort_order: number
+  in_grid: boolean
+  category: string
+  points: number
+  created_at: string
+}
+
+export interface BingoSettings {
+  id: string
+  timer_seconds: number
+  timer_end_at: string | null
+  active_section_id: string | null
+  created_at: string
+}
+
+// Same shape as TaskPage — uses bingo_task_pages table
+export type BingoTaskPage = TaskPage
+
+// Same shape as TaskPhoto — uses bingo_task_photos table
+export type BingoTaskPhoto = TaskPhoto
+
+export interface BingoTeam {
+  id: string
+  section_id: string
+  name: string
+  password: string
+  created_at: string
+}
+
+export interface BingoScan {
+  id: string
+  team_id: string
+  task_id: string
+  scanned_at: string
+  completed: boolean
+  completed_at: string | null
+}
