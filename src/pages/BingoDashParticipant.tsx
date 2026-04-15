@@ -7,6 +7,7 @@ import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useBingoScans } from '../hooks/useBingoScans'
 import { BingoDashRegistration } from '../components/BingoDashRegistration'
 import { InstructionPage } from '../components/InstructionPage'
+import { PageNavigator } from '../components/PageNavigator'
 import { ParticleBackground } from '../components/ParticleBackground'
 import type { BingoTask } from '../types/database'
 
@@ -22,6 +23,7 @@ export function BingoDashParticipant() {
   const [showSplash, setShowSplash] = useState(true)
   const [scanRecord, setScanRecord] = useState<{ id: string; completed: boolean } | null>(null)
   const [scanRecorded, setScanRecorded] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
   const [completing, setCompleting] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -226,7 +228,16 @@ export function BingoDashParticipant() {
 
         {/* Instruction pointers */}
         {pages.length > 0 ? (
-          <InstructionPage page={pages[0]} hexCode={task.hex_code} />
+          <>
+            <InstructionPage page={pages[currentPage]} hexCode={task.hex_code} />
+            <PageNavigator
+              current={currentPage}
+              total={pages.length}
+              onPrev={() => setCurrentPage((p) => Math.max(0, p - 1))}
+              onNext={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
+              hexCode={task.hex_code}
+            />
+          </>
         ) : (
           <div className="text-center py-12 text-gray-400">
             No instructions available for this challenge yet.
