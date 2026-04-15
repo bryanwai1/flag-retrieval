@@ -269,6 +269,11 @@ export function BingoDashAdmin() {
   // Category filter for off-grid list
   const [offGridCategoryFilter, setOffGridCategoryFilter] = useState('all')
 
+  // Cross-section card library filters (Add to Grid panel)
+  // 'current' = only this section's off-grid cards; 'all' = every section.
+  const [addListSectionFilter, setAddListSectionFilter] = useState<'current' | 'all' | string>('current')
+  const [addListSearch, setAddListSearch] = useState('')
+
   // Drag state
   const [dragState, setDragState] = useState<{ id: string; type: 'grid' | 'list' } | null>(null)
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null)
@@ -304,9 +309,29 @@ export function BingoDashAdmin() {
   const offGridCategories = [...new Set(offGridTasks.map(t => t.category).filter(Boolean))].sort() as string[]
   const isTimerRunning = !!settings?.timer_end_at && new Date(settings.timer_end_at) > new Date()
 
-  const filteredOffGrid = offGridCategoryFilter === 'all'
-    ? offGridTasks
-    : offGridTasks.filter(t => t.category === offGridCategoryFilter)
+  // Library view: candidates for "Add to Grid" across sections.
+  // A card is a candidate when it is NOT already on the current section's grid.
+  // Cross-section cards get duplicated into the current section on add.
+  const addListTasks = (() => {
+    const search = addListSearch.trim().toLowerCase()
+    let list = tasks.filter(t => !(t.section_id === currentSectionId && t.in_grid))
+    if (addListSectionFilter === 'current') list = list.filter(t => t.section_id === currentSectionId)
+    else if (addListSectionFilter !== 'all') list = list.filter(t => t.section_id === addListSectionFilter)
+    if (offGridCategoryFilter !== 'all') list = list.filter(t => t.category === offGridCategoryFilter)
+    if (search) list = list.filter(t =>
+      t.title.toLowerCase().includes(search) ||
+      (t.category ?? '').toLowerCase().includes(search) ||
+      (t.color ?? '').toLowerCase().includes(search)
+    )
+    return list.sort((a, b) => a.title.localeCompare(b.title))
+  })()
+
+  const addListCategories = (() => {
+    let base = tasks.filter(t => !(t.section_id === currentSectionId && t.in_grid))
+    if (addListSectionFilter === 'current') base = base.filter(t => t.section_id === currentSectionId)
+    else if (addListSectionFilter !== 'all') base = base.filter(t => t.section_id === addListSectionFilter)
+    return [...new Set(base.map(t => t.category).filter(Boolean))].sort() as string[]
+  })()
 
   const filteredTasks = categoryFilter === 'all'
     ? scopedTasks
@@ -586,6 +611,39 @@ export function BingoDashAdmin() {
     } finally { setTileSaving(false) }
   }
 
+  // Add a card from any section onto the current section's grid.
+  // If the card lives in a different section, duplicate it into the current
+  // section (with task pages) first so the source section is untouched.
+  const addCardFromLibrary = async (task: BingoTask) => {
+    if (!currentSectionId || gridTasks.length >= 25) return
+    const firstEmpty = gridSlots.findIndex(s => s === null)
+    if (firstEmpty === -1) return
+    if (task.section_id === currentSectionId) {
+      await insertIntoGrid(task.id, firstEmpty)
+      return
+    }
+    const { data: pages } = await supabase
+      .from('bingo_task_pages').select('*').eq('task_id', task.id).order('page_order')
+    const { data: created, error } = await supabase.from('bingo_tasks').insert({
+      section_id: currentSectionId,
+      title: task.title, color: task.color, hex_code: task.hex_code,
+      category: task.category, points: task.points,
+      in_grid: false,
+      sort_order: Math.max(25, scopedTasks.length + 25),
+    }).select().single()
+    if (error || !created) { alert('Failed to add card'); return }
+    if (pages && pages.length > 0) {
+      const copies = pages.map(p => {
+        const { id, task_id, created_at, ...rest } = p
+        void id; void task_id; void created_at
+        return { ...rest, task_id: created.id }
+      })
+      await supabase.from('bingo_task_pages').insert(copies)
+    }
+    setTasks(prev => [...prev, created])
+    await insertIntoGrid(created.id, firstEmpty)
+  }
+
   const duplicateTask = async (task: BingoTask) => {
     const { data: taskPages } = await supabase
       .from('bingo_task_pages').select('*').eq('task_id', task.id).order('page_order')
@@ -663,6 +721,21 @@ export function BingoDashAdmin() {
     if (!confirm(`Delete team "${name}" and all their scan records?`)) return
     await supabase.from('bingo_teams').delete().eq('id', id)
     await fetchAll()
+  }
+
+  const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
+    setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
+    await supabase.from('bingo_teams').update(updates).eq('id', id)
+  }
+
+  const moveTeamToSection = async (id: string, newSectionId: string) => {
+    const team = teams.find(t => t.id === id)
+    if (!team || team.section_id === newSectionId) return
+    const newName = sections.find(s => s.id === newSectionId)?.name ?? 'the new section'
+    // Team scans reference tasks in the old section, so progress will read as 0
+    // in the new section until they scan those tasks. Make that explicit.
+    if (!confirm(`Move "${team.name}" to ${newName}? Their existing scan progress will no longer apply.`)) return
+    await updateTeam(id, { section_id: newSectionId })
   }
 
   const copyLink = (taskId: string) => {
@@ -930,10 +1003,36 @@ export function BingoDashAdmin() {
               </div>
             </div>
 
-            {/* Off-grid tasks — drag or click to add */}
+            {/* Card library — pick any card from any section, filter & search */}
             <div className="flex-1 min-w-0 w-full lg:w-auto">
-              {/* Category filter for off-grid list */}
-              {offGridCategories.length > 0 && (
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Add to Grid
+                {gridTasks.length >= 25 && <span className="ml-2 text-red-400 normal-case font-normal">Grid full</span>}
+              </p>
+              {/* Section + search row */}
+              <div className="flex gap-2 mb-2">
+                <select
+                  value={addListSectionFilter}
+                  onChange={e => setAddListSectionFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium bg-white flex-shrink-0"
+                  title="Filter by section"
+                >
+                  <option value="current">This section</option>
+                  <option value="all">All sections</option>
+                  {sections.filter(s => s.id !== currentSectionId).map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="search"
+                  value={addListSearch}
+                  onChange={e => setAddListSearch(e.target.value)}
+                  placeholder="Search cards by title, category, color…"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-violet-400 min-w-0"
+                />
+              </div>
+              {/* Category chips */}
+              {addListCategories.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap mb-2">
                   <button
                     onClick={() => setOffGridCategoryFilter('all')}
@@ -941,7 +1040,7 @@ export function BingoDashAdmin() {
                   >
                     All
                   </button>
-                  {offGridCategories.map(cat => (
+                  {addListCategories.map(cat => (
                     <button
                       key={cat}
                       onClick={() => setOffGridCategoryFilter(cat)}
@@ -952,40 +1051,50 @@ export function BingoDashAdmin() {
                   ))}
                 </div>
               )}
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Add to Grid
-                {gridTasks.length >= 25 && <span className="ml-2 text-red-400 normal-case font-normal">Grid full</span>}
-              </p>
-              {filteredOffGrid.length === 0 ? (
+              {addListTasks.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-400">
-                  {offGridTasks.length === 0 ? 'All tasks are on the grid' : 'No tasks in this category'}
+                  No cards match these filters.
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 max-h-80 overflow-y-auto">
-                  {filteredOffGrid.map(task => (
-                    <div
-                      key={task.id}
-                      draggable
-                      onDragStart={e => onListDragStart(e, task.id)}
-                      onDragEnd={onDragEnd}
-                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors cursor-grab active:cursor-grabbing select-none ${
-                        dragState?.id === task.id ? 'opacity-40' : ''
-                      }`}
-                    >
-                      <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: task.hex_code }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
-                        {task.category && <p className="text-xs text-gray-400 truncate">{task.category}</p>}
-                      </div>
-                      <button
-                        onClick={() => insertIntoGrid(task.id, gridTasks.length)}
-                        disabled={gridTasks.length >= 25}
-                        className="px-3 py-1 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-40 transition-colors flex-shrink-0"
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                  {addListTasks.map(task => {
+                    const isSameSection = task.section_id === currentSectionId
+                    const sectionName = sections.find(s => s.id === task.section_id)?.name ?? ''
+                    return (
+                      <div
+                        key={task.id}
+                        draggable={isSameSection}
+                        onDragStart={isSameSection ? (e => onListDragStart(e, task.id)) : undefined}
+                        onDragEnd={isSameSection ? onDragEnd : undefined}
+                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors select-none ${
+                          isSameSection ? 'cursor-grab active:cursor-grabbing' : ''
+                        } ${dragState?.id === task.id ? 'opacity-40' : ''}`}
                       >
-                        + Add
-                      </button>
-                    </div>
-                  ))}
+                        <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: task.hex_code }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-400 truncate">
+                            {task.category && <span>{task.category}</span>}
+                            {!isSameSection && (
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 rounded px-1.5 py-0.5">
+                                {sectionName} · copy
+                              </span>
+                            )}
+                            {isSameSection && task.in_grid && (
+                              <span className="text-[10px] font-bold bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">on grid</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => addCardFromLibrary(task)}
+                          disabled={gridTasks.length >= 25 || (isSameSection && task.in_grid)}
+                          className="px-3 py-1 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-40 transition-colors flex-shrink-0"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -1215,6 +1324,8 @@ export function BingoDashAdmin() {
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Team</th>
                     <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
+                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Section</th>
+                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
                     {scopedTasks.map(t => (
                       <th key={t.id} className="px-3 py-3 text-center" title={t.title}>
                         <div className="w-4 h-4 rounded-full mx-auto" style={{ backgroundColor: t.hex_code }} />
@@ -1227,14 +1338,60 @@ export function BingoDashAdmin() {
                   {scopedTeams.map(team => {
                     const teamScans = scans.filter(s => s.team_id === team.id)
                     const completedCount = teamScans.filter(s => s.completed).length
+                    const pointsEarned = teamScans
+                      .filter(s => s.completed)
+                      .reduce((sum, s) => sum + (scopedTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
+                    const pct = scopedTasks.length > 0 ? Math.round((completedCount / scopedTasks.length) * 100) : 0
                     return (
                       <tr key={team.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
-                          <span className="font-medium text-gray-800">{team.name}</span>
-                          <span className="ml-2 text-xs text-gray-400">{completedCount}/{scopedTasks.length}</span>
+                          <input
+                            type="text"
+                            defaultValue={team.name}
+                            key={`${team.id}-name-${team.name}`}
+                            onBlur={e => {
+                              const v = e.target.value.trim()
+                              if (v && v !== team.name) updateTeam(team.id, { name: v })
+                              else e.target.value = team.name
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            className="w-full px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-medium text-gray-800 bg-transparent"
+                          />
                         </td>
                         <td className="px-4 py-3">
-                          <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded select-all">{team.password}</span>
+                          <input
+                            type="text"
+                            defaultValue={team.password}
+                            key={`${team.id}-pwd-${team.password}`}
+                            onBlur={e => {
+                              const v = e.target.value
+                              if (v !== team.password) updateTeam(team.id, { password: v })
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-1 rounded select-all border border-transparent hover:border-gray-300 focus:border-violet-400 focus:outline-none w-28"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={team.section_id}
+                            onChange={e => moveTeamToSection(team.id, e.target.value)}
+                            className="px-2 py-1 rounded border border-gray-200 text-xs bg-white"
+                          >
+                            {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 min-w-[140px]">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                              {completedCount}/{scopedTasks.length}
+                            </span>
+                          </div>
+                          {pointsEarned > 0 && (
+                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">{pointsEarned} pts</p>
+                          )}
                         </td>
                         {scopedTasks.map(t => {
                           const scan = teamScans.find(s => s.task_id === t.id)
