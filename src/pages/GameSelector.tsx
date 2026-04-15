@@ -22,6 +22,7 @@ export function GameSelector() {
         <GameCard
           href="/projector"
           adminHref="/admin"
+          faciHref="/flag-retrieval/facilitator"
           icon="🚩"
           title="FLAG RETRIEVAL"
           description="Hunt flags · Scan QR codes · Complete challenges"
@@ -36,6 +37,16 @@ export function GameSelector() {
           description="Match the pattern · Race against the clock · 3 rounds"
           accent="#60a5fa"
           delay="0.4s"
+        />
+        <GameCard
+          href="/bingo-dash"
+          adminHref="/bingo-dash/admin"
+          icon="🎯"
+          title="BINGO DASH"
+          description="Scan challenges · Complete tasks · Track your team"
+          accent="#a855f7"
+          delay="0.5s"
+          primaryLabel="PLAYER BOARD"
         />
       </div>
     </div>
@@ -82,19 +93,23 @@ function EventCard({ delay }: { delay: string }) {
 function GameCard({
   href,
   adminHref,
+  faciHref,
   icon,
   title,
   description,
   accent,
   delay,
+  primaryLabel,
 }: {
   href: string
   adminHref: string
+  faciHref?: string
   icon: string
   title: string
   description: string
   accent: string
   delay: string
+  primaryLabel?: string
 }) {
   return (
     <div
@@ -120,15 +135,26 @@ function GameCard({
           className="w-full py-3 rounded-xl font-black text-center text-sm tracking-wider transition-all hover:scale-105"
           style={{ background: accent, color: '#000' }}
         >
-          ▶ PROJECTOR VIEW
+          ▶ {primaryLabel ?? 'PROJECTOR VIEW'}
         </a>
-        <a
-          href={adminHref}
-          className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
-          style={{ color: accent, border: `1.5px solid ${accent}44` }}
-        >
-          ⚙ Admin Panel
-        </a>
+        {faciHref && (
+          <a
+            href={faciHref}
+            className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+            style={{ color: accent, border: `1.5px solid ${accent}44` }}
+          >
+            📋 Facilitator View
+          </a>
+        )}
+        {adminHref !== href && (
+          <a
+            href={adminHref}
+            className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+            style={{ color: accent, border: `1.5px solid ${accent}44` }}
+          >
+            ⚙ Admin Panel
+          </a>
+        )}
       </div>
     </div>
   )

@@ -34,14 +34,27 @@ export function useTeams() {
     const trimmed = name.trim()
     if (!trimmed) return
     setTeams(prev => prev.map(t => t.id === id ? { ...t, name: trimmed } : t))
-    await supabase.from('teams').update({ name: trimmed }).eq('id', id)
-  }, [])
+    const { data, error } = await supabase.from('teams').update({ name: trimmed }).eq('id', id).select()
+    if (error || !data || data.length === 0) {
+      await fetchTeams()
+      if (error) alert(`Rename failed: ${error.message}`)
+    } else {
+      await fetchTeams()
+    }
+  }, [fetchTeams])
 
   const deleteTeam = useCallback(async (id: string) => {
     setTeams(prev => prev.filter(t => t.id !== id))
+    await supabase.from('team_members').delete().eq('team_id', id)
     await supabase.from('team_scans').delete().eq('team_id', id)
-    await supabase.from('teams').delete().eq('id', id)
-  }, [])
+    const { data, error } = await supabase.from('teams').delete().eq('id', id).select()
+    if (error || !data || data.length === 0) {
+      await fetchTeams()
+      alert(error ? `Delete failed: ${error.message}` : 'Delete failed — ensure anon DELETE policy exists on the "teams" table in Supabase.')
+    } else {
+      await fetchTeams()
+    }
+  }, [fetchTeams])
 
   return { teams, loading, refetch: fetchTeams, renameTeam, deleteTeam }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSetting } from '../hooks/useSettings'
 import { useTasks } from '../hooks/useTasks'
 import { useTeams } from '../hooks/useTeams'
 import { useTeamMembers } from '../hooks/useTeamMembers'
@@ -27,8 +28,11 @@ export function AdminDashboard() {
   const [showUpload, setShowUpload] = useState(false)
   const [showConverter, setShowConverter] = useState(false)
   const [qrTask, setQrTask] = useState<Task | null>(null)
-  const [pointsEnabled, setPointsEnabled] = useState(() => localStorage.getItem('flag-retrieval-points-enabled') === 'true')
+  const [pointsSetting, setPointsSetting] = useSetting('points_enabled', 'false')
+  const pointsEnabled = pointsSetting === 'true'
+  const setPointsEnabled = (val: boolean) => setPointsSetting(String(val))
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null)
+  const [copiedFaciLink, setCopiedFaciLink] = useState(false)
 
   function copyTaskLink(e: React.MouseEvent, taskId: string) {
     e.stopPropagation()
@@ -45,17 +49,28 @@ export function AdminDashboard() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                const next = !pointsEnabled
-                setPointsEnabled(next)
-                localStorage.setItem('flag-retrieval-points-enabled', String(next))
+                setPointsEnabled(!pointsEnabled)
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${pointsEnabled ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}
             >
               Points {pointsEnabled ? 'ON' : 'OFF'}
             </button>
-            <a href="/flag-retrieval" target="_blank" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 text-sm transition-colors">
-              Facilitator View
-            </a>
+            <div className="flex items-center rounded-lg overflow-hidden border border-gray-700">
+              <a href="/flag-retrieval" target="_blank" className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-700 text-sm transition-colors">
+                Facilitator View
+              </a>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/flag-retrieval`)
+                  setCopiedFaciLink(true)
+                  setTimeout(() => setCopiedFaciLink(false), 1500)
+                }}
+                className="px-3 py-2 bg-gray-800 text-gray-300 hover:bg-gray-600 text-sm transition-colors border-l border-gray-700"
+                title="Copy facilitator link"
+              >
+                {copiedFaciLink ? '✓' : '🔗'}
+              </button>
+            </div>
             <a href="/projector" target="_blank" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors">
               Projector View
             </a>
@@ -99,6 +114,7 @@ export function AdminDashboard() {
                       ) : (
                         <span className="font-bold text-gray-800 text-sm">{team.name}</span>
                       )}
+                      <span className="text-xs font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" title="Passcode">{team.password}</span>
                       <span className="text-xs text-gray-400">{completed}/{tasks.length} flags</span>
                       {pointsEnabled && (() => {
                         const totalPts = teamScans.filter(s => s.completed).reduce((sum, s) => sum + (tasks.find(t => t.id === s.task_id)?.points || 0), 0)

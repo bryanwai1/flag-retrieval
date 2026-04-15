@@ -72,6 +72,14 @@ export interface BingoSection {
   created_at: string
 }
 
+export interface BingoCategory {
+  id: string
+  section_id: string
+  name: string
+  sort_order: number
+  created_at: string
+}
+
 export interface BingoTask {
   id: string
   section_id: string

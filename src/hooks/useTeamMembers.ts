@@ -37,18 +37,36 @@ export function useTeamMembers() {
     const trimmed = name.trim()
     if (!trimmed) return
     setMembers(prev => prev.map(m => m.id === id ? { ...m, name: trimmed } : m))
-    await supabase.from('team_members').update({ name: trimmed }).eq('id', id)
-  }, [])
+    const { data, error } = await supabase.from('team_members').update({ name: trimmed }).eq('id', id).select()
+    if (error || !data || data.length === 0) {
+      await fetchMembers()
+      if (error) alert(`Rename failed: ${error.message}`)
+    } else {
+      await fetchMembers()
+    }
+  }, [fetchMembers])
 
   const removeMember = useCallback(async (id: string) => {
     setMembers(prev => prev.filter(m => m.id !== id))
-    await supabase.from('team_members').delete().eq('id', id)
-  }, [])
+    const { data, error } = await supabase.from('team_members').delete().eq('id', id).select()
+    if (error || !data || data.length === 0) {
+      await fetchMembers()
+      if (error) alert(`Remove failed: ${error.message}`)
+    } else {
+      await fetchMembers()
+    }
+  }, [fetchMembers])
 
   const moveMember = useCallback(async (id: string, newTeamId: string) => {
     setMembers(prev => prev.map(m => m.id === id ? { ...m, team_id: newTeamId } : m))
-    await supabase.from('team_members').update({ team_id: newTeamId }).eq('id', id)
-  }, [])
+    const { data, error } = await supabase.from('team_members').update({ team_id: newTeamId }).eq('id', id).select()
+    if (error || !data || data.length === 0) {
+      await fetchMembers()
+      if (error) alert(`Move failed: ${error.message}`)
+    } else {
+      await fetchMembers()
+    }
+  }, [fetchMembers])
 
   return { members, loading, renameMember, removeMember, moveMember }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory } from '../types/database'
 
 const PRESET_COLORS = [
   { name: 'Red', hex: '#EF4444' },
@@ -220,9 +220,13 @@ export function BingoDashAdmin() {
   const [teams, setTeams] = useState<BingoTeam[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [sections, setSections] = useState<BingoSection[]>([])
+  const [categories, setCategories] = useState<BingoCategory[]>([])
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null)
   const [showSectionManager, setShowSectionManager] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
+  // Category management
+  const [showCategoryManager, setShowCategoryManager] = useState<string | null>(null) // section id or null
+  const [newCategoryName, setNewCategoryName] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [qrTask, setQrTask] = useState<BingoTask | null>(null)
@@ -259,9 +263,8 @@ export function BingoDashAdmin() {
   const [tileSectionId, setTileSectionId] = useState<string>('')
   const [tileSaving, setTileSaving] = useState(false)
 
-  // Inline category edit on gallery cards
+  // Inline category picker on gallery cards (shows a <select> dropdown)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
-  const [editingCategoryValue, setEditingCategoryValue] = useState('')
 
   // Category filter for challenges gallery
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -281,6 +284,12 @@ export function BingoDashAdmin() {
   // Slot picker: which empty grid slot is being filled via click
   const [slotPickerIndex, setSlotPickerIndex] = useState<number | null>(null)
   const [slotPickerFilter, setSlotPickerFilter] = useState('all')
+
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<'board' | 'library' | 'teams'>('board')
+
+  // Library: compartment filter
+  const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const scopedTasks = currentSectionId ? tasks.filter(t => t.section_id === currentSectionId) : []
@@ -357,13 +366,36 @@ export function BingoDashAdmin() {
     return groups
   })()
 
+  // Library: Compartment > Category > Cards (all sections)
+  const groupedLibrary = (() => {
+    const sectionList = libraryCompartmentFilter === 'all'
+      ? sections
+      : sections.filter(s => s.id === libraryCompartmentFilter)
+    return sectionList.map(section => {
+      const sectionTasks = tasks.filter(t => t.section_id === section.id)
+      const byCategory = new Map<string, BingoTask[]>()
+      const uncategorized: BingoTask[] = []
+      for (const task of sectionTasks) {
+        if (!task.category) { uncategorized.push(task); continue }
+        if (!byCategory.has(task.category)) byCategory.set(task.category, [])
+        byCategory.get(task.category)!.push(task)
+      }
+      const categories = [...byCategory.keys()].sort().map(cat => ({
+        label: cat, key: cat, tasks: byCategory.get(cat)!.sort((a, b) => a.title.localeCompare(b.title)),
+      }))
+      if (uncategorized.length > 0) categories.push({ label: 'Uncategorized', key: '__none__', tasks: uncategorized })
+      return { section, categories, totalTasks: sectionTasks.length }
+    })
+  })()
+
   // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
-    const [tasksRes, teamsRes, scansRes, sectionsRes] = await Promise.all([
+    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes] = await Promise.all([
       supabase.from('bingo_tasks').select('*').order('sort_order'),
       supabase.from('bingo_teams').select('*').order('created_at'),
       supabase.from('bingo_scans').select('*'),
       supabase.from('bingo_sections').select('*').order('sort_order'),
+      supabase.from('bingo_categories').select('*').order('sort_order'),
     ])
     if (tasksRes.data) setTasks(tasksRes.data)
     if (teamsRes.data) setTeams(teamsRes.data)
@@ -372,6 +404,7 @@ export function BingoDashAdmin() {
       setSections(sectionsRes.data)
       setCurrentSectionId(prev => prev ?? sectionsRes.data[0]?.id ?? null)
     }
+    if (categoriesRes.data) setCategories(categoriesRes.data)
     setLoading(false)
   }, [])
 
@@ -414,6 +447,63 @@ export function BingoDashAdmin() {
     setSections(remaining)
     if (currentSectionId === id) setCurrentSectionId(remaining[0]?.id ?? null)
     await fetchAll()
+  }
+
+  // ── Category CRUD ─────────────────────────────────────────────────────────
+  const createCategory = async (sectionId: string) => {
+    const name = newCategoryName.trim()
+    if (!name || !sectionId) return
+    if (categories.some(c => c.section_id === sectionId && c.name === name)) {
+      alert(`Category "${name}" already exists in this compartment.`)
+      return
+    }
+    const maxOrder = categories.filter(c => c.section_id === sectionId)
+      .reduce((m, c) => Math.max(m, c.sort_order), -1)
+    const { data, error } = await supabase.from('bingo_categories')
+      .insert({ section_id: sectionId, name, sort_order: maxOrder + 1 })
+      .select().single()
+    if (error || !data) { alert('Failed to create category'); return }
+    setCategories(prev => [...prev, data])
+    setNewCategoryName('')
+  }
+
+  const renameCategory = async (id: string, sectionId: string, newName: string) => {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    const old = categories.find(c => c.id === id)
+    if (!old || old.name === trimmed) return
+    if (categories.some(c => c.section_id === sectionId && c.name === trimmed && c.id !== id)) {
+      alert(`Category "${trimmed}" already exists.`)
+      return
+    }
+    // Update category name and cascade to all tasks in this section that reference it
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, name: trimmed } : c))
+    setTasks(prev => prev.map(t =>
+      t.section_id === sectionId && t.category === old.name ? { ...t, category: trimmed } : t
+    ))
+    await supabase.from('bingo_categories').update({ name: trimmed }).eq('id', id)
+    await supabase.from('bingo_tasks')
+      .update({ category: trimmed })
+      .eq('section_id', sectionId)
+      .eq('category', old.name)
+  }
+
+  const deleteCategory = async (id: string, sectionId: string) => {
+    const cat = categories.find(c => c.id === id)
+    if (!cat) return
+    const affected = tasks.filter(t => t.section_id === sectionId && t.category === cat.name).length
+    if (!confirm(`Delete category "${cat.name}"? ${affected > 0 ? `${affected} card${affected !== 1 ? 's' : ''} will become uncategorized.` : ''}`)) return
+    setCategories(prev => prev.filter(c => c.id !== id))
+    setTasks(prev => prev.map(t =>
+      t.section_id === sectionId && t.category === cat.name ? { ...t, category: '' } : t
+    ))
+    await supabase.from('bingo_categories').delete().eq('id', id)
+    if (affected > 0) {
+      await supabase.from('bingo_tasks')
+        .update({ category: '' })
+        .eq('section_id', sectionId)
+        .eq('category', cat.name)
+    }
   }
 
   const setActiveSection = async (id: string) => {
@@ -667,11 +757,10 @@ export function BingoDashAdmin() {
     setTasks(prev => [...prev, created])
   }
 
-  const saveCategoryInline = async (taskId: string) => {
-    const val = editingCategoryValue.trim()
+  const saveCategoryInline = async (taskId: string, categoryName: string) => {
     setEditingCategoryId(null)
-    await supabase.from('bingo_tasks').update({ category: val }).eq('id', taskId)
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, category: val } : t))
+    await supabase.from('bingo_tasks').update({ category: categoryName }).eq('id', taskId)
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, category: categoryName } : t))
   }
 
   const matchesBulkCategory = (t: BingoTask, categoryKey: string) => {
@@ -840,6 +929,12 @@ export function BingoDashAdmin() {
               Player View ↗
             </a>
             <button
+              onClick={() => setActiveTab('teams')}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              View Teams
+            </button>
+            <button
               onClick={() => { setShowImport(true); setImportText(''); setImportPreview(null); setImportError('') }}
               className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 text-sm font-medium transition-colors"
             >
@@ -850,6 +945,29 @@ export function BingoDashAdmin() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-10">
+
+        {/* ── Tab navigation ───────────────────────────────────────────────── */}
+        <div className="flex gap-0 border-b border-gray-200 -mt-4">
+          {([
+            { key: 'board', label: 'Board' },
+            { key: 'library', label: 'Card Library' },
+            { key: 'teams', label: `Teams${teams.length > 0 ? ` (${teams.length})` : ''}` },
+          ] as const).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-5 py-3 text-sm font-bold border-b-2 -mb-px transition-colors ${
+                activeTab === tab.key
+                  ? 'border-violet-600 text-violet-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'board' && <>
 
         {/* ── Timer ────────────────────────────────────────────────────────── */}
         <section>
@@ -1101,8 +1219,282 @@ export function BingoDashAdmin() {
           </div>
         </section>
 
-        {/* ── Challenges gallery ────────────────────────────────────────────── */}
+        </> /* end board tab */}
+
+        {/* ── Library tab: Compartment > Category > Cards ───────────────────── */}
+        {activeTab === 'library' && (
         <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Card Library</h2>
+            <button onClick={() => setShowForm(!showForm)}
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium transition-colors">
+              + Add Challenge
+            </button>
+          </div>
+
+          {/* Compartment filter chips */}
+          <div className="flex gap-2 flex-wrap mb-5">
+            <button
+              onClick={() => setLibraryCompartmentFilter('all')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${libraryCompartmentFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              All Compartments ({tasks.length})
+            </button>
+            {sections.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setLibraryCompartmentFilter(s.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${libraryCompartmentFilter === s.id ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              >
+                {s.name} ({tasks.filter(t => t.section_id === s.id).length})
+                {settings?.active_section_id === s.id && <span className="ml-1 text-green-400">●</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* New challenge form (scoped to current section) */}
+          {showForm && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+              <h3 className="font-bold text-gray-900 mb-1">New Challenge</h3>
+              {currentSectionId && (
+                <p className="text-xs text-gray-400 mb-4">
+                  Adding to: <span className="font-bold text-gray-600">{sections.find(s => s.id === currentSectionId)?.name}</span>
+                  {' '}— change compartment via the section switcher in the header
+                </p>
+              )}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
+                    placeholder="e.g. Water Challenge"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500" autoFocus />
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
+                      <option value="">— Uncategorized —</option>
+                      {categories.filter(c => c.section_id === currentSectionId).map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
+                    <input type="number" value={formPoints} min={0}
+                      onChange={e => setFormPoints(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 text-center font-bold" />
+                  </div>
+                </div>
+                <ColorPicker hex={formHex} colorName={formColor} onHexChange={setFormHex} onNameChange={setFormColor} />
+                <div className="flex gap-3">
+                  <button onClick={createTask} disabled={formSaving || !formTitle.trim() || !formColor.trim()}
+                    className="px-6 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm transition-colors">
+                    {formSaving ? 'Creating...' : 'Create Challenge'}
+                  </button>
+                  <button onClick={() => setShowForm(false)}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Compartment > Category > Cards hierarchy */}
+          {tasks.length === 0 ? (
+            <p className="text-gray-400 text-center py-8 bg-white rounded-xl border border-gray-200">
+              No challenges yet. Click "Add Challenge" to create one.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-10">
+              {groupedLibrary.map(({ section, categories, totalTasks }) => (
+                <div key={section.id}>
+                  {/* Compartment header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-black text-gray-800 uppercase tracking-wider">{section.name}</h2>
+                      {settings?.active_section_id === section.id && (
+                        <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium">{totalTasks} cards</span>
+                    <div className="flex-1 h-px bg-gray-300" />
+                    <button
+                      onClick={() => setShowCategoryManager(showCategoryManager === section.id ? null : section.id)}
+                      className={`text-xs font-bold transition-colors flex-shrink-0 px-2 py-0.5 rounded ${
+                        showCategoryManager === section.id
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'text-gray-500 hover:text-violet-600'
+                      }`}
+                    >
+                      Categories ({categories.filter(c => c.section_id === section.id).length})
+                    </button>
+                    <button
+                      onClick={() => { setCurrentSectionId(section.id); setActiveTab('board') }}
+                      className="text-xs text-violet-600 hover:text-violet-800 font-bold transition-colors flex-shrink-0"
+                    >
+                      Open Board →
+                    </button>
+                  </div>
+
+                  {/* Category manager panel */}
+                  {showCategoryManager === section.id && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Manage Categories</p>
+                      <div className="flex flex-col gap-1.5 mb-3">
+                        {categories.filter(c => c.section_id === section.id).length === 0 ? (
+                          <p className="text-xs text-gray-400 italic">No categories yet — add one below.</p>
+                        ) : (
+                          categories.filter(c => c.section_id === section.id).map(cat => {
+                            const cardCount = tasks.filter(t => t.section_id === section.id && t.category === cat.name).length
+                            return (
+                              <div key={cat.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                                <input
+                                  type="text"
+                                  defaultValue={cat.name}
+                                  key={`${cat.id}-${cat.name}`}
+                                  onBlur={e => renameCategory(cat.id, section.id, e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                  className="flex-1 text-sm font-medium text-gray-800 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-violet-400 rounded px-1"
+                                />
+                                <span className="text-xs text-gray-400 flex-shrink-0">{cardCount} card{cardCount !== 1 ? 's' : ''}</span>
+                                <button
+                                  onClick={() => deleteCategory(cat.id, section.id)}
+                                  className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0 px-1"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={e => setNewCategoryName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') createCategory(section.id) }}
+                          placeholder="New category name…"
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
+                        <button
+                          onClick={() => createCategory(section.id)}
+                          disabled={!newCategoryName.trim()}
+                          className="px-4 py-1.5 bg-violet-600 text-white rounded-lg text-sm font-bold hover:bg-violet-700 disabled:opacity-40"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Categories within this compartment */}
+                  <div className="flex flex-col gap-8">
+                    {categories.length === 0 ? (
+                      <p className="text-gray-300 text-sm pl-4">No cards in this compartment.</p>
+                    ) : (
+                      categories.map(group => (
+                        <div key={group.key}>
+                          {/* Category subheader */}
+                          <div className="flex items-center gap-3 mb-3 pl-4">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.label}</h3>
+                            <span className="text-xs text-gray-300 font-medium">{group.tasks.length}</span>
+                            <div className="flex-1 h-px bg-gray-100" />
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <span className="text-xs text-gray-400">color for all:</span>
+                              <input type="color" defaultValue={group.tasks[0]?.hex_code ?? '#3B82F6'}
+                                key={section.id + group.key + '-color'}
+                                className="w-7 h-7 rounded cursor-pointer border border-gray-200"
+                                onChange={e => setBulkCategoryColor(group.key, e.target.value)}
+                                title={`Set color for all ${group.label} tasks`} />
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <span className="text-xs text-gray-400">pts for all:</span>
+                              <input type="number" min={0} defaultValue={group.tasks[0]?.points ?? 0}
+                                key={section.id + group.key + '-pts'}
+                                className="w-14 px-1.5 py-0.5 text-xs border border-gray-200 rounded text-center font-bold focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                onBlur={e => setBulkCategoryPoints(group.key, Math.max(0, parseInt(e.target.value) || 0))}
+                                onKeyDown={e => { if (e.key === 'Enter') setBulkCategoryPoints(group.key, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0)) }}
+                                title={`Set points for all ${group.label} tasks`} />
+                            </div>
+                          </div>
+
+                          {/* Cards grid */}
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pl-4">
+                            {group.tasks.map(task => (
+                              <div key={task.id} className="rounded-2xl overflow-hidden flex flex-col shadow-sm"
+                                style={{ backgroundColor: task.hex_code }}>
+                                <div className="px-4 pt-4 pb-3 flex-1">
+                                  <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">{task.color}</p>
+                                  <h3 className="text-white font-black text-lg leading-tight">{task.title}</h3>
+                                  {editingCategoryId === task.id ? (
+                                    <select
+                                      autoFocus
+                                      defaultValue={task.category || ''}
+                                      onChange={e => saveCategoryInline(task.id, e.target.value)}
+                                      onBlur={() => setEditingCategoryId(null)}
+                                      className="w-full bg-black/20 text-white text-xs px-2 py-1 rounded border border-white/30 focus:outline-none focus:border-white/60 mt-2"
+                                    >
+                                      <option value="">— Uncategorized —</option>
+                                      {categories.filter(c => c.section_id === task.section_id).map(c => (
+                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingCategoryId(task.id)}
+                                      className="mt-1.5 text-white/50 text-xs hover:text-white/80 transition-colors text-left block">
+                                      {task.category ? `📂 ${task.category}` : '+ category'}
+                                    </button>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <p className="text-white/50 text-xs">
+                                      {scans.filter(s => s.task_id === task.id && s.completed).length} completed ·{' '}
+                                      {scans.filter(s => s.task_id === task.id).length} scanned
+                                    </p>
+                                    {(task.points ?? 0) > 0 && (
+                                      <span className="bg-black/30 text-white/80 text-[10px] font-black rounded px-1.5 py-0.5">{task.points} pts</span>
+                                    )}
+                                  </div>
+                                  <p className="text-white/40 text-xs mt-0.5">{task.in_grid ? '✓ In grid' : 'Off grid'}</p>
+                                </div>
+                                <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+                                  <button onClick={() => navigate(`/bingo-dash/admin/task/${task.id}`)}
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors">Edit</button>
+                                  <button onClick={() => setQrTask(task)}
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors">QR</button>
+                                  <button onClick={() => copyLink(task.id)}
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors">
+                                    {copiedId === task.id ? '✓' : '🔗'}
+                                  </button>
+                                  <button onClick={() => duplicateTask(task)}
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors"
+                                    title="Duplicate this card">⎘ Copy</button>
+                                  <button onClick={() => openTileEdit(task)}
+                                    className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors"
+                                    title="Move to another section">Move</button>
+                                  <button onClick={() => deleteTask(task.id, task.title)}
+                                    className="px-3 py-1.5 bg-red-500/30 rounded-lg text-white text-xs font-bold hover:bg-red-500/50 transition-colors">Delete</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        )}
+
+        {/* ── Challenges gallery (Board tab, scoped to current section) ──────── */}
+        {activeTab === 'board' && <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">Challenges</h2>
             <button onClick={() => setShowForm(!showForm)}
@@ -1147,10 +1539,13 @@ export function BingoDashAdmin() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <input type="text" list="cat-list-form" value={formCategory} onChange={e => setFormCategory(e.target.value)}
-                      placeholder="e.g. Physical Activities"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500" />
-                    <datalist id="cat-list-form">{allCategories.map(c => <option key={c} value={c} />)}</datalist>
+                    <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
+                      <option value="">— Uncategorized —</option>
+                      {categories.filter(c => c.section_id === currentSectionId).map(c => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="w-24">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
@@ -1231,31 +1626,26 @@ export function BingoDashAdmin() {
                         <div className="px-4 pt-4 pb-3 flex-1">
                           <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">{task.color}</p>
                           <h3 className="text-white font-black text-lg leading-tight">{task.title}</h3>
-                          {/* Inline category edit */}
+                          {/* Inline category picker */}
                           {editingCategoryId === task.id ? (
-                            <div className="mt-2">
-                              <input
-                                autoFocus
-                                type="text"
-                                list="cat-list-gallery"
-                                value={editingCategoryValue}
-                                onChange={e => setEditingCategoryValue(e.target.value)}
-                                onBlur={() => saveCategoryInline(task.id)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') saveCategoryInline(task.id)
-                                  if (e.key === 'Escape') setEditingCategoryId(null)
-                                }}
-                                placeholder="Category..."
-                                className="w-full bg-black/20 text-white text-xs px-2 py-1 rounded border border-white/30 focus:outline-none focus:border-white/60 placeholder-white/40"
-                              />
-                              <datalist id="cat-list-gallery">{allCategories.map(c => <option key={c} value={c} />)}</datalist>
-                            </div>
+                            <select
+                              autoFocus
+                              defaultValue={task.category || ''}
+                              onChange={e => saveCategoryInline(task.id, e.target.value)}
+                              onBlur={() => setEditingCategoryId(null)}
+                              className="w-full bg-black/20 text-white text-xs px-2 py-1 rounded border border-white/30 focus:outline-none focus:border-white/60 mt-2"
+                            >
+                              <option value="">— Uncategorized —</option>
+                              {categories.filter(c => c.section_id === task.section_id).map(c => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
                           ) : (
                             <button
-                              onClick={() => { setEditingCategoryId(task.id); setEditingCategoryValue(task.category || '') }}
+                              onClick={() => setEditingCategoryId(task.id)}
                               className="mt-1.5 text-white/50 text-xs hover:text-white/80 transition-colors text-left block"
                             >
-                              {task.category ? `📂 ${task.category}` : '+ Add category'}
+                              {task.category ? `📂 ${task.category}` : '+ category'}
                             </button>
                           )}
                           <div className="flex items-center gap-2 mt-2">
@@ -1308,114 +1698,132 @@ export function BingoDashAdmin() {
               ))}
             </div>
           )}
-        </section>
+        </section>}
 
-        {/* ── Teams ─────────────────────────────────────────────────────────── */}
+        {/* ── Teams tab ────────────────────────────────────────────────────── */}
+        {activeTab === 'teams' && (
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Teams <span className="ml-2 text-sm font-normal text-gray-400">({scopedTeams.length} registered)</span>
-          </h2>
-          {scopedTeams.length === 0 ? (
-            <p className="text-gray-400 text-sm">No teams yet. Teams register when they scan a QR code.</p>
-          ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Team</th>
-                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
-                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Section</th>
-                    <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
-                    {scopedTasks.map(t => (
-                      <th key={t.id} className="px-3 py-3 text-center" title={t.title}>
-                        <div className="w-4 h-4 rounded-full mx-auto" style={{ backgroundColor: t.hex_code }} />
-                      </th>
-                    ))}
-                    <th className="text-right px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {scopedTeams.map(team => {
-                    const teamScans = scans.filter(s => s.team_id === team.id)
-                    const completedCount = teamScans.filter(s => s.completed).length
-                    const pointsEarned = teamScans
-                      .filter(s => s.completed)
-                      .reduce((sum, s) => sum + (scopedTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
-                    const pct = scopedTasks.length > 0 ? Math.round((completedCount / scopedTasks.length) * 100) : 0
-                    return (
-                      <tr key={team.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            defaultValue={team.name}
-                            key={`${team.id}-name-${team.name}`}
-                            onBlur={e => {
-                              const v = e.target.value.trim()
-                              if (v && v !== team.name) updateTeam(team.id, { name: v })
-                              else e.target.value = team.name
-                            }}
-                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                            className="w-full px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-medium text-gray-800 bg-transparent"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            defaultValue={team.password}
-                            key={`${team.id}-pwd-${team.password}`}
-                            onBlur={e => {
-                              const v = e.target.value
-                              if (v !== team.password) updateTeam(team.id, { password: v })
-                            }}
-                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                            className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-1 rounded select-all border border-transparent hover:border-gray-300 focus:border-violet-400 focus:outline-none w-28"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <select
-                            value={team.section_id}
-                            onChange={e => moveTeamToSection(team.id, e.target.value)}
-                            className="px-2 py-1 rounded border border-gray-200 text-xs bg-white"
-                          >
-                            {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-4 py-3 min-w-[140px]">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
-                              {completedCount}/{scopedTasks.length}
-                            </span>
-                          </div>
-                          {pointsEarned > 0 && (
-                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">{pointsEarned} pts</p>
-                          )}
-                        </td>
-                        {scopedTasks.map(t => {
-                          const scan = teamScans.find(s => s.task_id === t.id)
-                          return (
-                            <td key={t.id} className="px-3 py-3 text-center">
-                              {scan?.completed ? <span className="text-green-600 font-black">✓</span>
-                                : scan ? <span className="text-gray-300">◎</span>
-                                : <span className="text-gray-100">·</span>}
-                            </td>
-                          )
-                        })}
-                        <td className="px-4 py-3 text-right">
-                          <button onClick={() => deleteTeam(team.id, team.name)}
-                            className="text-xs text-gray-400 hover:text-red-500 transition-colors">Delete</button>
-                        </td>
+          {/* Teams grouped by compartment (section) */}
+          {sections.map(section => {
+            const sectionTeams = teams.filter(t => t.section_id === section.id)
+            const sectionTasks = tasks.filter(t => t.section_id === section.id)
+            if (sectionTeams.length === 0) return null
+            return (
+              <div key={section.id} className="mb-10">
+                {/* Compartment header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-base font-black text-gray-800 uppercase tracking-wider">{section.name}</h2>
+                  {settings?.active_section_id === section.id && (
+                    <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>
+                  )}
+                  <span className="text-xs text-gray-400 font-medium">{sectionTeams.length} team{sectionTeams.length !== 1 ? 's' : ''}</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Team</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
+                        {sectionTasks.map(t => (
+                          <th key={t.id} className="px-3 py-3 text-center" title={t.title}>
+                            <div className="w-4 h-4 rounded-full mx-auto" style={{ backgroundColor: t.hex_code }} />
+                          </th>
+                        ))}
+                        <th className="text-right px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Actions</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              <p className="text-xs text-gray-300 px-4 py-2">◎ = Scanned &nbsp;·&nbsp; ✓ = Completed</p>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {sectionTeams.map(team => {
+                        const teamScans = scans.filter(s => s.team_id === team.id)
+                        const completedCount = teamScans.filter(s => s.completed).length
+                        const pointsEarned = teamScans
+                          .filter(s => s.completed)
+                          .reduce((sum, s) => sum + (sectionTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
+                        const pct = sectionTasks.length > 0 ? Math.round((completedCount / sectionTasks.length) * 100) : 0
+                        return (
+                          <tr key={team.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                defaultValue={team.name}
+                                key={`${team.id}-name-${team.name}`}
+                                onBlur={e => {
+                                  const v = e.target.value.trim()
+                                  if (v && v !== team.name) updateTeam(team.id, { name: v })
+                                  else e.target.value = team.name
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                className="w-full px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-medium text-gray-800 bg-transparent"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                defaultValue={team.password}
+                                key={`${team.id}-pwd-${team.password}`}
+                                onBlur={e => {
+                                  const v = e.target.value
+                                  if (v !== team.password) updateTeam(team.id, { password: v })
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-1 rounded select-all border border-transparent hover:border-gray-300 focus:border-violet-400 focus:outline-none w-28"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <select
+                                value={team.section_id}
+                                onChange={e => moveTeamToSection(team.id, e.target.value)}
+                                className="px-2 py-1 rounded border border-gray-200 text-xs bg-white"
+                              >
+                                {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 min-w-[140px]">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                                  {completedCount}/{sectionTasks.length}
+                                </span>
+                              </div>
+                              {pointsEarned > 0 && (
+                                <p className="text-[10px] text-gray-400 font-bold mt-0.5">{pointsEarned} pts</p>
+                              )}
+                            </td>
+                            {sectionTasks.map(t => {
+                              const scan = teamScans.find(s => s.task_id === t.id)
+                              return (
+                                <td key={t.id} className="px-3 py-3 text-center">
+                                  {scan?.completed ? <span className="text-green-600 font-black">✓</span>
+                                    : scan ? <span className="text-gray-300">◎</span>
+                                    : <span className="text-gray-100">·</span>}
+                                </td>
+                              )
+                            })}
+                            <td className="px-4 py-3 text-right">
+                              <button onClick={() => deleteTeam(team.id, team.name)}
+                                className="text-xs text-gray-400 hover:text-red-500 transition-colors">Delete</button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-gray-300 px-4 py-2">◎ = Scanned &nbsp;·&nbsp; ✓ = Completed</p>
+                </div>
+              </div>
+            )
+          })}
+          {teams.length === 0 && (
+            <p className="text-gray-400 text-sm">No teams yet. Teams register when they scan a QR code.</p>
           )}
         </section>
+        )}
+
       </main>
 
       {/* ── Slot Picker Modal ───────────────────────────────────────────────── */}
@@ -1503,10 +1911,13 @@ export function BingoDashAdmin() {
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <input type="text" list="cat-list-tile" value={tileCategory} onChange={e => setTileCategory(e.target.value)}
-                    placeholder="e.g. Physical Activities"
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500" />
-                  <datalist id="cat-list-tile">{allCategories.map(c => <option key={c} value={c} />)}</datalist>
+                  <select value={tileCategory} onChange={e => setTileCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
+                    <option value="">— Uncategorized —</option>
+                    {categories.filter(c => c.section_id === tileSectionId).map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="w-24">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>

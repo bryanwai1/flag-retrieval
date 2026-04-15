@@ -15,7 +15,8 @@ export function ShapeSequenceAdmin() {
   const {
     rounds, results, facilitators,
     upsertRound, setActiveRound, endRound,
-    toggleResultsVisible, addResult, deleteResult,
+    setAllResultsVisible,
+    addResult, deleteResult, clearRoundResults,
     addFacilitator, renameFacilitator, deleteFacilitator,
   } = useShapeSequence()
 
@@ -131,7 +132,7 @@ export function ShapeSequenceAdmin() {
   const cols = localCircleCount === 20 ? 10 : 15
   const isActive = round?.is_active ?? false
   const isCollecting = round?.accepting_submissions ?? false
-  const resultsVisible = round?.results_visible ?? false
+  const anyResultsVisible = rounds.some(r => r.results_visible)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,42 +200,63 @@ export function ShapeSequenceAdmin() {
         <div className="bg-indigo-950 border-b border-indigo-800 px-6 py-5">
           <div className="max-w-5xl mx-auto">
             <h2 className="text-white font-black text-sm uppercase tracking-wider mb-4">Facilitator Groups</h2>
-            <div className="flex flex-wrap gap-3 mb-4">
-              {facilitators.length === 0 && (
-                <p className="text-indigo-300/50 text-sm">No groups registered yet. Share the QR code above.</p>
-              )}
-              {facilitators.map(f => (
-                <div key={f.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
-                  {editingId === f.id ? (
-                    <>
-                      <input
-                        value={editingName}
-                        onChange={e => setEditingName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRename(f.id); if (e.key === 'Escape') setEditingId(null) }}
-                        className="px-2 py-0.5 rounded bg-white/20 text-white text-sm font-bold focus:outline-none w-32"
-                        autoFocus
-                      />
-                      <button onClick={() => handleRename(f.id)} className="text-green-400 text-xs font-bold">✓</button>
-                      <button onClick={() => setEditingId(null)} className="text-white/40 text-xs">✕</button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-white font-bold text-sm">{f.group_name}</span>
-                      <button
-                        onClick={() => { setEditingId(f.id); setEditingName(f.group_name) }}
-                        className="text-white/30 hover:text-white/70 text-xs transition-colors"
-                        title="Rename"
-                      >✏️</button>
-                      <button
-                        onClick={() => { if (confirm(`Remove "${f.group_name}"?`)) deleteFacilitator(f.id) }}
-                        className="text-white/30 hover:text-red-400 text-xs transition-colors"
-                        title="Remove"
-                      >✕</button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
+
+            {facilitators.length === 0 && (
+              <p className="text-indigo-300/50 text-sm mb-4">No groups registered yet. Share the QR code above.</p>
+            )}
+
+            {/* Group by facilitator_num */}
+            {(() => {
+              const facNums = Array.from(new Set(facilitators.map(f => f.facilitator_num))).sort((a, b) => {
+                if (a === null) return 1
+                if (b === null) return -1
+                return a - b
+              })
+              return facNums.map(num => {
+                const groups = facilitators.filter(f => f.facilitator_num === num)
+                return (
+                  <div key={String(num)} className="mb-4">
+                    <p className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">
+                      {num !== null ? `Facilitator ${num}` : 'Unassigned'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {groups.map(f => (
+                        <div key={f.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
+                          {editingId === f.id ? (
+                            <>
+                              <input
+                                value={editingName}
+                                onChange={e => setEditingName(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleRename(f.id); if (e.key === 'Escape') setEditingId(null) }}
+                                className="px-2 py-0.5 rounded bg-white/20 text-white text-sm font-bold focus:outline-none w-32"
+                                autoFocus
+                              />
+                              <button onClick={() => handleRename(f.id)} className="text-green-400 text-xs font-bold">✓</button>
+                              <button onClick={() => setEditingId(null)} className="text-white/40 text-xs">✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-white font-bold text-sm">{f.group_name}</span>
+                              <button
+                                onClick={() => { setEditingId(f.id); setEditingName(f.group_name) }}
+                                className="text-white/30 hover:text-white/70 text-xs transition-colors"
+                                title="Rename"
+                              >✏️</button>
+                              <button
+                                onClick={() => { if (confirm(`Remove "${f.group_name}"?`)) deleteFacilitator(f.id) }}
+                                className="text-white/30 hover:text-red-400 text-xs transition-colors"
+                                title="Remove"
+                              >✕</button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+
             <div className="flex gap-2">
               <input
                 type="text"
@@ -385,16 +407,26 @@ export function ShapeSequenceAdmin() {
               </button>
 
               <button
-                onClick={() => round && toggleResultsVisible(round.id, !resultsVisible)}
-                disabled={!round}
+                onClick={() => setAllResultsVisible(!anyResultsVisible)}
+                disabled={rounds.length === 0}
                 className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40"
-                style={{
-                  background: resultsVisible ? '#7c3aed' : '#7c3aed',
-                  color: '#fff',
-                  opacity: !round ? 0.4 : 1,
-                }}
+                style={{ background: '#7c3aed', color: '#fff' }}
               >
-                {resultsVisible ? '🙈 Hide Results' : '👁 Show Results'}
+                {anyResultsVisible ? '🙈 Hide Scoreboard' : '👁 Show Scoreboard'}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!round || roundResults.length === 0) return
+                  if (confirm(`Delete all ${roundResults.length} result(s) for Round ${selectedRound}?`)) {
+                    clearRoundResults(round.id)
+                  }
+                }}
+                disabled={!round || roundResults.length === 0}
+                className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40"
+                style={{ background: '#9f1239', color: '#fff' }}
+              >
+                🗑 Reset Round {selectedRound} Results
               </button>
 
               {isCollecting && (

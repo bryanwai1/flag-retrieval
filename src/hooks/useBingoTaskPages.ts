@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { TaskPage } from '../types/database'
 
-export function useTaskPages(taskId: string | undefined) {
+export function useBingoTaskPages(taskId: string | undefined) {
   const [pages, setPages] = useState<TaskPage[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -10,7 +10,7 @@ export function useTaskPages(taskId: string | undefined) {
     if (!taskId || !isSupabaseConfigured) { setLoading(false); return }
     try {
       const { data } = await supabase
-        .from('task_pages')
+        .from('bingo_task_pages')
         .select('*')
         .eq('task_id', taskId)
         .order('page_order', { ascending: true })
@@ -23,8 +23,8 @@ export function useTaskPages(taskId: string | undefined) {
     fetchPages()
     if (!taskId || !isSupabaseConfigured) return
     const channel = supabase
-      .channel(`task-pages-realtime-${taskId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_pages', filter: `task_id=eq.${taskId}` }, () => {
+      .channel(`bingo-pages-${taskId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_task_pages', filter: `task_id=eq.${taskId}` }, () => {
         fetchPages()
       })
       .subscribe()
@@ -32,29 +32,28 @@ export function useTaskPages(taskId: string | undefined) {
   }, [fetchPages, taskId])
 
   const createPage = async (page: Omit<TaskPage, 'id' | 'created_at'>) => {
-    const { data, error } = await supabase.from('task_pages').insert(page).select().single()
+    const { data, error } = await supabase.from('bingo_task_pages').insert(page).select().single()
     if (error) throw error
     await fetchPages()
     return data
   }
 
   const updatePage = async (id: string, updates: Partial<TaskPage>) => {
-    const { data, error } = await supabase.from('task_pages').update(updates).eq('id', id).select()
+    const { data, error } = await supabase.from('bingo_task_pages').update(updates).eq('id', id).select()
     if (error) throw error
-    if (!data || data.length === 0) throw new Error('Save failed — no rows were updated. Check Supabase RLS policies: the anon role likely needs UPDATE permission on task_pages.')
+    if (!data || data.length === 0) throw new Error('Save failed — no rows updated. Check RLS on bingo_task_pages.')
     await fetchPages()
   }
 
   const deletePage = async (id: string) => {
-    const { error } = await supabase.from('task_pages').delete().eq('id', id)
+    const { error } = await supabase.from('bingo_task_pages').delete().eq('id', id)
     if (error) throw error
     await fetchPages()
   }
 
   const reorderPages = async (reordered: TaskPage[]) => {
-    const updates = reordered.map((p, i) => ({ id: p.id, page_order: i }))
-    for (const u of updates) {
-      await supabase.from('task_pages').update({ page_order: u.page_order }).eq('id', u.id)
+    for (let i = 0; i < reordered.length; i++) {
+      await supabase.from('bingo_task_pages').update({ page_order: i }).eq('id', reordered[i].id)
     }
     await fetchPages()
   }

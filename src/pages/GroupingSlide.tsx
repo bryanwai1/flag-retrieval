@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { useFullscreen } from '../hooks/useFullscreen'
 
@@ -29,16 +30,56 @@ function saveGroups(groups: typeof DEFAULT_GROUPS) {
   localStorage.setItem('grouping_data', JSON.stringify(groups))
 }
 
+function loadPasswords(): Record<string, string> {
+  try {
+    const saved = localStorage.getItem('grouping_passwords')
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return {}
+}
+
 export function GroupingSlide() {
   const eventName = localStorage.getItem('event_name') || 'SWIFT TEAM BUILDING'
   const [groups, setGroups] = useState(loadGroups)
   const dragSrc = useRef<{ groupIdx: number; memberIdx: number } | null>(null)
   const [dragOver, setDragOver] = useState<{ groupIdx: number; memberIdx: number } | null>(null)
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
+  const [syncing, setSyncing] = useState(false)
+  const [passwords, setPasswords] = useState<Record<string, string>>(loadPasswords)
+  const [showPasswords, setShowPasswords] = useState(false)
 
   const updateGroups = (next: typeof DEFAULT_GROUPS) => {
     setGroups(next)
     saveGroups(next)
+  }
+
+  const pushToTribes = async () => {
+    if (!confirm('Push all groups to Supabase as joinable tribes? Existing groups will be updated.')) return
+    setSyncing(true)
+    const newPasswords: Record<string, string> = { ...loadPasswords() }
+    try {
+      for (const group of groups) {
+        // Reuse existing password or generate new one
+        if (!newPasswords[group.name]) {
+          newPasswords[group.name] = String(Math.floor(1000 + Math.random() * 9000))
+        }
+        const password = newPasswords[group.name]
+        // Check if team already exists
+        const { data: existing } = await supabase.from('teams').select('id').ilike('name', group.name).maybeSingle()
+        if (existing) {
+          await supabase.from('teams').update({ password }).eq('id', existing.id)
+        } else {
+          await supabase.from('teams').insert({ name: group.name, password })
+        }
+      }
+      localStorage.setItem('grouping_passwords', JSON.stringify(newPasswords))
+      setPasswords(newPasswords)
+      setShowPasswords(true)
+    } catch (err) {
+      alert('Sync failed: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const renameMember = (groupIdx: number, memberIdx: number, value: string) => {
@@ -142,8 +183,50 @@ export function GroupingSlide() {
         <span className="text-white/10">·</span>
         <button onClick={resetGroups} className="text-xs text-white/15 hover:text-red-400/60 transition-colors uppercase tracking-widest">Reset</button>
         <span className="text-white/10">·</span>
+        <button
+          onClick={pushToTribes}
+          disabled={syncing}
+          className="text-xs text-emerald-400/60 hover:text-emerald-400 transition-colors uppercase tracking-widest disabled:opacity-40"
+        >
+          {syncing ? 'Syncing...' : '⬆ Push to Tribes'}
+        </button>
+        {Object.keys(passwords).length > 0 && (
+          <>
+            <span className="text-white/10">·</span>
+            <button onClick={() => setShowPasswords(true)} className="text-xs text-amber-400/60 hover:text-amber-400 transition-colors uppercase tracking-widest">
+              🔑 Passwords
+            </button>
+          </>
+        )}
+        <span className="text-white/10">·</span>
         <a href="/" className="text-xs text-white/20 hover:text-white/50 transition-colors uppercase tracking-widest">Hub</a>
       </div>
+
+      {/* Password modal */}
+      {showPasswords && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6" onClick={() => setShowPasswords(false)}>
+          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-white font-black text-lg mb-1">Group Passwords</h2>
+            <p className="text-white/40 text-xs mb-4">Share each code with the matching group</p>
+            <div className="flex flex-col gap-2">
+              {groups.map((g, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5">
+                  <span className="text-white font-bold text-sm">{g.name}</span>
+                  <span
+                    className="font-black text-xl tracking-widest"
+                    style={{ color: GROUP_COLORS[i] }}
+                  >
+                    {passwords[g.name] ?? '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowPasswords(false)} className="mt-4 w-full py-2 bg-white/10 text-white/60 rounded-xl text-sm hover:bg-white/20 transition-colors">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen button */}
       <button
@@ -279,11 +362,11 @@ function MemberRow({
           onChange={(e) => setVal(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setVal(name) } }}
-          className="flex-1 bg-white/10 text-white text-xs font-medium px-1 py-0 rounded outline-none border border-white/30 min-w-0 leading-tight"
+          className="flex-1 bg-white/10 text-white text-sm font-medium px-1 py-0 rounded outline-none border border-white/30 min-w-0 leading-tight"
         />
       ) : (
         <span
-          className="flex-1 text-white text-xs font-medium leading-tight cursor-pointer truncate"
+          className="flex-1 text-white text-sm font-medium leading-tight cursor-pointer truncate"
           style={{ textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}
           onClick={() => setEditing(true)}
           title="Click to edit"

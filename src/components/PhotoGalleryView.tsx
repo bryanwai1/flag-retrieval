@@ -46,6 +46,14 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
     }, 700)
   }
 
+  const handleUndo = () => {
+    setFound(prev => {
+      const next = new Set(prev)
+      next.delete(current)
+      return next
+    })
+  }
+
   const isCurrentFound = found.has(current)
   const isCelebrating = celebrating === current
 
@@ -159,6 +167,15 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
       >
         {isCurrentFound ? '✓ Already Done' : isCelebrating ? 'Done! 🎯' : '📍 Done!'}
       </button>
+
+      {isCurrentFound && !isCelebrating && (
+        <button
+          onClick={handleUndo}
+          className="w-full py-2 rounded-xl text-sm font-bold text-white/50 hover:text-red-400 transition-colors"
+        >
+          Undo Done
+        </button>
+      )}
 
       {total > 1 && (
         <p className="text-center text-xs text-white/40 font-medium">

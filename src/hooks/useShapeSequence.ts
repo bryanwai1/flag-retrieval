@@ -25,6 +25,7 @@ export interface ShapeResult {
 export interface ShapeFacilitator {
   id: string
   group_name: string
+  facilitator_num: number | null
   created_at: string
 }
 
@@ -143,11 +144,23 @@ export function useShapeSequence() {
     await fetchResults()
   }
 
+  const clearRoundResults = async (roundId: string) => {
+    await supabase.from('shape_results').delete().eq('round_id', roundId)
+    await fetchResults()
+  }
+
+  const setAllResultsVisible = async (visible: boolean) => {
+    for (const r of rounds) {
+      await supabase.from('shape_rounds').update({ results_visible: visible }).eq('id', r.id)
+    }
+    await fetchRounds()
+  }
+
   // Facilitator management
-  const addFacilitator = async (groupName: string): Promise<ShapeFacilitator | null> => {
+  const addFacilitator = async (groupName: string, facilitatorNum?: number): Promise<ShapeFacilitator | null> => {
     const { data, error } = await supabase
       .from('shape_facilitators')
-      .insert({ group_name: groupName.trim() })
+      .insert({ group_name: groupName.trim(), facilitator_num: facilitatorNum ?? null })
       .select()
       .single()
     if (error) throw error
@@ -178,9 +191,11 @@ export function useShapeSequence() {
     setActiveRound,
     endRound,
     toggleResultsVisible,
+    setAllResultsVisible,
     addResult,
     updateResult,
     deleteResult,
+    clearRoundResults,
     addFacilitator,
     renameFacilitator,
     deleteFacilitator,

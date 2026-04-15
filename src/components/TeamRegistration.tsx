@@ -316,7 +316,7 @@ export function TeamRegistration({
                   <div>
                     <p className="font-bold text-gray-800">{tribe.name}</p>
                     <p className="text-xs text-gray-400">
-                      {tribe.memberCount} / 4 members
+                      {tribe.memberCount} members
                     </p>
                   </div>
                   <button

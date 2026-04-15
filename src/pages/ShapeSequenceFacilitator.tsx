@@ -2,11 +2,96 @@ import { useState, useEffect } from 'react'
 import { useShapeSequence } from '../hooks/useShapeSequence'
 import { formatTime } from './ShapeSequenceProjector'
 
+// ── Flag Retrieval answer data ────────────────────────────────────────────────
+const ORANGE_ANSWERS = [
+  { qty: 4,    item: 'Visa card' },
+  { qty: 3,    item: 'Waist belt' },
+  { qty: 5,    item: 'Grey hair' },
+  { qty: 1,    item: 'Lipstick' },
+  { qty: 1,    item: 'Physical photo of a loved one' },
+  { qty: null, item: 'Malaysia bank note with at least one "8" in the number' },
+  { qty: null, item: "Tie a coconut hair to one member's hair" },
+]
+const GREEN_ANSWERS = [
+  'Red shoe', 'Battery', 'Ball', 'Belt', 'Umbrella',
+  'White cap', 'Yellow shirt', 'Wet tissue', 'Water bottle', 'Toy',
+]
+
+function FlagRetrievalAnswers({ onBack }: { onBack: () => void }) {
+  const [tab, setTab] = useState<'orange' | 'green'>('orange')
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col px-4 pt-5 pb-10">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={onBack} className="text-white/30 hover:text-white text-sm transition-colors">← Back</button>
+        <h1 className="text-white font-black text-base tracking-tight">🚩 Flag Retrieval — Faci</h1>
+        <div className="w-12" />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setTab('orange')}
+          className={`flex-1 py-3 rounded-2xl font-black text-sm tracking-wider transition-all ${
+            tab === 'orange' ? 'bg-orange-500 text-white' : 'bg-white/8 text-white/40 hover:text-white'
+          }`}
+        >
+          🟠 Orange Card
+        </button>
+        <button
+          onClick={() => setTab('green')}
+          className={`flex-1 py-3 rounded-2xl font-black text-sm tracking-wider transition-all ${
+            tab === 'green' ? 'bg-green-500 text-white' : 'bg-white/8 text-white/40 hover:text-white'
+          }`}
+        >
+          🟢 Green Flag
+        </button>
+      </div>
+
+      {tab === 'orange' && (
+        <div className="flex flex-col gap-2.5">
+          <p className="text-white/30 text-xs font-bold uppercase tracking-widest mb-1">Acceptance checklist — verify all before marking done</p>
+          {ORANGE_ANSWERS.map((a, i) => (
+            <div key={i} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3.5 border border-orange-500/15">
+              <span className="font-black text-orange-500/50 w-5 text-right shrink-0 text-sm">{i + 1}</span>
+              <span className="text-white font-bold flex-1 text-sm">{a.item}</span>
+              {a.qty !== null && (
+                <span className="shrink-0 px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-xs font-black">×{a.qty}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'green' && (
+        <div className="flex flex-col gap-2.5">
+          <p className="text-white/30 text-xs font-bold uppercase tracking-widest mb-1">Items to collect — 10 total</p>
+          {GREEN_ANSWERS.map((item, i) => (
+            <div key={i} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3.5 border border-green-500/15">
+              <span className="font-black text-green-500/50 w-5 text-right shrink-0 text-sm">{i + 1}</span>
+              <span className="text-white font-bold flex-1 text-sm">{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const FAC_NUM_KEY    = 'ss_facilitator_num'
-const FAC_GROUPS_KEY = 'ss_facilitator_groups'
+const FAC_GROUPS_KEY = 'ss_facilitator_groups' // per-faci: key + '_' + facNum
+
+function loadGroups(facNum: number): string[] {
+  try { return JSON.parse(localStorage.getItem(`${FAC_GROUPS_KEY}_${facNum}`) ?? '[]') } catch { return [] }
+}
 
 export function ShapeSequenceFacilitator() {
   const { rounds, results, facilitators, addFacilitator, addResult } = useShapeSequence()
+
+  // ── Game selection ────────────────────────────────────────────────────────
+  const [game, setGame] = useState<'select' | 'flag' | 'shape'>('select')
+
+  if (game === 'flag') return <FlagRetrievalAnswers onBack={() => setGame('select')} />
 
   // ── Facilitator identity ──────────────────────────────────────────────────
   const [facNum, setFacNum] = useState<number | null>(() => {
@@ -17,7 +102,8 @@ export function ShapeSequenceFacilitator() {
 
   // ── Groups this facilitator manages ──────────────────────────────────────
   const [myGroups, setMyGroups] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(FAC_GROUPS_KEY) ?? '[]') } catch { return [] }
+    const s = localStorage.getItem(FAC_NUM_KEY)
+    return s ? loadGroups(parseInt(s)) : []
   })
   const [showPicker, setShowPicker]     = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -38,34 +124,57 @@ export function ShapeSequenceFacilitator() {
     setSubmitErrors({})
   }, [currentRound?.id])
 
-  // Persist group list to localStorage
+  // Persist group list to per-faci localStorage key
   useEffect(() => {
-    localStorage.setItem(FAC_GROUPS_KEY, JSON.stringify(myGroups))
-  }, [myGroups])
+    if (facNum !== null) {
+      localStorage.setItem(`${FAC_GROUPS_KEY}_${facNum}`, JSON.stringify(myGroups))
+    }
+  }, [myGroups, facNum])
 
   // ── Sign in / out ─────────────────────────────────────────────────────────
   const signIn = (n: number) => {
     localStorage.setItem(FAC_NUM_KEY, String(n))
     setFacNum(n)
+    setMyGroups(loadGroups(n))
   }
   const signOut = () => {
     localStorage.removeItem(FAC_NUM_KEY)
     setFacNum(null)
+    setMyGroups([])
   }
 
   // ── Group management ──────────────────────────────────────────────────────
   const addGroup = async (name: string) => {
     if (myGroups.includes(name)) { setShowPicker(false); return }
-    // Register with Supabase if not already there
-    const exists = facilitators.some(f => f.group_name.toLowerCase() === name.toLowerCase())
-    if (!exists) {
+    // Insert to DB if this group isn't already owned by this faci
+    const ownedByMe = facilitators.some(
+      f => f.group_name.toLowerCase() === name.toLowerCase() && f.facilitator_num === facNum
+    )
+    if (!ownedByMe) {
       setAddingGroup(true)
-      try { await addFacilitator(name) } catch { /* continue even if fails */ } finally { setAddingGroup(false) }
+      try { await addFacilitator(name, facNum ?? undefined) } catch { /* name collision — already exists */ } finally { setAddingGroup(false) }
     }
     setMyGroups(prev => [...prev, name])
     setShowPicker(false)
     setNewGroupName('')
   }
+
+  // Re-sync myGroups to DB whenever facilitators list loads (handles DB resets)
+  useEffect(() => {
+    if (facNum === null || myGroups.length === 0 || facilitators.length === 0) return
+    myGroups.forEach(name => {
+      const ownedByMe = facilitators.some(
+        f => f.group_name.toLowerCase() === name.toLowerCase() && f.facilitator_num === facNum
+      )
+      if (!ownedByMe) {
+        // Check if name exists at all — if not, insert
+        const existsAnywhere = facilitators.some(f => f.group_name.toLowerCase() === name.toLowerCase())
+        if (!existsAnywhere) {
+          addFacilitator(name, facNum).catch(() => {/* ignore */})
+        }
+      }
+    })
+  }, [facilitators]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeGroup = (name: string) => setMyGroups(prev => prev.filter(g => g !== name))
 
@@ -90,6 +199,37 @@ export function ShapeSequenceFacilitator() {
     } finally {
       setSubmitting(p => ({ ...p, [group]: false }))
     }
+  }
+
+  // ── GAME SELECT SCREEN ───────────────────────────────────────────────────
+  if (game === 'select') {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm flex flex-col items-center gap-8">
+          <div className="text-center">
+            <div className="text-5xl mb-4">🎮</div>
+            <h1 className="text-3xl font-black text-white tracking-tight">FACILITATOR</h1>
+            <p className="text-white/40 mt-2 text-xs font-bold uppercase tracking-widest">Which game are you running?</p>
+          </div>
+          <div className="w-full flex flex-col gap-3">
+            <button
+              onClick={() => setGame('flag')}
+              className="w-full py-5 rounded-2xl font-black text-white text-lg tracking-wider transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', boxShadow: '0 8px 24px rgba(245,158,11,0.3)' }}
+            >
+              <span className="text-2xl">🚩</span> Flag Retrieval
+            </button>
+            <button
+              onClick={() => setGame('shape')}
+              className="w-full py-5 rounded-2xl font-black text-white text-lg tracking-wider transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
+              style={{ background: 'linear-gradient(135deg, #3b82f6, #6366f1)', boxShadow: '0 8px 24px rgba(59,130,246,0.3)' }}
+            >
+              <span className="text-2xl">🔷</span> Shape Sequence
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // ── LOGIN SCREEN ──────────────────────────────────────────────────────────
@@ -324,9 +464,9 @@ export function ShapeSequenceFacilitator() {
             </div>
 
             <div className="flex flex-col gap-2 p-4 overflow-y-auto">
-              {/* Existing groups not yet added */}
+              {/* Existing groups not yet added, belonging to this facilitator */}
               {facilitators
-                .filter(f => !myGroups.includes(f.group_name))
+                .filter(f => f.facilitator_num === facNum && !myGroups.includes(f.group_name))
                 .map(f => (
                   <button
                     key={f.id}
@@ -341,7 +481,7 @@ export function ShapeSequenceFacilitator() {
                   </button>
                 ))}
 
-              {facilitators.filter(f => !myGroups.includes(f.group_name)).length === 0 && (
+              {facilitators.filter(f => f.facilitator_num === facNum && !myGroups.includes(f.group_name)).length === 0 && (
                 <p className="text-white/25 text-xs text-center py-2">No existing groups — create one below.</p>
               )}
 
