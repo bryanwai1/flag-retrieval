@@ -72,9 +72,18 @@ export interface BingoSection {
   created_at: string
 }
 
+export interface BingoChallengeSection {
+  id: string
+  game_section_id: string
+  name: string
+  sort_order: number
+  created_at: string
+}
+
 export interface BingoCategory {
   id: string
   section_id: string
+  challenge_section_id: string | null
   name: string
   sort_order: number
   created_at: string
@@ -90,6 +99,9 @@ export interface BingoTask {
   in_grid: boolean
   category: string
   points: number
+  task_type: 'standard' | 'answer'
+  answer_question: string | null
+  answer_text: string | null
   created_at: string
 }
 
