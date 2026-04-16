@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
@@ -29,6 +29,12 @@ export function BingoDashParticipant() {
   const [leaving, setLeaving] = useState(false)
   // Answer-input state: one string per answer row
   const [answerInputs, setAnswerInputs] = useState<string[]>([])
+  const [carouselIdx, setCarouselIdx] = useState(0)
+  const letterRefs = useRef<(HTMLInputElement | null)[][]>([])
+
+  const focusLetter = useCallback((rowIdx: number, charIdx: number) => {
+    letterRefs.current[rowIdx]?.[charIdx]?.focus()
+  }, [])
 
   useEffect(() => {
     if (!taskId) return
@@ -36,20 +42,39 @@ export function BingoDashParticipant() {
       if (data) {
         setTask(data)
         if (data.task_type === 'answer' && data.answer_text) {
-          setAnswerInputs(data.answer_text.split('\n').map(() => ''))
+          const rows = data.answer_text.split('\n')
+          // Restore saved answers from localStorage
+          const saved = localStorage.getItem(`bingo-answers-${taskId}`)
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved) as string[]
+              setAnswerInputs(rows.map((_r: string, i: number) => parsed[i] ?? ''))
+            } catch { setAnswerInputs(rows.map(() => '')) }
+          } else {
+            setAnswerInputs(rows.map(() => ''))
+          }
         }
       }
     })
   }, [taskId])
 
+  // Persist answer inputs to localStorage
+  useEffect(() => {
+    if (taskId && answerInputs.length > 0) {
+      localStorage.setItem(`bingo-answers-${taskId}`, JSON.stringify(answerInputs))
+    }
+  }, [taskId, answerInputs])
+
   // Derived: the answer rows expected by the task
   const answerRows = task?.task_type === 'answer' && task.answer_text
-    ? task.answer_text.split('\n').map(r => r.trim().toUpperCase())
+    ? task.answer_text.split('\n').map(r => r.trim())
     : []
 
-  // True when every row is fully and correctly filled
+  const normalize = (s: string) => s.replace(/\s/g, '').toLowerCase()
+
+  // True when every row is fully and correctly filled (case-insensitive)
   const answerMatches = answerRows.length > 0 && answerRows.every(
-    (row, i) => (answerInputs[i] ?? '').toUpperCase() === row
+    (row, i) => normalize(answerInputs[i] ?? '') === normalize(row)
   )
 
   useEffect(() => {
@@ -107,8 +132,6 @@ export function BingoDashParticipant() {
       </div>
     )
   }
-
-  const heroPhoto = photos[0] ?? null
 
   // ── Splash ───────────────────────────────────────────────────────────
   if (showSplash) {
@@ -209,18 +232,41 @@ export function BingoDashParticipant() {
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8 relative z-10">
-        {/* Hero photo */}
-        {heroPhoto && (
+        {/* Photo carousel */}
+        {photos.length > 0 && (
           <div className="rounded-2xl overflow-hidden mb-6 shadow-xl animate-slide-up">
-            <img
-              src={heroPhoto.photo_url}
-              alt={task.title}
-              className="w-full max-h-72 object-cover"
-              style={{ objectPosition: `${heroPhoto.position_x ?? 50}% ${heroPhoto.position_y ?? 50}%` }}
-            />
-            {heroPhoto.caption && (
+            <div className="relative">
+              <img
+                src={photos[carouselIdx]?.photo_url}
+                alt={`${task.title} ${carouselIdx + 1}`}
+                className="w-full max-h-72 object-cover"
+                style={{ objectPosition: `${photos[carouselIdx]?.position_x ?? 50}% ${photos[carouselIdx]?.position_y ?? 50}%` }}
+              />
+              {photos.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setCarouselIdx(i => (i - 1 + photos.length) % photos.length)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm active:scale-90 transition-transform"
+                  >‹</button>
+                  <button
+                    onClick={() => setCarouselIdx(i => (i + 1) % photos.length)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm active:scale-90 transition-transform"
+                  >›</button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {photos.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCarouselIdx(i)}
+                        className={`w-2 h-2 rounded-full transition-all ${i === carouselIdx ? 'bg-white scale-125' : 'bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {photos[carouselIdx]?.caption && (
               <div className="px-4 py-2 text-xs text-white/70 font-medium" style={{ backgroundColor: `${task.hex_code}cc` }}>
-                {heroPhoto.caption}
+                {photos[carouselIdx].caption}
               </div>
             )}
           </div>
@@ -275,7 +321,7 @@ export function BingoDashParticipant() {
               </button>
             </div>
           ) : task.task_type === 'answer' ? (
-            /* ── Answer-input card ─────────────────────────────── */
+            /* ── Answer-input card (letter boxes) ─────────────── */
             <div
               className="rounded-3xl p-5 border-2"
               style={{
@@ -289,66 +335,101 @@ export function BingoDashParticipant() {
                   {task.answer_question}
                 </p>
               )}
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-5">
                 {answerRows.map((row, rowIdx) => {
-                  const chars = row.replace(/ /g, '\u00a0').split('')
-                  const typed = (answerInputs[rowIdx] ?? '').toUpperCase()
+                  const letters = row.replace(/\s/g, '').split('')
+                  const typed = answerInputs[rowIdx] ?? ''
+                  const rowCorrect = normalize(typed) === normalize(row.replace(/\s/g, ''))
+                  if (!letterRefs.current[rowIdx]) letterRefs.current[rowIdx] = []
                   return (
                     <div key={rowIdx} className="flex flex-col items-center gap-2">
-                      {/* Hidden input for keyboard */}
-                      <input
-                        type="text"
-                        inputMode="text"
-                        autoCapitalize="characters"
-                        maxLength={row.replace(/ /g, '').length}
-                        value={answerInputs[rowIdx] ?? ''}
-                        onChange={e => {
-                          const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '')
-                          setAnswerInputs(prev => {
-                            const next = [...prev]
-                            next[rowIdx] = val
-                            return next
-                          })
-                        }}
-                        className="opacity-0 absolute w-0 h-0"
-                        aria-label={`Row ${rowIdx + 1} answer`}
-                      />
-                      {/* Letter boxes */}
-                      <div className="flex flex-wrap justify-center gap-1.5">
-                        {chars.map((ch, ci) => {
-                          const letterIndex = row.slice(0, ci + 1).replace(/ /g, '').length - (ch === ' ' ? 0 : 0)
-                          const nonSpaceBefore = row.slice(0, ci).replace(/ /g, '').length
-                          const typedChar = ch === ' ' ? ' ' : typed[nonSpaceBefore] ?? ''
-                          const correct = ch === ' ' || typedChar.toUpperCase() === ch
-                          const filled = ch !== ' ' && typedChar !== ''
-                          void letterIndex
-                          return ch === ' ' ? (
-                            <div key={ci} className="w-3" />
-                          ) : (
-                            <div
-                              key={ci}
-                              className={`w-9 h-11 rounded-lg border-2 flex items-center justify-center text-lg font-black transition-all select-none ${
-                                filled && correct
-                                  ? 'border-green-400 bg-green-400/20 text-green-300'
-                                  : filled
-                                  ? 'border-red-400 bg-red-400/20 text-red-300'
-                                  : 'border-white/30 bg-white/10 text-white/20'
-                              }`}
-                              onClick={() => {
-                                const el = document.querySelector<HTMLInputElement>(`input[aria-label="Row ${rowIdx + 1} answer"]`)
-                                el?.focus()
+                      {answerRows.length > 1 && (
+                        <label className="text-white/50 text-xs font-bold uppercase tracking-wider">
+                          Word {rowIdx + 1}
+                        </label>
+                      )}
+                      <div className="flex gap-1.5 justify-center flex-wrap">
+                        {letters.map((_, charIdx) => {
+                          const typedChar = typed[charIdx] ?? ''
+                          const expectedChar = letters[charIdx]
+                          const charCorrect = typedChar.length > 0 && typedChar.toLowerCase() === expectedChar.toLowerCase()
+                          const charWrong = typedChar.length > 0 && !charCorrect
+                          return (
+                            <input
+                              key={charIdx}
+                              ref={el => { letterRefs.current[rowIdx][charIdx] = el }}
+                              type="text"
+                              inputMode="text"
+                              autoCapitalize="characters"
+                              autoComplete="off"
+                              maxLength={1}
+                              value={typedChar.toUpperCase()}
+                              onChange={e => {
+                                const ch = e.target.value.slice(-1).replace(/[^a-zA-Z0-9]/g, '')
+                                if (!ch) return
+                                setAnswerInputs(prev => {
+                                  const next = [...prev]
+                                  const arr = (next[rowIdx] ?? '').split('')
+                                  while (arr.length <= charIdx) arr.push('')
+                                  arr[charIdx] = ch
+                                  next[rowIdx] = arr.join('')
+                                  return next
+                                })
+                                if (charIdx < letters.length - 1) focusLetter(rowIdx, charIdx + 1)
                               }}
-                            >
-                              {filled ? typedChar : ''}
-                            </div>
+                              onKeyDown={e => {
+                                if (e.key === 'Backspace') {
+                                  e.preventDefault()
+                                  const current = typed[charIdx] ?? ''
+                                  if (current) {
+                                    setAnswerInputs(prev => {
+                                      const next = [...prev]
+                                      const arr = (next[rowIdx] ?? '').split('')
+                                      arr[charIdx] = ''
+                                      next[rowIdx] = arr.join('')
+                                      return next
+                                    })
+                                  } else if (charIdx > 0) {
+                                    setAnswerInputs(prev => {
+                                      const next = [...prev]
+                                      const arr = (next[rowIdx] ?? '').split('')
+                                      arr[charIdx - 1] = ''
+                                      next[rowIdx] = arr.join('')
+                                      return next
+                                    })
+                                    focusLetter(rowIdx, charIdx - 1)
+                                  }
+                                } else if (e.key === 'ArrowLeft' && charIdx > 0) {
+                                  focusLetter(rowIdx, charIdx - 1)
+                                } else if (e.key === 'ArrowRight' && charIdx < letters.length - 1) {
+                                  focusLetter(rowIdx, charIdx + 1)
+                                }
+                              }}
+                              onFocus={e => e.target.select()}
+                              className={`w-10 h-12 text-center text-xl font-black rounded-lg border-2 outline-none transition-all ${
+                                rowCorrect
+                                  ? 'border-green-400 bg-green-400/20 text-green-300'
+                                  : charCorrect
+                                  ? 'border-green-400/60 bg-green-400/10 text-green-300'
+                                  : charWrong
+                                  ? 'border-red-400/60 bg-red-400/10 text-red-300'
+                                  : 'border-white/30 bg-black/30 text-white'
+                              }`}
+                              style={{ caretColor: 'transparent' }}
+                            />
                           )
                         })}
                       </div>
+                      {rowCorrect && (
+                        <span className="text-green-400 text-xs font-bold mt-0.5">✓ Correct!</span>
+                      )}
                     </div>
                   )
                 })}
               </div>
-              <p className="text-white/40 text-xs text-center mt-4">Tap a row to type your answer</p>
+              {!answerMatches && (
+                <p className="text-white/40 text-xs text-center mt-4">Fill in the letters above</p>
+              )}
             </div>
           ) : (
             /* ── Standard card ─────────────────────────────────── */
@@ -360,16 +441,18 @@ export function BingoDashParticipant() {
                 boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
               }}
             >
-              <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
-                <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                  <span className="text-2xl">👮</span>
-                  <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
+              {(task.completion_warning || !task.completion_warning) && (
+                <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
+                  <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                    <span className="text-2xl">👮</span>
+                    <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
+                  </div>
+                  <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
+                    {task.completion_warning || 'Only tap Complete AFTER receiving your Completion Card from the Marshal!'}
+                  </p>
+                  <span className="text-2xl flex-shrink-0">🛑</span>
                 </div>
-                <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
-                  Only tap Complete <span className="text-yellow-300 underline underline-offset-2">after</span> receiving your Completion Card from the Marshal!
-                </p>
-                <span className="text-2xl flex-shrink-0">🛑</span>
-              </div>
+              )}
               <button
                 onClick={async () => {
                   if (!scanRecord) return

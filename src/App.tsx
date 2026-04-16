@@ -9,6 +9,7 @@ const ProjectorView         = lazy(() => import('./pages/ProjectorView').then(m 
 const AdminDashboard        = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })))
 const AdminTaskEdit         = lazy(() => import('./pages/AdminTaskEdit').then(m => ({ default: m.AdminTaskEdit })))
 const InstructionsSlide     = lazy(() => import('./pages/InstructionsSlide').then(m => ({ default: m.InstructionsSlide })))
+const InstructionsHub       = lazy(() => import('./pages/InstructionsHub').then(m => ({ default: m.InstructionsHub })))
 const ShapeSequenceProjector = lazy(() => import('./pages/ShapeSequenceProjector').then(m => ({ default: m.ShapeSequenceProjector })))
 const ShapeSequenceAdmin    = lazy(() => import('./pages/ShapeSequenceAdmin').then(m => ({ default: m.ShapeSequenceAdmin })))
 const ShapeSequenceFacilitator = lazy(() => import('./pages/ShapeSequenceFacilitator').then(m => ({ default: m.ShapeSequenceFacilitator })))
@@ -29,7 +30,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<GameSelector />} />
           <Route path="/flag-retrieval" element={<ProjectorDisplay />} />
-          <Route path="/instructions" element={<InstructionsSlide />} />
+          <Route path="/instructions" element={<InstructionsHub />} />
+          <Route path="/instructions/:deckId" element={<InstructionsSlide />} />
           <Route path="/projector" element={<ProjectorView />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/task/:taskId" element={<AdminTaskEdit />} />

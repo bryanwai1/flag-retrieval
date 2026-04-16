@@ -45,7 +45,7 @@ export function ProjectorDisplay() {
 
       {/* Instructions link - top right */}
       <a
-        href="/instructions"
+        href="/instructions/flag-retrieval"
         className="absolute top-5 right-6 z-20 px-4 py-2 bg-white/10 text-white/70 rounded-xl hover:bg-white/20 hover:text-white text-sm font-bold transition-all backdrop-blur-sm flex items-center gap-2"
       >
         📋 Instructions Slide

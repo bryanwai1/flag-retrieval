@@ -1,161 +1,37 @@
-import { useState, useEffect, useCallback } from 'react'
-
-interface Point {
-  icon: string
-  text: string
-  sub: string
-}
-
-interface Slide {
-  id: string
-  gradientFrom: string
-  gradientVia: string
-  gradientTo: string
-  accent: string
-  glowColor: string
-  icon: string
-  stepLabel: string
-  stepColor: string
-  title: string
-  titleColor: string
-  points: Point[]
-  qrNote?: boolean
-}
-
-const slides: Slide[] = [
-  {
-    id: 'register',
-    gradientFrom: '#1e0a3c',
-    gradientVia: '#0f1b4d',
-    gradientTo: '#071e3d',
-    accent: '#a78bfa',
-    glowColor: 'rgba(167,139,250,0.35)',
-    icon: '📱',
-    stepLabel: '⚡ BEFORE YOU START',
-    stepColor: '#a78bfa',
-    title: 'SCAN & REGISTER',
-    titleColor: '#e9d5ff',
-    points: [
-      { icon: '👑', text: 'TEAM LEADERS go first!', sub: 'Scan the main QR code on screen' },
-      { icon: '✍️', text: 'Enter TRIBE NAME + PASSWORD', sub: 'Share the password with your whole team' },
-      { icon: '👥', text: 'Teammates scan & JOIN the tribe', sub: 'Maximum 3 teammates per tribe' },
-    ],
-    qrNote: true,
-  },
-  {
-    id: 'step1',
-    gradientFrom: '#3b0a0a',
-    gradientVia: '#431407',
-    gradientTo: '#1c1002',
-    accent: '#fb923c',
-    glowColor: 'rgba(251,146,60,0.35)',
-    icon: '🚩',
-    stepLabel: 'STEP 1',
-    stepColor: '#fb923c',
-    title: 'FIND THE FLAG!',
-    titleColor: '#fed7aa',
-    points: [
-      { icon: '👀', text: 'Search the ROOM / VENUE', sub: 'Flags are hidden all around you!' },
-      { icon: '🏃', text: 'GRAB the physical flag', sub: 'Each color = a different challenge' },
-    ],
-  },
-  {
-    id: 'step2',
-    gradientFrom: '#03162b',
-    gradientVia: '#061e2f',
-    gradientTo: '#01171f',
-    accent: '#22d3ee',
-    glowColor: 'rgba(34,211,238,0.35)',
-    icon: '📲',
-    stepLabel: 'STEP 2',
-    stepColor: '#22d3ee',
-    title: 'GET THE QR CODE',
-    titleColor: '#a5f3fc',
-    points: [
-      { icon: '🧑‍⚖️', text: 'Go to the MARSHAL', sub: 'They are wearing official vests' },
-      { icon: '📱', text: 'SCAN the QR code they show you', sub: 'Use your phone camera — it\'s easy!' },
-    ],
-  },
-  {
-    id: 'step3',
-    gradientFrom: '#021a0e',
-    gradientVia: '#031e10',
-    gradientTo: '#01171a',
-    accent: '#34d399',
-    glowColor: 'rgba(52,211,153,0.35)',
-    icon: '📋',
-    stepLabel: 'STEP 3',
-    stepColor: '#34d399',
-    title: 'DO THE CHALLENGE!',
-    titleColor: '#a7f3d0',
-    points: [
-      { icon: '📖', text: 'READ the instructions carefully', sub: 'Think before you move!' },
-      { icon: '🧰', text: 'Need PROPS? Grab from marshal table', sub: 'Some challenges need equipment' },
-      { icon: '🎯', text: 'No props? Start ANYWHERE — GO!', sub: 'Just follow what\'s on screen' },
-    ],
-  },
-  {
-    id: 'step4',
-    gradientFrom: '#1c1000',
-    gradientVia: '#1e0f00',
-    gradientTo: '#1a0900',
-    accent: '#fbbf24',
-    glowColor: 'rgba(251,191,36,0.35)',
-    icon: '✅',
-    stepLabel: 'STEP 4',
-    stepColor: '#fbbf24',
-    title: 'VERIFY WITH MARSHAL',
-    titleColor: '#fde68a',
-    points: [
-      { icon: '🏁', text: 'Challenge DONE?', sub: 'Don\'t run off just yet...' },
-      { icon: '🧑‍⚖️', text: 'Show the ONSITE MARSHAL', sub: 'They will check your work' },
-      { icon: '👍', text: 'Wait for VERIFICATION', sub: 'Marshal confirms you did it right!' },
-    ],
-  },
-  {
-    id: 'step5',
-    gradientFrom: '#2d0018',
-    gradientVia: '#1e000f',
-    gradientTo: '#1a0005',
-    accent: '#f472b6',
-    glowColor: 'rgba(244,114,182,0.35)',
-    icon: '🃏',
-    stepLabel: 'STEP 5',
-    stepColor: '#f472b6',
-    title: 'COLLECT YOUR CARD!',
-    titleColor: '#fbcfe8',
-    points: [
-      { icon: '🎉', text: 'VERIFIED — Amazing work!', sub: 'The marshal is proud of you' },
-      { icon: '🃏', text: 'Get your COMPLETION CARD', sub: 'Physical card — handed by marshal' },
-      { icon: '💎', text: 'KEEP IT SAFE — it\'s your proof!', sub: 'Don\'t lose this card!' },
-    ],
-  },
-  {
-    id: 'step6',
-    gradientFrom: '#1a003d',
-    gradientVia: '#1e0035',
-    gradientTo: '#2a0040',
-    accent: '#c084fc',
-    glowColor: 'rgba(192,132,252,0.35)',
-    icon: '🌈',
-    stepLabel: 'STEP 6',
-    stepColor: '#c084fc',
-    title: 'NEXT FLAG — GO AGAIN!',
-    titleColor: '#e9d5ff',
-    points: [
-      { icon: '🔄', text: 'Repeat STEPS 1 to 5', sub: 'For every new flag color' },
-      { icon: '🏆', text: 'Most CARDS / POINTS wins!', sub: 'Collect as many completion cards as you can!' },
-      { icon: '⏱️', text: 'TIME matters too!', sub: 'Fastest tribe wins in a tie — so hustle!' },
-    ],
-  },
-]
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useParams, Navigate } from 'react-router-dom'
+import { decks, getDeck, type Point } from '../lib/instructionDecks'
+import { useSetting } from '../hooks/useSettings'
 
 export function InstructionsSlide() {
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const [visiblePoints, setVisiblePoints] = useState(0)
+  const { deckId } = useParams<{ deckId: string }>()
+  const effectiveId = deckId ?? 'flag-retrieval'
+  const deck = getDeck(effectiveId)
+  if (!deck) return <Navigate to="/instructions" replace />
+
+  const slides = deck.slides
+
+  // Synced state — persisted in Supabase settings table, realtime across all devices
+  const [syncedSlide, setSyncedSlide] = useSetting(`briefing-${effectiveId}-slide`, '0')
+  const [syncedPoints, setSyncedPoints] = useSetting(`briefing-${effectiveId}-points`, '0')
+
+  const currentSlide = Math.min(Number(syncedSlide) || 0, slides.length - 1)
+  const visiblePoints = Math.min(Number(syncedPoints) || 0, slides[currentSlide]?.points.length ?? 0)
+
   const [direction, setDirection] = useState<'right' | 'left'>('right')
   const [slideKey, setSlideKey] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Track previous slide to detect direction for animation
+  const prevSlideRef = useRef(currentSlide)
+  useEffect(() => {
+    if (currentSlide !== prevSlideRef.current) {
+      setDirection(currentSlide > prevSlideRef.current ? 'right' : 'left')
+      setSlideKey(k => k + 1)
+      prevSlideRef.current = currentSlide
+    }
+  }, [currentSlide])
 
   const slide = slides[currentSlide]
   const isLastSlide = currentSlide === slides.length - 1
@@ -163,34 +39,35 @@ export function InstructionsSlide() {
   const advance = useCallback(() => {
     if (isTransitioning) return
     if (visiblePoints < slide.points.length) {
-      setVisiblePoints(v => v + 1)
+      setSyncedPoints(String(visiblePoints + 1))
     } else if (!isLastSlide) {
       setIsTransitioning(true)
       setDirection('right')
       setTimeout(() => {
-        setCurrentSlide(s => s + 1)
-        setVisiblePoints(0)
+        setSyncedSlide(String(currentSlide + 1))
+        setSyncedPoints('0')
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, 80)
     }
-  }, [isTransitioning, visiblePoints, slide.points.length, isLastSlide])
+  }, [isTransitioning, visiblePoints, slide.points.length, isLastSlide, currentSlide, setSyncedSlide, setSyncedPoints])
 
   const goBack = useCallback(() => {
     if (isTransitioning) return
     if (visiblePoints > 0) {
-      setVisiblePoints(v => v - 1)
+      setSyncedPoints(String(visiblePoints - 1))
     } else if (currentSlide > 0) {
       setIsTransitioning(true)
       setDirection('left')
+      const prevPoints = slides[currentSlide - 1].points.length
       setTimeout(() => {
-        setCurrentSlide(s => s - 1)
-        setVisiblePoints(slides[currentSlide - 1].points.length)
+        setSyncedSlide(String(currentSlide - 1))
+        setSyncedPoints(String(prevPoints))
         setSlideKey(k => k + 1)
         setIsTransitioning(false)
       }, 80)
     }
-  }, [isTransitioning, visiblePoints, currentSlide])
+  }, [isTransitioning, visiblePoints, currentSlide, slides, setSyncedSlide, setSyncedPoints])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -228,14 +105,65 @@ export function InstructionsSlide() {
         }}
       />
 
-      {/* Admin link */}
-      <a
-        href="/"
-        className="absolute top-4 left-5 z-30 px-3 py-1.5 rounded-lg text-white/30 hover:text-white/70 text-sm font-medium transition-all"
-        onClick={e => e.stopPropagation()}
-      >
-        ← Home
-      </a>
+      {/* Top-left: Hub link + deck switcher */}
+      <div className="absolute top-4 left-5 z-30 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+        <a
+          href="/instructions"
+          className="px-3 py-1.5 rounded-lg text-white/30 hover:text-white/70 text-sm font-medium transition-all"
+        >
+          ← Decks
+        </a>
+        <span className="text-white/10 text-sm">·</span>
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="px-3 py-1.5 rounded-lg text-white/40 hover:text-white text-sm font-bold transition-all flex items-center gap-1.5"
+            style={{
+              background: `${deck.accent}15`,
+              border: `1.5px solid ${deck.accent}44`,
+            }}
+          >
+            <span>{deck.icon}</span>
+            <span>{deck.label}</span>
+            <span className="text-xs opacity-60">▾</span>
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute top-full left-0 mt-2 w-60 rounded-xl overflow-hidden shadow-2xl"
+              style={{
+                background: 'rgba(12,12,20,0.96)',
+                border: '1.5px solid rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(16px)',
+              }}
+            >
+              <div className="px-3 py-2 text-white/30 text-[10px] font-black tracking-[0.2em] uppercase border-b border-white/10">
+                Instruction Slides
+              </div>
+              {decks.map(d => (
+                <a
+                  key={d.id}
+                  href={`/instructions/${d.id}`}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 transition-colors ${
+                    d.id === deck.id ? 'bg-white/10' : 'hover:bg-white/5'
+                  }`}
+                  style={{
+                    borderLeft: d.id === deck.id ? `3px solid ${d.accent}` : '3px solid transparent',
+                  }}
+                >
+                  <span className="text-lg">{d.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-sm font-bold leading-tight">{d.label}</div>
+                    <div className="text-white/40 text-[10px] leading-tight truncate">{d.tagline}</div>
+                  </div>
+                  {d.id === deck.id && (
+                    <span className="text-white/40 text-xs">●</span>
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Slide counter top-right */}
       <div className="absolute top-4 right-5 z-30 flex items-center gap-2">
@@ -376,7 +304,6 @@ function PointCard({ point, accent, glowColor }: { point: Point; accent: string;
         boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
       }}
     >
-      {/* Icon bubble */}
       <div
         className="text-3xl flex-shrink-0 w-14 h-14 flex items-center justify-center rounded-xl"
         style={{
@@ -387,16 +314,12 @@ function PointCard({ point, accent, glowColor }: { point: Point; accent: string;
       >
         {point.icon}
       </div>
-
-      {/* Text */}
       <div className="flex-1 min-w-0">
         <div className="text-white font-black text-xl leading-tight">{point.text}</div>
         {point.sub && (
           <div className="text-white/50 text-sm font-medium mt-0.5 leading-snug">{point.sub}</div>
         )}
       </div>
-
-      {/* Accent dot */}
       <div
         className="w-2 h-2 rounded-full flex-shrink-0"
         style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}

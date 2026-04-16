@@ -95,6 +95,22 @@ function EventCard({ delay }: { delay: string }) {
         >
           👥 Team Groupings
         </a>
+        <a
+          href="/instructions"
+          className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+          style={{ color: '#a78bfa', border: '1.5px solid rgba(167,139,250,0.27)' }}
+        >
+          📖 Instruction Slides
+        </a>
+        <a
+          href="/briefing.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+          style={{ color: '#DB0011', border: '1.5px solid rgba(219,0,17,0.27)' }}
+        >
+          🛡️ Leader's Briefing
+        </a>
       </div>
     </div>
   )

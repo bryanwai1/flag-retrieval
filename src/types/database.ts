@@ -102,6 +102,7 @@ export interface BingoTask {
   task_type: 'standard' | 'answer'
   answer_question: string | null
   answer_text: string | null
+  completion_warning: string | null
   created_at: string
 }
 

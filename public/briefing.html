@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HSBC KL City Hunt 2026 — Leader's Briefing</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --red:#DB0011;--dark-red:#8B0009;--navy:#0F172A;--navy2:#1B1F3B;
+  --gold:#FFB81C;--white:#FFF;--teal:#00C48C;--purple:#818CF8;
+}
+html,body{height:100%;overflow:hidden;background:var(--navy);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;}
+body{display:flex;flex-direction:column;}
+
+@keyframes bounce{0%,100%{transform:translateY(0) scale(1);}40%{transform:translateY(-16px) scale(1.2);}60%{transform:translateY(-8px) scale(1.1);}}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+@keyframes glowRed{0%,100%{box-shadow:0 0 0 0 rgba(219,0,17,.4);}50%{box-shadow:0 0 24px 8px rgba(219,0,17,0);}}
+@keyframes glowGold{0%,100%{box-shadow:0 0 0 0 rgba(255,184,28,.5);}50%{box-shadow:0 0 24px 8px rgba(255,184,28,0);}}
+@keyframes glowTeal{0%,100%{box-shadow:0 0 0 0 rgba(0,196,140,.4);}50%{box-shadow:0 0 20px 6px rgba(0,196,140,0);}}
+@keyframes wiggle{0%,100%{transform:rotate(0);}20%{transform:rotate(-10deg);}40%{transform:rotate(10deg);}60%{transform:rotate(-6deg);}80%{transform:rotate(6deg);}}
+@keyframes slideRight{0%,100%{transform:translateX(0);}50%{transform:translateX(6px);}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(32px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popIn{0%{opacity:0;transform:scale(.3);}70%{transform:scale(1.1);}100%{opacity:1;transform:scale(1);}}
+@keyframes fadeLeft{from{opacity:0;transform:translateX(-36px);}to{opacity:1;transform:translateX(0);}}
+@keyframes fadeRight{from{opacity:0;transform:translateX(36px);}to{opacity:1;transform:translateX(0);}}
+@keyframes dropDown{from{opacity:0;transform:translateY(-32px);}to{opacity:1;transform:translateY(0);}}
+@keyframes bgFloat1{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(30px,-20px) scale(1.05);}66%{transform:translate(-20px,15px) scale(.95);}}
+@keyframes bgFloat2{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(-25px,20px) scale(.92);}66%{transform:translate(20px,-15px) scale(1.08);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+@keyframes moneyFloat{0%{transform:translateY(0) rotate(-5deg);opacity:.18;}50%{transform:translateY(-30px) rotate(8deg);opacity:.28;}100%{transform:translateY(0) rotate(-5deg);opacity:.18;}}
+@keyframes moneyFloat2{0%{transform:translateY(0) rotate(10deg);opacity:.15;}50%{transform:translateY(-22px) rotate(-6deg);opacity:.25;}100%{transform:translateY(0) rotate(10deg);opacity:.15;}}
+@keyframes coinSpin{0%{transform:rotateY(0deg);}100%{transform:rotateY(360deg);}}
+
+/* ── HOW TO PLAY DEMO ANIMATIONS ── */
+/* Step 1: finger tap on bingo grid */
+@keyframes fingerHover{0%,15%{transform:translate(0,0) scale(1);}35%,55%{transform:translate(38px,-20px) scale(1);}58%,62%{transform:translate(38px,-20px) scale(.85);}65%,85%{transform:translate(38px,-20px) scale(1);}100%{transform:translate(0,0) scale(1);}}
+@keyframes miniTilePick{0%,40%{background:rgba(255,255,255,.07);transform:scale(1);}55%,80%{background:rgba(219,0,17,.7);transform:scale(1.2);box-shadow:0 0 10px 3px rgba(219,0,17,.5);}100%{background:rgba(255,255,255,.07);transform:scale(1);}}
+
+/* Step 2: map route drawing */
+@keyframes routeDraw{0%{stroke-dashoffset:160;}70%{stroke-dashoffset:0;}100%{stroke-dashoffset:0;}}
+@keyframes pinDrop{0%,55%{opacity:0;transform:translateY(-12px) scale(.5);}70%{opacity:1;transform:translateY(3px) scale(1.2);}80%,100%{opacity:1;transform:translateY(0) scale(1);}}
+@keyframes dotPulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.5);opacity:.6;}}
+
+/* Step 3: activity characters */
+@keyframes actSwap{0%,18%{opacity:1;transform:translateY(0);}22%,48%{opacity:0;transform:translateY(-16px);}52%,68%{opacity:1;transform:translateY(0);}72%,98%{opacity:0;transform:translateY(-16px);}100%{opacity:1;transform:translateY(0);}}
+@keyframes actSwap2{0%,18%{opacity:0;transform:translateY(16px);}22%,48%{opacity:1;transform:translateY(0);}52%,68%{opacity:0;transform:translateY(-16px);}72%,98%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(16px);}}
+@keyframes actSwap3{0%,45%{opacity:0;transform:translateY(16px);}52%,68%{opacity:1;transform:translateY(0);}72%,100%{opacity:0;transform:translateY(16px);}}
+@keyframes actSwap4{0%,68%{opacity:0;transform:translateY(16px);}75%,95%{opacity:1;transform:translateY(0);}100%{opacity:0;}}
+
+/* Step 4: camera flash + submit */
+@keyframes cameraFlash{0%,60%{opacity:1;transform:scale(1);}65%{opacity:1;transform:scale(1.2);}67%{opacity:0;}70%,100%{opacity:1;transform:scale(1);}}
+@keyframes flashBurst{0%,60%{opacity:0;transform:scale(0);}63%{opacity:.8;transform:scale(1.5);}70%,100%{opacity:0;transform:scale(0);}}
+@keyframes submitSlide{0%,50%{transform:translateY(20px);opacity:0;}65%,90%{transform:translateY(0);opacity:1;}100%{transform:translateY(20px);opacity:0;}}
+@keyframes checkPop{0%,60%{transform:scale(0);opacity:0;}70%{transform:scale(1.3);opacity:1;}80%,95%{transform:scale(1);opacity:1;}100%{transform:scale(0);opacity:0;}}
+
+/* Step card layout */
+.step-card{display:flex;gap:0;border-radius:16px;border:1px solid rgba(255,255,255,.1);overflow:hidden;width:100%;}
+.step-demo{width:160px;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;padding:16px;}
+.step-body{flex:1;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;}
+.step-num{font-size:9px;font-weight:900;letter-spacing:3px;opacity:.5;text-transform:uppercase;margin-bottom:4px;}
+.step-title{font-size:20px;font-weight:900;line-height:1.2;}
+.step-sub{font-size:12px;opacity:.75;margin-top:4px;line-height:1.4;}
+.step-card.blue{background:rgba(129,140,248,.12);border-left:4px solid var(--purple);}
+.step-card.plain{background:rgba(255,255,255,.06);border-left:4px solid rgba(255,255,255,.2);}
+.step-card.green{background:rgba(0,196,140,.1);border-left:4px solid var(--teal);}
+.step-card.gold{background:rgba(255,184,28,.1);border-left:4px solid var(--gold);}
+.step-demo.blue{background:rgba(129,140,248,.08);}
+.step-demo.plain{background:rgba(255,255,255,.04);}
+.step-demo.green{background:rgba(0,196,140,.08);}
+.step-demo.gold{background:rgba(255,184,28,.08);}
+
+/* Mini bingo grid */
+.mini-bingo{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;width:130px;}
+.mb{height:18px;border-radius:3px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);}
+.mb.target{animation:miniTilePick 3s ease-in-out infinite;}
+.finger{position:absolute;font-size:22px;animation:fingerHover 3s ease-in-out infinite;pointer-events:none;}
+
+/* Map SVG */
+.map-wrap{width:130px;height:90px;position:relative;}
+.map-wrap .pin-emoji{position:absolute;font-size:18px;right:4px;top:2px;animation:pinDrop 3s ease-in-out infinite;}
+.map-wrap .start-dot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--red);bottom:4px;left:14px;animation:dotPulse 1.5s ease-in-out infinite;}
+
+/* Activity emojis */
+.act-wrap{position:relative;width:80px;height:70px;display:flex;align-items:center;justify-content:center;}
+.act{position:absolute;font-size:40px;line-height:1;}
+.act1{animation:actSwap 4s ease-in-out infinite;}
+.act2{animation:actSwap2 4s ease-in-out infinite;}
+.act3{animation:actSwap3 4s ease-in-out infinite;}
+.act4{animation:actSwap4 4s ease-in-out infinite;}
+
+/* Camera / submit */
+.cam-wrap{position:relative;width:120px;height:80px;display:flex;align-items:center;justify-content:center;}
+.cam-icon{font-size:36px;animation:cameraFlash 3s ease-in-out infinite;}
+.flash{position:absolute;inset:0;background:white;border-radius:8px;animation:flashBurst 3s ease-in-out infinite;pointer-events:none;}
+.submit-badge{position:absolute;bottom:0;right:0;background:rgba(0,196,140,.9);border-radius:8px;padding:3px 8px;font-size:10px;font-weight:800;color:#fff;animation:submitSlide 3s ease-in-out infinite;}
+.check-pop{position:absolute;font-size:28px;animation:checkPop 3s ease-in-out infinite;}
+
+.anim-up{animation:fadeUp .5s cubic-bezier(.22,1,.36,1) both;}
+.anim-pop{animation:popIn .45s cubic-bezier(.175,.885,.32,1.275) both;}
+.anim-left{animation:fadeLeft .5s cubic-bezier(.22,1,.36,1) both;}
+.anim-right{animation:fadeRight .5s cubic-bezier(.22,1,.36,1) both;}
+.anim-down{animation:dropDown .5s cubic-bezier(.22,1,.36,1) both;}
+
+.loop-float{animation:float 3s ease-in-out infinite;}
+.loop-bounce{animation:bounce 1.8s cubic-bezier(.36,.07,.19,.97) infinite;}
+.loop-pulse{animation:pulse 2s ease-in-out infinite;}
+.loop-glow-red{animation:glowRed 2s ease-in-out infinite;}
+.loop-glow-gold{animation:glowGold 2s ease-in-out infinite;}
+.loop-glow-teal{animation:glowTeal 2s ease-in-out infinite;}
+.loop-wiggle{animation:wiggle 2.5s ease-in-out infinite;}
+.loop-spin{animation:spin 6s linear infinite;}
+.loop-slide{animation:slideRight 1.5s ease-in-out infinite;}
+.loop-blink{animation:blink 1.2s ease-in-out infinite;}
+
+.s{opacity:0;pointer-events:none;}
+.s.on{pointer-events:auto;}
+
+#top-nav{background:#080D1A;border-bottom:3px solid var(--red);
+  display:flex;align-items:stretch;flex-shrink:0;z-index:100;}
+.nav-tabs{display:flex;overflow-x:auto;flex:1;}
+.nav-tabs::-webkit-scrollbar{height:3px;}
+.nav-tabs::-webkit-scrollbar-thumb{background:var(--red);}
+.tab-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;
+  cursor:pointer;font-size:11px;font-weight:700;color:#6B7280;
+  white-space:nowrap;border:none;background:none;
+  border-bottom:3px solid transparent;margin-bottom:-3px;
+  transition:all .2s;text-transform:uppercase;letter-spacing:.5px;}
+.tab-btn:hover{color:#fff;background:rgba(219,0,17,.1);}
+.tab-btn.active{color:#fff;border-bottom-color:var(--red);background:rgba(219,0,17,.15);}
+.t-icon{font-size:15px;}
+
+#slide-area{flex:1;position:relative;overflow:hidden;cursor:pointer;}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;
+  justify-content:center;align-items:center;padding:30px 50px;}
+.slide.active{display:flex;}
+
+.bg-red{background:linear-gradient(135deg,#C0000E 0%,#7A0009 100%);}
+.bg-dark{background:linear-gradient(135deg,#0A0F1E 0%,#1B2340 100%);}
+.bg-navy2{background:linear-gradient(160deg,#0D1225 0%,#1B2340 100%);}
+.bg-danger{background:linear-gradient(135deg,#5A000A 0%,#8B0009 100%);}
+.bg-teal{background:linear-gradient(135deg,#023440 0%,#026B5A 100%);}
+.bg-gold{background:linear-gradient(135deg,#7C4A00 0%,#B8760A 100%);}
+.bg-safety{background:linear-gradient(135deg,#1A0A2E 0%,#2D1B69 100%);}
+
+.blob{position:absolute;border-radius:50%;filter:blur(60px);pointer-events:none;opacity:.12;}
+.blob1{width:300px;height:300px;background:var(--red);top:-80px;left:-80px;animation:bgFloat1 12s ease-in-out infinite;}
+.blob2{width:250px;height:250px;background:var(--gold);bottom:-60px;right:-60px;animation:bgFloat2 10s ease-in-out infinite;}
+.blob3{width:200px;height:200px;background:var(--teal);top:50%;left:60%;animation:bgFloat1 15s ease-in-out infinite reverse;}
+
+.slide-logo{position:absolute;top:14px;right:16px;opacity:.18;z-index:10;pointer-events:none;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
+.slide-logo svg{width:56px;height:auto;}
+
+.inner{width:100%;max-width:920px;margin:0 auto;}
+.inner.wide{max-width:1020px;}
+.text-center{text-align:center;display:flex;flex-direction:column;align-items:center;}
+
+.label{background:var(--red);color:#fff;font-size:10px;font-weight:900;
+  letter-spacing:3px;text-transform:uppercase;padding:5px 18px;
+  border-radius:4px;display:inline-block;margin-bottom:14px;}
+.label.gold{background:var(--gold);color:#0F172A;}
+.label.teal{background:var(--teal);}
+.label.danger{background:#6B0008;}
+.label.purple{background:#4F46E5;}
+
+.big-title{font-size:66px;font-weight:900;line-height:1;letter-spacing:2px;color:#fff;}
+.big-title span{color:var(--gold);}
+.section-title{font-size:38px;font-weight:900;line-height:1.1;margin-bottom:6px;color:#fff;}
+.section-title span{color:var(--gold);}
+
+.slide, .slide *{color:inherit;}
+.slide{color:#fff;}
+
+.pts{display:flex;flex-direction:column;gap:10px;width:100%;}
+.pts.cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.pts.cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+.pt{display:flex;align-items:center;gap:16px;padding:14px 20px;
+  border-radius:16px;border:1px solid rgba(255,255,255,.1);}
+.pt-icon{font-size:38px;flex-shrink:0;line-height:1;display:block;}
+.pt-label{font-size:19px;font-weight:800;line-height:1.2;color:#fff;}
+.pt-sub{font-size:12px;color:rgba(255,255,255,.8);margin-top:3px;line-height:1.4;font-weight:500;}
+
+.pt.green{background:rgba(0,196,140,.15);border-color:rgba(0,196,140,.3);border-left:4px solid var(--teal);}
+.pt.red{background:rgba(219,0,17,.15);border-color:rgba(219,0,17,.3);border-left:4px solid var(--red);}
+.pt.gold{background:rgba(255,184,28,.15);border-color:rgba(255,184,28,.3);border-left:4px solid var(--gold);}
+.pt.blue{background:rgba(129,140,248,.15);border-color:rgba(129,140,248,.3);border-left:4px solid var(--purple);}
+.pt.plain{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);}
+
+.timeline{display:flex;width:100%;gap:0;align-items:flex-start;margin-top:20px;}
+.tl-item{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;}
+.tl-item:not(:last-child)::after{content:'';position:absolute;top:36px;left:50%;
+  width:100%;height:3px;background:rgba(255,255,255,.12);z-index:0;}
+.tl-dot{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:30px;z-index:1;position:relative;
+  border:3px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);margin-bottom:12px;}
+.tl-time{font-size:22px;font-weight:900;margin-bottom:4px;color:#fff;}
+.tl-label{font-size:13px;text-align:center;line-height:1.4;font-weight:700;color:rgba(255,255,255,.9);}
+.tl-item.gold .tl-dot{background:rgba(255,184,28,.2);border-color:var(--gold);}
+.tl-item.gold .tl-time{color:var(--gold);}
+.tl-item.red .tl-dot{background:rgba(219,0,17,.2);border-color:var(--red);}
+.tl-item.red .tl-time{color:#ff5563;}
+.tl-item.teal .tl-dot{background:rgba(0,196,140,.2);border-color:var(--teal);}
+.tl-item.teal .tl-time{color:var(--teal);}
+.tl-item.green .tl-dot{background:rgba(74,222,128,.15);border-color:#4ADE80;}
+.tl-item.green .tl-time{color:#4ADE80;}
+
+.bingo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+.bc{width:68px;height:52px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:8px;text-align:center;padding:3px;
+  line-height:1.3;font-weight:700;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);transition:all .4s;}
+.bc.lit{background:rgba(219,0,17,.45);border-color:var(--red);transform:scale(1.05);}
+.bc.bingo{background:var(--gold);border-color:var(--gold);color:#0F172A;animation:glowGold 1.5s infinite;}
+.bc.line-done{background:var(--teal);border-color:var(--teal);color:#fff;transform:scale(1.05);}
+
+@keyframes tileSweep{
+  0%{background:rgba(0,196,140,.1);border-color:rgba(0,196,140,.3);transform:scale(1);}
+  30%{background:#fff;border-color:#fff;transform:scale(1.22);
+    box-shadow:0 0 28px 10px rgba(0,196,140,.9),0 0 60px 20px rgba(0,196,140,.4);}
+  60%{background:rgba(0,196,140,.7);border-color:var(--teal);transform:scale(1.1);
+    box-shadow:0 0 16px 6px rgba(0,196,140,.5);}
+  100%{background:var(--teal);border-color:var(--teal);transform:scale(1.05);
+    box-shadow:0 0 8px 2px rgba(0,196,140,.3);}
+}
+.bc.sweep{animation:tileSweep .55s cubic-bezier(.22,1,.36,1) forwards;color:#fff;}
+
+/* BINGO popup */
+.bingo-popup{margin-top:10px;padding:8px 18px;border-radius:14px;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transform:scale(0);transition:all .4s cubic-bezier(.175,.885,.32,1.275);
+  pointer-events:none;min-height:56px;}
+.bingo-popup.show{transform:scale(1);}
+.bingo-popup.show.partial{border-color:rgba(255,184,28,.3);background:rgba(255,184,28,.08);}
+.bingo-popup.show.full{border-color:var(--gold);background:rgba(255,184,28,.15);
+  box-shadow:0 0 30px rgba(255,184,28,.2);}
+.bingo-cele{font-size:28px;line-height:1;}
+.bingo-letter{font-size:36px;font-weight:900;line-height:1;letter-spacing:2px;}
+.bingo-letter.on{color:var(--gold);animation:popIn .4s cubic-bezier(.175,.885,.32,1.275) both;}
+.bingo-letter.off{color:rgba(255,255,255,.12);}
+.bingo-popup.full .bingo-letter.on{animation:popIn .4s cubic-bezier(.175,.885,.32,1.275) both, glowGold 1.5s ease-in-out infinite .5s;}
+.bingo-popup.full .bingo-cele{animation:bounce 1.8s cubic-bezier(.36,.07,.19,.97) infinite;}
+
+.chip{display:inline-flex;align-items:center;gap:8px;padding:10px 28px;
+  border-radius:50px;font-size:14px;font-weight:700;letter-spacing:1px;
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);}
+
+.hbox{background:rgba(255,184,28,.12);border:2px solid var(--gold);
+  border-radius:14px;padding:16px 22px;width:100%;text-align:center;}
+.hbox.red{background:rgba(219,0,17,.15);border-color:var(--red);}
+.hbox.teal{background:rgba(0,196,140,.12);border-color:var(--teal);}
+
+.transport-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+.tr-chip{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 24px;
+  border-radius:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  font-size:13px;font-weight:800;}
+.tr-chip .tri{font-size:38px;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;width:100%;align-items:start;}
+
+.announce{text-align:center;padding:24px 32px;border-radius:20px;width:100%;
+  background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);}
+.announce .a-icon{font-size:56px;margin-bottom:10px;}
+.announce h2{font-size:32px;font-weight:900;}
+.announce h2 span{color:var(--gold);}
+.announce p{font-size:15px;opacity:.8;margin-top:6px;}
+
+.div{width:50px;height:4px;background:var(--gold);border-radius:2px;margin:12px 0;}
+.div.red{background:var(--red);}
+.div.teal{background:var(--teal);}
+
+.return-ring{width:150px;height:150px;border-radius:50%;
+  border:5px solid var(--teal);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;background:rgba(0,196,140,.1);flex-shrink:0;}
+.return-ring .rr-t{font-size:34px;font-weight:900;color:var(--teal);}
+.return-ring .rr-l{font-size:10px;letter-spacing:2px;opacity:.7;}
+
+#bottom-bar{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 24px;background:#080D1A;
+  border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+.slide-info{font-size:12px;color:#9CA3AF;}
+.slide-info span{color:#fff;font-weight:700;}
+.step-dots{display:flex;gap:5px;align-items:center;}
+.dot{width:7px;height:7px;border-radius:50%;background:#1E293B;transition:all .3s;}
+.dot.done{background:var(--red);}
+.dot.cur{background:var(--gold);width:20px;border-radius:4px;}
+.btn-row{display:flex;gap:10px;}
+.btn{padding:8px 22px;border:none;border-radius:6px;cursor:pointer;
+  font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;transition:all .2s;}
+.btn-prev{background:#1E293B;color:#9CA3AF;}
+.btn-prev:hover{background:#374151;color:#fff;}
+.btn-next{background:var(--red);color:#fff;}
+.btn-next:hover{background:#B0000E;}
+
+.click-hint{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);
+  background:rgba(255,184,28,.15);border:1px solid rgba(255,184,28,.4);
+  padding:8px 24px;border-radius:50px;font-size:12px;color:var(--gold);
+  letter-spacing:1px;font-weight:700;pointer-events:none;
+  animation:fadeUp .6s ease 2s both;z-index:200;}
+
+/* ── ALWAYS-EDITABLE ── */
+[data-editable]{cursor:text;min-width:40px;border-radius:4px;
+  outline:2px solid transparent;outline-offset:2px;transition:outline .2s,background .2s;}
+[data-editable]:hover{outline:2px dashed rgba(255,184,28,.35);}
+[data-editable]:focus{outline:2px solid var(--gold);background:rgba(255,184,28,.08);}
+
+.add-contact-btn{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 20px;
+  border-radius:12px;background:rgba(255,255,255,.08);border:2px dashed rgba(255,255,255,.25);
+  cursor:pointer;font-size:14px;font-weight:700;color:rgba(255,255,255,.6);
+  transition:all .3s;margin-top:10px;}
+.add-contact-btn:hover{background:rgba(255,184,28,.15);border-color:var(--gold);color:var(--gold);}
+
+.contact-card{background:rgba(219,0,17,.25);border:2px solid var(--red);border-radius:14px;
+  padding:22px;text-align:center;position:relative;}
+.contact-card .remove-contact{position:absolute;top:8px;right:10px;background:rgba(255,255,255,.1);
+  border:none;color:rgba(255,255,255,.4);font-size:16px;cursor:pointer;width:28px;height:28px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.contact-card .remove-contact:hover{background:var(--red);color:#fff;}
+</style>
+</head>
+<body>
+
+
+<nav id="top-nav">
+  <div class="nav-tabs" id="nav-tabs">
+    <button class="tab-btn active" data-section="0" onclick="jumpToSection(0)"><span class="t-icon">&#128197;</span> Overview</button>
+    <button class="tab-btn" data-section="1" onclick="jumpToSection(1)"><span class="t-icon">&#127919;</span> The Goal</button>
+    <button class="tab-btn" data-section="2" onclick="jumpToSection(2)"><span class="t-icon">&#128506;</span> Location</button>
+    <button class="tab-btn" data-section="3" onclick="jumpToSection(3)"><span class="t-icon">&#128737;</span> Safety</button>
+    <button class="tab-btn" data-section="4" onclick="jumpToSection(4)"><span class="t-icon">&#128176;</span> Budget</button>
+    <button class="tab-btn" data-section="5" onclick="jumpToSection(5)"><span class="t-icon">&#128647;</span> Transport</button>
+    <button class="tab-btn" data-section="6" onclick="jumpToSection(6)"><span class="t-icon">&#128081;</span> Leaders</button>
+    <button class="tab-btn" data-section="7" onclick="jumpToSection(7)"><span class="t-icon">&#128680;</span> Emergency</button>
+    <button class="tab-btn" data-section="8" onclick="jumpToSection(8)"><span class="t-icon">&#127937;</span> Return</button>
+  </div>
+</nav>
+
+<div id="slide-area" onclick="handleSlideClick(event)">
+
+<!-- S0  TITLE -->
+<div class="slide bg-red text-center active" data-section="0" data-max="2">
+  <div class="blob blob1"></div><div class="blob blob2"></div>
+  <div class="inner" style="max-width:760px;">
+    <div class="s" data-step="0" data-anim="anim-pop" data-loop="loop-float">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 140"
+        style="width:90px;height:auto;margin-bottom:18px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.5));">
+        <polygon points="0,70 65,0 65,140" fill="#fff"/>
+        <polygon points="260,70 195,0 195,140" fill="#fff"/>
+        <polygon points="65,0 130,70 195,0" fill="#fff"/>
+        <polygon points="65,140 130,70 195,140" fill="#fff"/>
+        <polygon points="65,0 130,70 65,140" fill="rgba(200,0,12,.7)"/>
+        <polygon points="195,0 130,70 195,140" fill="rgba(200,0,12,.7)"/>
+      </svg>
+      <div class="big-title" data-editable>LEADER'S<br>BRIEFING</div>
+    </div>
+    <div class="s" data-step="1" data-anim="anim-up">
+      <div style="font-size:22px;font-weight:300;opacity:.9;margin-top:14px;" data-editable>HSBC KL City Hunt 2026</div>
+      <div class="div" style="margin:14px auto;"></div>
+      <div style="font-size:13px;opacity:.65;letter-spacing:3px;text-transform:uppercase;" data-editable>Bingo Dash Edition &middot; KL Explorace</div>
+    </div>
+    <div class="s" data-step="2" data-anim="anim-pop" data-loop="loop-pulse">
+      <div class="chip" style="margin-top:28px;" data-editable>&#128197; 14 April 2026 &middot; KL City Centre &middot; 120 Pax</div>
+      <div style="margin-top:24px;font-size:11px;opacity:.45;letter-spacing:2px;">CLICK ANYWHERE &middot; SPACE &middot; &rarr; TO ADVANCE</div>
+    </div>
+  </div>
+</div>
+
+<!-- S1  TIMELINE -->
+<div class="slide bg-dark" data-section="0" data-max="4">
+  <div class="blob blob1"></div><div class="blob blob3"></div>
+  <div class="inner wide">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label">Today's Plan</div>
+      <div class="section-title">What Happens <span>Today?</span></div>
+      <div class="div" style="margin-bottom:4px;"></div>
+    </div>
+    <div class="timeline">
+      <div class="tl-item gold s" data-step="1" data-anim="anim-pop" data-loop="loop-float">
+        <div class="tl-dot loop-bounce">&#9889;</div>
+        <div class="tl-time" data-editable>9:00 AM</div>
+        <div class="tl-label" data-editable>Energizer &amp;<br>Team Up!</div>
+      </div>
+      <div class="tl-item red s" data-step="2" data-anim="anim-pop" data-loop="loop-float">
+        <div class="tl-dot loop-bounce">&#128640;</div>
+        <div class="tl-time" data-editable>9:30 AM</div>
+        <div class="tl-label" data-editable>HUNT<br>BEGINS!</div>
+      </div>
+      <div class="tl-item teal s" data-step="3" data-anim="anim-pop" data-loop="loop-float">
+        <div class="tl-dot loop-bounce">&#127937;</div>
+        <div class="tl-time" data-editable>1:30 PM</div>
+        <div class="tl-label" data-editable>Back to<br>HSBC HQ</div>
+      </div>
+      <div class="tl-item green s" data-step="4" data-anim="anim-pop" data-loop="loop-float">
+        <div class="tl-dot loop-bounce">&#127942;</div>
+        <div class="tl-time" data-editable>2:00 PM</div>
+        <div class="tl-label" data-editable>Lunch &amp;<br>Results!</div>
+      </div>
+    </div>
+    <div class="s" data-step="4" data-anim="anim-up" style="margin-top:22px;">
+      <div class="hbox teal" style="font-size:15px;font-weight:700;">&#9201; You have <strong style="color:var(--teal);" data-editable>4 hours</strong> in the city. Make it count!</div>
+    </div>
+  </div>
+</div>
+
+<!-- S2  THE GOAL -->
+<div class="slide bg-navy2" data-section="1" data-max="4">
+  <div class="blob blob2"></div><div class="blob blob3"></div>
+  <div class="inner wide">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label">The Goal</div>
+      <div class="section-title"><span>Bingo Dash</span> &mdash; Your Mission!</div>
+    </div>
+    <div style="display:flex;gap:28px;align-items:center;margin-top:16px;width:100%;">
+      <div style="position:relative;flex-shrink:0;">
+        <div class="bingo-grid" id="bingo-grid">
+          <div class="bc" id="b0">Street Food</div><div class="bc" id="b1">Batik Art</div><div class="bc" id="b2">Roti Canai</div><div class="bc" id="b3">Teh Tarik</div><div class="bc" id="b4">Heritage</div>
+          <div class="bc" id="b5">Calligraphy</div><div class="bc" id="b6">Coconut Bowl</div><div class="bc" id="b7">Chapteh</div><div class="bc" id="b8">Batu Seremban</div><div class="bc" id="b9">Chinese Yoyo</div>
+          <div class="bc" id="b10">Selfie Spot</div><div class="bc" id="b11">Culture Quiz</div><div class="bc" id="b12" style="background:rgba(255,184,28,.25);border-color:var(--gold);font-size:13px;">&#9733;FREE&#9733;</div><div class="bc" id="b13">Local Chat</div><div class="bc" id="b14">Temple Task</div>
+          <div class="bc" id="b15">Street Art</div><div class="bc" id="b16">Market Hunt</div><div class="bc" id="b17">Team Pose</div><div class="bc" id="b18">Food ID</div><div class="bc" id="b19">Language</div>
+          <div class="bc" id="b20">Mini Game</div><div class="bc" id="b21">Architecture</div><div class="bc" id="b22">Landmark</div><div class="bc" id="b23">Photo Story</div><div class="bc" id="b24">Bonus!</div>
+        </div>
+        <div class="bingo-popup" id="bingo-popup">
+          <span class="bingo-cele" id="cele-l">&#127881;</span>
+          <span class="bingo-letter off" id="bl-B">B</span>
+          <span class="bingo-letter off" id="bl-I">I</span>
+          <span class="bingo-letter off" id="bl-N">N</span>
+          <span class="bingo-letter off" id="bl-G">G</span>
+          <span class="bingo-letter off" id="bl-O">O</span>
+          <span class="bingo-cele" id="cele-r">&#127881;</span>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:12px;">
+        <div class="s" data-step="1" data-anim="anim-right" data-loop="loop-float">
+          <div class="pt plain" style="border-left:4px solid #818CF8;">
+            <span class="pt-icon loop-bounce">&#127922;</span>
+            <div><div class="pt-label" data-editable>Complete tasks to light up tiles</div><div class="pt-sub" data-editable>Each task you finish fills one square on your grid</div></div>
+          </div>
+        </div>
+        <div class="s" data-step="2" data-anim="anim-right" data-loop="loop-float">
+          <div class="pt gold">
+            <span class="pt-icon loop-wiggle">&#127919;</span>
+            <div><div class="pt-label" data-editable>1 Line = Getting started!</div><div class="pt-sub" data-editable>5 in a row &mdash; but you're not done yet!</div></div>
+          </div>
+        </div>
+        <div class="s" data-step="3" data-anim="anim-right" data-loop="loop-float">
+          <div class="pt green">
+            <span class="pt-icon loop-bounce">&#127942;</span>
+            <div><div class="pt-label" data-editable>3 Lines = Almost there!</div><div class="pt-sub" data-editable>Rows, columns &amp; diagonals all count</div></div>
+          </div>
+        </div>
+        <div class="s" data-step="4" data-anim="anim-right">
+          <div class="pt red" style="border-left:4px solid var(--gold);">
+            <span class="pt-icon loop-slide">&#128293;</span>
+            <div><div class="pt-label" data-editable>5 Lines = BINGO! Keep going!</div><div class="pt-sub" data-editable>Finish all 25 tasks for MAXIMUM bonus points &#127942;</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S3  HOW TO PLAY -->
+<div class="slide bg-dark" data-section="1" data-max="4">
+  <div class="blob blob1"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label">How to Play</div>
+      <div class="section-title">4 Simple <span>Steps</span></div>
+      <div class="div" style="margin-bottom:8px;"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;width:100%;">
+
+      <!-- STEP 1: PICK A TASK -->
+      <div class="step-card blue s" data-step="1" data-anim="anim-left">
+        <div class="step-demo blue">
+          <!-- Mini bingo grid + animated finger -->
+          <div style="position:relative;">
+            <div class="mini-bingo">
+              <div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div>
+              <div class="mb"></div><div class="mb"></div><div class="mb target"></div><div class="mb"></div><div class="mb"></div>
+              <div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div>
+              <div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div>
+              <div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div>
+            </div>
+            <div class="finger">&#128072;</div>
+          </div>
+        </div>
+        <div class="step-body">
+          <div class="step-num">Step 1</div>
+          <div class="step-title" data-editable>&#129517; PICK a Task</div>
+          <div class="step-sub" data-editable>Tap any tile on your Bingo grid — each one is a unique challenge in KL</div>
+        </div>
+      </div>
+
+      <!-- STEP 2: GO THERE -->
+      <div class="step-card plain s" data-step="2" data-anim="anim-left">
+        <div class="step-demo plain">
+          <div class="map-wrap">
+            <svg viewBox="0 0 130 90" width="130" height="90" xmlns="http://www.w3.org/2000/svg">
+              <!-- Street grid -->
+              <line x1="18" y1="0" x2="18" y2="90" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <line x1="65" y1="0" x2="65" y2="90" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <line x1="112" y1="0" x2="112" y2="90" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <line x1="0" y1="22" x2="130" y2="22" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <line x1="0" y1="55" x2="130" y2="55" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <line x1="0" y1="78" x2="130" y2="78" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+              <!-- Blocks (building rects) -->
+              <rect x="24" y="28" width="36" height="22" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="24" y="60" width="36" height="14" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="71" y="28" width="36" height="22" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="71" y="60" width="36" height="14" rx="3" fill="rgba(255,255,255,.05)"/>
+              <rect x="24" y="4" width="36" height="14" rx="3" fill="rgba(255,255,255,.05)"/>
+              <!-- Animated route: bottom-left → up → right → up → right -->
+              <path d="M18,78 L18,55 L65,55 L65,22 L112,22"
+                stroke="#00C48C" stroke-width="2.5" fill="none"
+                stroke-dasharray="160" stroke-dashoffset="160"
+                stroke-linecap="round" stroke-linejoin="round"
+                style="animation:routeDraw 3s ease-in-out infinite;"/>
+              <!-- Start dot -->
+              <circle cx="18" cy="78" r="5" fill="#DB0011" style="animation:dotPulse 1.5s ease-in-out infinite;"/>
+            </svg>
+            <div class="pin-emoji">&#128205;</div>
+          </div>
+        </div>
+        <div class="step-body">
+          <div class="step-num">Step 2</div>
+          <div class="step-title" data-editable>&#128647; GO There</div>
+          <div class="step-sub" data-editable>Navigate using LRT / MRT / bus — your team travels together, always</div>
+        </div>
+      </div>
+
+      <!-- STEP 3: DO THE TASK -->
+      <div class="step-card green s" data-step="3" data-anim="anim-left">
+        <div class="step-demo green">
+          <div class="act-wrap">
+            <div class="act act1">&#127939;</div>
+            <div class="act act2">&#127917;</div>
+            <div class="act act3">&#128247;</div>
+            <div class="act act4">&#127919;</div>
+          </div>
+        </div>
+        <div class="step-body">
+          <div class="step-num">Step 3</div>
+          <div class="step-title" data-editable>&#127917; DO the Task</div>
+          <div class="step-sub" data-editable>Complete the challenge as a team — food, culture, games, photos &amp; more!</div>
+        </div>
+      </div>
+
+      <!-- STEP 4: TAKE PHOTO & SUBMIT -->
+      <div class="step-card gold s" data-step="4" data-anim="anim-left">
+        <div class="step-demo gold">
+          <div class="cam-wrap">
+            <div class="flash"></div>
+            <div class="cam-icon">&#128248;</div>
+            <div class="check-pop">&#9989;</div>
+            <div class="submit-badge">SUBMITTED ✓</div>
+          </div>
+        </div>
+        <div class="step-body">
+          <div class="step-num">Step 4</div>
+          <div class="step-title" data-editable>&#128248; Snap &amp; Submit</div>
+          <div class="step-sub" data-editable>Everyone in the shot &mdash; then submit for marshal verification. <strong style="color:var(--gold);">Onsite marshal or online submission.</strong></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- S4  LOCATION TILES -->
+<div class="slide bg-navy2" data-section="2" data-max="3">
+  <div class="blob blob2"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label">Location Rules</div>
+      <div class="section-title">Reading the <span>Task Tiles</span></div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts" style="margin-top:8px;">
+      <div class="s" data-step="1" data-anim="anim-left" data-loop="loop-float">
+        <div style="background:rgba(219,0,17,.2);border:2px solid var(--red);border-radius:14px;padding:18px 22px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:.6;margin-bottom:4px;">EXAMPLE TASK TILE</div>
+          <div style="font-size:26px;font-weight:900;margin-bottom:8px;">&#128341; Temple Task</div>
+          <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700;">&#128205; PUBLIC AREA</div>
+          <div style="font-size:13px;opacity:.75;margin-top:10px;">Take a team photo at a temple or heritage site entrance</div>
+        </div>
+      </div>
+      <div class="pt gold s" data-step="2" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-wiggle">&#128506;</span>
+        <div><div class="pt-label" data-editable>"TEMPLE" = Outside Only</div><div class="pt-sub" data-editable>Entrance, courtyard, public areas &mdash; easy access, no permission needed</div></div>
+      </div>
+      <div class="pt green s" data-step="3" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#9989;</span>
+        <div><div class="pt-label" data-editable>Can't get in? Just skip it!</div><div class="pt-sub" data-editable>Always a public alternative nearby &mdash; no task is worth forcing entry</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S5  DO'S & DON'TS -->
+<div class="slide bg-dark" data-section="2" data-max="6">
+  <div class="blob blob1"></div><div class="blob blob3"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label">Location Rules</div>
+      <div class="section-title">Do's &amp; <span>Don'ts</span></div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts" style="margin-top:6px;">
+      <div class="pt green s" data-step="1" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#9989;</span>
+        <div><div class="pt-label" data-editable>Public spaces only</div><div class="pt-sub" data-editable>Anywhere the public can freely walk</div></div>
+      </div>
+      <div class="pt green s" data-step="2" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128591;</span>
+        <div><div class="pt-label" data-editable>Be kind &amp; respectful</div><div class="pt-sub" data-editable>Talk softly, smile, represent HSBC well</div></div>
+      </div>
+      <div class="pt green s" data-step="3" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#129529;</span>
+        <div><div class="pt-label" data-editable>Keep it clean</div><div class="pt-sub" data-editable>Leave no litter &mdash; leave every place better than you found it</div></div>
+      </div>
+      <div class="pt red s" data-step="4" data-anim="anim-right" data-loop="loop-float">
+        <span class="pt-icon loop-wiggle">&#128683;</span>
+        <div><div class="pt-label" data-editable>No sneaking in!</div><div class="pt-sub" data-editable>Skip any gated or restricted area</div></div>
+      </div>
+      <div class="pt red s" data-step="5" data-anim="anim-right" data-loop="loop-float">
+        <span class="pt-icon loop-wiggle">&#128179;</span>
+        <div><div class="pt-label" data-editable>No paid entry to complete tasks</div><div class="pt-sub" data-editable>Budget is for transport, food &amp; souvenirs only</div></div>
+      </div>
+      <div class="pt red s" data-step="6" data-anim="anim-right" data-loop="loop-float">
+        <span class="pt-icon loop-wiggle">&#128226;</span>
+        <div><div class="pt-label" data-editable>No loud or rude behaviour</div><div class="pt-sub" data-editable>No shouting, blocking walkways or causing scenes</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S6  SAFETY -->
+<div class="slide bg-safety" data-section="3" data-max="5">
+  <div class="blob blob1" style="background:#818CF8;"></div><div class="blob blob2" style="background:var(--red);"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label purple">&#128737; Safety First</div>
+      <div class="section-title">Stay <span>Safe</span> Out There!</div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts cols2" style="margin-top:8px;">
+      <div class="pt gold s" data-step="1" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128101;</span>
+        <div><div class="pt-label" data-editable>Always stay together</div><div class="pt-sub" data-editable>Nobody moves alone. Ever.</div></div>
+      </div>
+      <div class="pt gold s" data-step="2" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128678;</span>
+        <div><div class="pt-label" data-editable>Watch the road!</div><div class="pt-sub" data-editable>Use crossings. KL traffic is no joke.</div></div>
+      </div>
+      <div class="pt blue s" data-step="3" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128167;</span>
+        <div><div class="pt-label" data-editable>Drink water often</div><div class="pt-sub" data-editable>KL heat is real &mdash; stay hydrated!</div></div>
+      </div>
+      <div class="pt blue s" data-step="4" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-wiggle">&#127783;</span>
+        <div><div class="pt-label" data-editable>Heavy rain? Find shelter!</div><div class="pt-sub" data-editable>Don't travel in a storm &mdash; wait it out</div></div>
+      </div>
+      <div class="pt red s" data-step="5" data-anim="anim-pop" data-loop="loop-glow-red" style="grid-column:1/-1;">
+        <span class="pt-icon loop-wiggle">&#129298;</span>
+        <div><div class="pt-label" data-editable>Anyone unwell? STOP. Call facilitator.</div><div class="pt-sub" data-editable>No task is worth anyone's health. Stop immediately.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S7  BUDGET -->
+<div class="slide bg-dark" data-section="4" data-max="3" style="background:linear-gradient(135deg,#0A0F1E 0%,#1a1400 60%,#0A0F1E 100%);">
+  <!-- Floating money emojis background -->
+  <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
+    <div style="position:absolute;font-size:52px;top:8%;left:3%;animation:moneyFloat 5s ease-in-out infinite;">&#128181;</div>
+    <div style="position:absolute;font-size:40px;top:15%;right:5%;animation:moneyFloat2 4s ease-in-out infinite 1s;">&#129689;</div>
+    <div style="position:absolute;font-size:60px;bottom:10%;left:6%;animation:moneyFloat2 6s ease-in-out infinite .5s;">&#128180;</div>
+    <div style="position:absolute;font-size:36px;bottom:15%;right:4%;animation:moneyFloat 4.5s ease-in-out infinite 2s;">&#128176;</div>
+    <div style="position:absolute;font-size:44px;top:50%;left:1%;animation:moneyFloat 7s ease-in-out infinite 1.5s;">&#128184;</div>
+    <div style="position:absolute;font-size:30px;top:30%;right:2%;animation:moneyFloat2 5.5s ease-in-out infinite .8s;">&#128183;</div>
+  </div>
+  <div class="inner" style="position:relative;z-index:2;">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label gold">&#128176; Team Budget</div>
+      <div class="section-title">Your Team's <span>Money</span></div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="two-col" style="margin-top:10px;align-items:center;">
+
+      <!-- BIG AMOUNT -->
+      <div class="s" data-step="1" data-anim="anim-pop" data-loop="loop-pulse" style="text-align:center;">
+        <div style="background:rgba(255,184,28,.1);border:2px solid rgba(255,184,28,.3);border-radius:24px;padding:28px 36px;position:relative;overflow:hidden;">
+          <div style="font-size:22px;font-weight:900;color:rgba(255,184,28,.7);letter-spacing:6px;margin-bottom:4px;">RM</div>
+          <div style="font-size:110px;font-weight:900;color:var(--gold);line-height:.9;text-shadow:0 0 40px rgba(255,184,28,.4);" data-editable>300</div>
+          <div style="font-size:13px;font-weight:900;color:rgba(255,255,255,.5);letter-spacing:4px;margin-top:10px;text-transform:uppercase;">Per Team</div>
+        </div>
+      </div>
+
+      <!-- WHAT IT COVERS -->
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="s" data-step="2" data-anim="anim-right" data-loop="loop-float">
+          <div style="background:rgba(255,184,28,.08);border:1.5px solid rgba(255,184,28,.2);border-radius:16px;padding:18px 20px;">
+            <div style="font-size:11px;font-weight:900;letter-spacing:3px;color:var(--gold);opacity:.7;margin-bottom:14px;">THIS COVERS:</div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;align-items:center;gap:14px;">
+                <span class="loop-bounce" style="font-size:30px;display:inline-block;">&#128647;</span>
+                <span style="font-size:18px;font-weight:800;color:#fff;" data-editable>Transport fares</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <span class="loop-bounce" style="font-size:30px;display:inline-block;animation-delay:.3s">&#127836;</span>
+                <span style="font-size:18px;font-weight:800;color:#fff;" data-editable>Food &amp; drinks</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <span class="loop-bounce" style="font-size:30px;display:inline-block;animation-delay:.6s">&#128717;</span>
+                <span style="font-size:18px;font-weight:800;color:#fff;" data-editable>Souvenirs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="s" data-step="3" data-anim="anim-up">
+          <div style="background:rgba(219,0,17,.15);border:1.5px solid rgba(219,0,17,.3);border-radius:12px;padding:14px 18px;text-align:center;">
+            <span style="font-size:15px;font-weight:800;color:#fff;" data-editable>&#128161; Spend smart &mdash; you only get this much!</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- S8  TRANSPORT -->
+<div class="slide bg-dark" data-section="5" data-max="3">
+  <div class="blob blob3"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label teal">&#128647; Transport</div>
+      <div class="section-title">Getting <span>Around KL</span></div>
+      <div class="div teal" style="margin-bottom:8px;"></div>
+    </div>
+    <div class="s" data-step="1" data-anim="anim-up" data-loop="loop-float">
+      <div class="transport-row">
+        <div class="tr-chip" style="border-color:var(--teal);"><div class="tri loop-bounce">&#128647;</div><span data-editable>LRT / MRT</span></div>
+        <div class="tr-chip" style="border-color:var(--teal);"><div class="tri loop-bounce" style="animation-delay:.4s">&#128652;</div><span data-editable>Public Bus</span></div>
+        <div class="tr-chip" style="border-color:var(--teal);"><div class="tri loop-bounce" style="animation-delay:.8s">&#128694;</div><span data-editable>Walking</span></div>
+      </div>
+    </div>
+    <div class="pts" style="margin-top:14px;">
+      <div class="pt green s" data-step="2" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128101;</span>
+        <div><div class="pt-label" data-editable>Team travels together &mdash; always</div><div class="pt-sub" data-editable>Same train, same bus, same station. No one left behind.</div></div>
+      </div>
+      <div class="pt red s" data-step="3" data-anim="anim-left" data-loop="loop-glow-red">
+        <span class="pt-icon loop-wiggle">&#128683;</span>
+        <div><div class="pt-label" data-editable>NO splitting up!</div><div class="pt-sub" data-editable>Splitting = automatic disqualification. Not worth it.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S9  LEADER'S JOB -->
+<div class="slide bg-navy2" data-section="6" data-max="6">
+  <div class="blob blob1"></div><div class="blob blob2"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label gold">&#128081; Leader's Code</div>
+      <div class="section-title">Your <span>6 Jobs</span> as Leader</div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts cols2" style="margin-top:8px;">
+      <div class="pt gold s" data-step="1" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128064;</span>
+        <div><div class="pt-label" data-editable>Watch your team</div><div class="pt-sub" data-editable>Check their health &amp; energy constantly</div></div>
+      </div>
+      <div class="pt gold s" data-step="2" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#9201;</span>
+        <div><div class="pt-label" data-editable>Watch the clock</div><div class="pt-sub" data-editable>Head back by 1:00 PM &mdash; don't cut it close</div></div>
+      </div>
+      <div class="pt blue s" data-step="3" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128248;</span>
+        <div><div class="pt-label" data-editable>Check every photo</div><div class="pt-sub" data-editable>All members visible. Clear shot. Before leaving.</div></div>
+      </div>
+      <div class="pt blue s" data-step="4" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128222;</span>
+        <div><div class="pt-label" data-editable>Call if anything</div><div class="pt-sub" data-editable>Don't solve problems alone &mdash; call facilitator</div></div>
+      </div>
+      <div class="pt red s" data-step="5" data-anim="anim-pop" data-loop="loop-glow-red">
+        <span class="pt-icon loop-wiggle">&#128241;</span>
+        <div><div class="pt-label" data-editable>Only 2 people access the Bingo app</div><div class="pt-sub" data-editable>Max 2 members per group on the app &mdash; the rest focus on tasks &amp; teamwork!</div></div>
+      </div>
+      <div class="pt green s" data-step="6" data-anim="anim-pop" data-loop="loop-glow-teal" style="grid-column:1/-1;">
+        <span class="pt-icon loop-bounce">&#127942;</span>
+        <div><div class="pt-label" data-editable>Be the energy your team needs!</div><div class="pt-sub" data-editable>Your vibe sets the tone &mdash; stay positive, stay decisive</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S9B EXPLORATION ZONES -->
+<div class="slide bg-dark" data-section="6" data-max="3">
+  <div class="blob blob1" style="background:#38bdf8;"></div><div class="blob blob3" style="background:#f472b6;"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label" style="background:#38bdf8;color:#0F172A;">&#128506; Exploration Zones</div>
+      <div class="section-title">Places You'll <span>Explore</span></div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts" style="margin-top:8px;">
+      <div class="pt blue s" data-step="1" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#127963;</span>
+        <div><div class="pt-label" data-editable>Central Market</div><div class="pt-sub" data-editable>Iconic heritage building &amp; surrounding area &mdash; explore the art, culture &amp; shops</div></div>
+      </div>
+      <div class="pt gold s" data-step="2" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#127982;</span>
+        <div><div class="pt-label" data-editable>Heritage Places at Petaling Street</div><div class="pt-sub" data-editable>Historical landmarks &amp; cultural hotspots along the famous street</div></div>
+      </div>
+      <div class="pt green s" data-step="3" data-anim="anim-left" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#9961;</span>
+        <div><div class="pt-label" data-editable>Temple &amp; Petaling Street</div><div class="pt-sub" data-editable>Temples, vibrant street life &amp; hidden gems to discover</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S9C WHAT TO BRING + MARSHAL RULES -->
+<div class="slide bg-dark" data-section="6" data-max="6">
+  <div class="blob blob2" style="background:#e879f9;"></div><div class="blob blob1" style="background:#fbbf24;"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label" style="background:#e879f9;color:#0F172A;">&#127890; Gear Up</div>
+      <div class="section-title">What to <span>Bring</span></div>
+      <div class="div" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="pts cols2" style="margin-top:8px;">
+      <div class="pt blue s" data-step="1" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128241;</span>
+        <div><div class="pt-label" data-editable>Phone &mdash; fully charged</div><div class="pt-sub" data-editable>You'll need it for scanning QR codes &amp; navigation</div></div>
+      </div>
+      <div class="pt blue s" data-step="2" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128095;</span>
+        <div><div class="pt-label" data-editable>Comfortable shoes</div><div class="pt-sub" data-editable>You'll be walking &amp; running around the city!</div></div>
+      </div>
+      <div class="pt green s" data-step="3" data-anim="anim-pop" data-loop="loop-float">
+        <span class="pt-icon loop-bounce">&#128167;</span>
+        <div><div class="pt-label" data-editable>Water bottle</div><div class="pt-sub" data-editable>Stay hydrated &mdash; KL heat is no joke!</div></div>
+      </div>
+      <div class="pt gold s" data-step="4" data-anim="anim-pop" data-loop="loop-glow-gold">
+        <span class="pt-icon loop-bounce">&#128221;</span>
+        <div><div class="pt-label" data-editable>Paper or book for route planning</div><div class="pt-sub" data-editable>Strategize your route &mdash; plan which stations to hit first!</div></div>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <div class="s" data-step="5" data-anim="anim-down">
+        <div class="label danger" style="font-size:11px;">&#9888; Important Rule</div>
+      </div>
+      <div class="pt red s" data-step="6" data-anim="anim-pop" data-loop="loop-glow-red" style="margin-top:8px;">
+        <span class="pt-icon loop-wiggle">&#9995;</span>
+        <div><div class="pt-label" data-editable>Max 5 teams per marshal station!</div><div class="pt-sub" data-editable>If you're the 6th team at a station &mdash; don't waste time waiting! Move on and do another task first, then come back later.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S10 EMERGENCY -->
+<div class="slide bg-danger" data-section="7" data-max="4">
+  <div class="blob blob2" style="background:#ff4400;"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label danger">&#128680; Emergency Plan</div>
+      <div class="section-title" style="color:#fff;">What To Do <span style="color:var(--gold);">If...</span></div>
+      <div class="div red" style="margin-bottom:6px;"></div>
+    </div>
+    <div class="two-col" style="margin-top:8px;">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="pt red s" data-step="1" data-anim="anim-left" data-loop="loop-float">
+          <span class="pt-icon loop-bounce">&#128657;</span>
+          <div><div class="pt-label" data-editable>Someone's hurt</div><div class="pt-sub" data-editable>&rarr; Call 999. Stay with them. Call facilitator.</div></div>
+        </div>
+        <div class="pt red s" data-step="2" data-anim="anim-left" data-loop="loop-float">
+          <span class="pt-icon loop-wiggle">&#128269;</span>
+          <div><div class="pt-label" data-editable>Lost a team member</div><div class="pt-sub" data-editable>&rarr; Stop moving. Call them. Wait. Call facilitator.</div></div>
+        </div>
+        <div class="pt gold s" data-step="3" data-anim="anim-left" data-loop="loop-float">
+          <span class="pt-icon loop-wiggle">&#127783;</span>
+          <div><div class="pt-label" data-editable>Heavy rain</div><div class="pt-sub" data-editable>&rarr; Find nearest shelter. Wait for instruction.</div></div>
+        </div>
+      </div>
+      <div class="s" data-step="4" data-anim="anim-pop" data-loop="loop-glow-red">
+        <div id="contacts-container">
+          <div class="contact-card" style="animation:glowRed 2s ease-in-out infinite;">
+            <button class="remove-contact" onclick="removeContact(this)" title="Remove contact">&times;</button>
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:.7;margin-bottom:8px;">&#128222; EMERGENCY CONTACT</div>
+            <div style="font-size:26px;font-weight:900;margin-bottom:4px;" data-editable>Bryan Ng</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold);" data-editable>012-661 1043</div>
+            <div style="font-size:12px;opacity:.65;margin-top:8px;" data-editable>Facilitator &mdash; Available the entire hunt duration</div>
+          </div>
+          <div class="contact-card" style="margin-top:12px;animation:glowRed 2s ease-in-out infinite;">
+            <button class="remove-contact" onclick="removeContact(this)" title="Remove contact">&times;</button>
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:.7;margin-bottom:8px;">&#128222; EMERGENCY CONTACT</div>
+            <div style="font-size:26px;font-weight:900;margin-bottom:4px;" data-editable>Susan Yap (InStep)</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold);" data-editable>012-370 3732</div>
+            <div style="font-size:12px;opacity:.65;margin-top:8px;" data-editable>InStep &mdash; Available the entire hunt duration</div>
+          </div>
+          <div class="contact-card" style="margin-top:12px;animation:glowRed 2s ease-in-out infinite;">
+            <button class="remove-contact" onclick="removeContact(this)" title="Remove contact">&times;</button>
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:.7;margin-bottom:8px;">&#128222; EMERGENCY CONTACT</div>
+            <div style="font-size:26px;font-weight:900;margin-bottom:4px;" data-editable>Ariel Lai (HSBC)</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold);" data-editable>016-939 1957</div>
+            <div style="font-size:12px;opacity:.65;margin-top:8px;" data-editable>HSBC &mdash; Available the entire hunt duration</div>
+          </div>
+        </div>
+        <div class="add-contact-btn" onclick="addContact()">
+          + Add Emergency Contact
+        </div>
+        <div style="margin-top:14px;background:rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;font-size:14px;font-weight:700;text-align:center;">
+          &#9888; Never handle emergencies alone.<br><strong style="color:var(--gold);">Always call first.</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S11 RETURN -->
+<div class="slide bg-teal" data-section="8" data-max="4">
+  <div class="blob blob1" style="background:#fff;opacity:.08;"></div>
+  <div class="inner">
+    <div class="s" data-step="0" data-anim="anim-down">
+      <div class="label teal" style="background:rgba(255,255,255,.2);">&#127937; Return</div>
+      <div class="section-title">Time to Head <span style="color:var(--gold);">Back!</span></div>
+      <div class="div teal" style="background:rgba(255,255,255,.4);margin-bottom:6px;"></div>
+    </div>
+    <div class="two-col" style="margin-top:10px;align-items:center;">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="s" data-step="1" data-anim="anim-left" data-loop="loop-float">
+          <div style="display:flex;align-items:center;gap:18px;margin-bottom:6px;">
+            <div class="return-ring loop-glow-teal">
+              <div class="rr-t" data-editable>1:30</div>
+              <div class="rr-l">PM SHARP</div>
+            </div>
+            <div>
+              <div style="font-size:20px;font-weight:800;margin-bottom:6px;" data-editable>Return Deadline</div>
+              <div style="font-size:14px;opacity:.85;line-height:1.5;" data-editable>HSBC HQ &mdash; Training Hall<br><strong>No exceptions!</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="pt plain s" data-step="2" data-anim="anim-left" data-loop="loop-float" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);">
+          <span class="pt-icon loop-bounce">&#9200;</span>
+          <div><div class="pt-label" data-editable>Leave by 1:00 PM</div><div class="pt-sub" data-editable>30-min buffer for transit &mdash; don't risk being late</div></div>
+        </div>
+        <div class="pt plain s" data-step="3" data-anim="anim-left" data-loop="loop-float" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);">
+          <span class="pt-icon loop-bounce">&#128647;</span>
+          <div><div class="pt-label" data-editable>Same transport back</div><div class="pt-sub" data-editable>LRT/MRT back to HSBC &mdash; whole team together</div></div>
+        </div>
+      </div>
+      <div class="s" data-step="4" data-anim="anim-pop" data-loop="loop-pulse">
+        <div class="announce">
+          <div class="a-icon loop-bounce">&#127882;</div>
+          <h2 data-editable>2:00 PM &mdash; <span>PARTY!</span></h2>
+          <p style="font-size:16px;font-weight:700;margin-top:8px;" data-editable>Lunch &middot; Results &middot; Winners! &#127942;</p>
+          <p style="margin-top:8px;font-size:13px;opacity:.7;" data-editable>Go hunt smart.<br>See you at the finish line! &#128170;</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="click-hint" id="click-hint">&#128161; CLICK ANYWHERE TO ADVANCE</div>
+<div id="save-toast" style="position:fixed;bottom:80px;right:20px;z-index:999;
+  background:rgba(0,196,140,.9);color:#fff;padding:8px 18px;border-radius:50px;
+  font-size:12px;font-weight:800;letter-spacing:1px;pointer-events:none;
+  opacity:0;transition:opacity .3s;backdrop-filter:blur(8px);">&#10003; SAVED</div>
+
+<div id="bottom-bar">
+  <div class="slide-info">Section: <span id="sec-label">Overview</span> &middot; Slide <span id="cur-s">1</span> of <span id="tot-s">12</span></div>
+  <div class="step-dots" id="step-dots"></div>
+  <div class="btn-row">
+    <a href="/" class="btn btn-prev" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;">&#127968; Hub</a>
+    <button class="btn btn-prev" onclick="prevStep()">&#8592; Prev</button>
+    <button class="btn btn-next" onclick="nextStep()">Next &#8594;</button>
+  </div>
+</div>
+
+<script>
+const SECTION_NAMES=['Overview','The Goal','Location Rules','Safety','Budget','Transport','Leaders','Emergency','Return'];
+const LOGO_SVG=`<div class="slide-logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 140"><polygon points="0,70 65,0 65,140" fill="#DB0011"/><polygon points="260,70 195,0 195,140" fill="#DB0011"/><polygon points="65,0 130,70 195,0" fill="#DB0011"/><polygon points="65,140 130,70 195,140" fill="#DB0011"/><polygon points="65,0 130,70 65,140" fill="rgba(0,0,0,.55)"/><polygon points="195,0 130,70 195,140" fill="rgba(0,0,0,.55)"/></svg></div>`;
+
+const slides=Array.from(document.querySelectorAll('.slide'));
+slides.forEach(s=>s.insertAdjacentHTML('afterbegin',LOGO_SVG));
+const total=slides.length;
+let cur=0,step=0;
+let hintGone=false;
+
+function hideHint(){if(!hintGone){hintGone=true;const h=document.getElementById('click-hint');if(h)h.style.opacity='0';}}
+
+function getMax(i){return parseInt(slides[i].dataset.max)||0;}
+
+function revealEl(el){
+  const anim=el.dataset.anim;
+  const loop=el.dataset.loop;
+  el.classList.add('on');
+  if(anim){
+    el.style.opacity='0';
+    el.classList.add(anim);
+    const onEnd=()=>{
+      el.classList.remove(anim);
+      el.style.opacity='1';
+      if(loop){
+        const idx=Array.from(slides[cur].querySelectorAll('.s.on')).indexOf(el);
+        el.style.animationDelay=(idx*0.08)+'s';
+        el.classList.add(loop);
+      }
+    };
+    el.addEventListener('animationend',onEnd,{once:true});
+  } else {
+    el.style.opacity='1';
+    if(loop) el.classList.add(loop);
+  }
+  el.querySelectorAll('.loop-bounce').forEach((ic,i)=>{
+    ic.style.animationDelay=(i*0.2)+'s';
+  });
+}
+
+function showSlide(idx,st){
+  slides.forEach((s,i)=>s.classList.toggle('active',i===idx));
+  const slideEl=slides[idx];
+  slideEl.querySelectorAll('.s').forEach(el=>{
+    const elStep=parseInt(el.dataset.step)||0;
+    const loop=el.dataset.loop;
+    if(elStep<=st){
+      if(!el.classList.contains('on')) revealEl(el);
+    } else {
+      el.classList.remove('on');
+      el.style.opacity='0';
+      if(el.dataset.anim) el.classList.remove(el.dataset.anim);
+      if(loop) el.classList.remove(loop);
+    }
+  });
+  if(idx===2) animBingo(st);
+  updateUI(idx,st);
+}
+
+function animBingo(st){
+  // Reset all tiles
+  for(let i=0;i<25;i++){const c=document.getElementById('b'+i);if(c){c.classList.remove('lit','bingo','line-done');}}
+  // Reset popup
+  const popup=document.getElementById('bingo-popup');
+  const letters=['B','I','N','G','O'];
+  popup.classList.remove('show','full','partial');
+  letters.forEach(l=>{const el=document.getElementById('bl-'+l);el.className='bingo-letter off';});
+  document.getElementById('cele-l').style.opacity='0';
+  document.getElementById('cele-r').style.opacity='0';
+
+  // Row 0: 0,1,2,3,4  Row 1: 5,6,7,8,9  Row 2: 10,11,12,13,14
+  // Row 3: 15,16,17,18,19  Row 4: 20,21,22,23,24
+  // Col 2: 2,7,12,17,22   Diag: 0,6,12,18,24
+
+  if(st>=1){
+    // Step 1: Just 1 tile lights up — doing 1 activity
+    setTimeout(()=>{const c=document.getElementById('b7');if(c)c.classList.add('lit');},200);
+  }
+
+  if(st>=2){
+    // Keep tile 7 lit
+    setTimeout(()=>{const c=document.getElementById('b7');if(c)c.classList.add('lit');},0);
+    // Step 2: sweep row 2 one tile at a time (10→11→12→13→14)
+    const row2=[10,11,12,13,14];
+    function sweepTile(id,delay){
+      setTimeout(()=>{
+        const c=document.getElementById('b'+id);
+        if(!c)return;
+        c.classList.remove('lit','line-done');
+        c.classList.add('sweep');
+        // After animation finishes settle into line-done
+        setTimeout(()=>{c.classList.remove('sweep');c.classList.add('line-done');},580);
+      },delay);
+    }
+    row2.forEach((id,i)=>sweepTile(id, 200 + i*280));
+    const rowDoneAt=200+(row2.length-1)*280+600;
+    // Show "B" with greyed "INGO" after sweep completes
+    setTimeout(()=>{
+      popup.classList.add('show','partial');
+      document.getElementById('bl-B').className='bingo-letter on';
+    },rowDoneAt);
+  }
+
+  if(st>=3){
+    // Step 3: sweep 3 lines one after another
+    // Line 1 — row 2: 10,11,12,13,14
+    // Line 2 — col 2: 2,7,12,17,22
+    // Line 3 — diagonal: 0,6,12,18,24
+    const lines=[[10,11,12,13,14],[2,7,12,17,22],[0,6,12,18,24]];
+    function sweepLine(tiles, startDelay){
+      tiles.forEach((id,i)=>{
+        const delay=startDelay+i*260;
+        setTimeout(()=>{
+          const c=document.getElementById('b'+id);
+          if(!c)return;
+          c.classList.remove('lit','bingo','sweep');
+          c.classList.add('sweep');
+          setTimeout(()=>{c.classList.remove('sweep');c.classList.add('line-done');},580);
+        },delay);
+      });
+      return startDelay + tiles.length*260 + 300;
+    }
+    let t=150;
+    t=sweepLine(lines[0],t);
+    t=sweepLine(lines[1],t);
+    t=sweepLine(lines[2],t);
+    // Show "BIN" after all sweeps
+    setTimeout(()=>{
+      popup.classList.add('show','partial');
+      document.getElementById('bl-B').className='bingo-letter on';
+      setTimeout(()=>{document.getElementById('bl-I').className='bingo-letter on';},150);
+      setTimeout(()=>{document.getElementById('bl-N').className='bingo-letter on';},300);
+    },t);
+  }
+
+  if(st>=4){
+    // Step 4: All 25 gold BINGO — full board
+    for(let i=0;i<25;i++){const c=document.getElementById('b'+i);if(c)setTimeout(()=>{c.classList.remove('lit','line-done');c.classList.add('bingo');},i*40);}
+    // Full BINGO popup with celebration
+    setTimeout(()=>{
+      popup.classList.add('show','full');
+      document.getElementById('cele-l').style.opacity='1';
+      document.getElementById('cele-r').style.opacity='1';
+      letters.forEach((l,i)=>{
+        setTimeout(()=>{document.getElementById('bl-'+l).className='bingo-letter on';},i*120);
+      });
+    },600);
+  }
+}
+
+function updateUI(idx,st){
+  document.getElementById('cur-s').textContent=idx+1;
+  document.getElementById('tot-s').textContent=total;
+  const sec=parseInt(slides[idx].dataset.section)||0;
+  document.getElementById('sec-label').textContent=SECTION_NAMES[sec];
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.section)===sec));
+  const max=getMax(idx);
+  const dots=document.getElementById('step-dots');
+  dots.innerHTML='';
+  for(let i=0;i<=max;i++){const d=document.createElement('div');d.className='dot'+(i<st?' done':i===st?' cur':'');dots.appendChild(d);}
+}
+
+function nextStep(){
+  hideHint();
+  const max=getMax(cur);
+  if(step<max){step++;showSlide(cur,step);}
+  else if(cur<total-1){cur++;step=0;showSlide(cur,0);}
+}
+function prevStep(){
+  hideHint();
+  if(step>0){step--;showSlide(cur,step);}
+  else if(cur>0){cur--;step=getMax(cur);showSlide(cur,step);}
+}
+function jumpToSection(s){
+  hideHint();
+  for(let i=0;i<slides.length;i++){if(parseInt(slides[i].dataset.section)===s){cur=i;step=0;showSlide(cur,0);return;}}
+}
+
+function handleSlideClick(e){
+  if(e.target.closest('[contenteditable="true"]')) return;
+  if(e.target.closest('.add-contact-btn')) return;
+  if(e.target.closest('.remove-contact')) return;
+  nextStep();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.target.hasAttribute('contenteditable')) return;
+  if(e.code==='ArrowRight'||e.code==='Space'||e.code==='Enter'){nextStep();e.preventDefault();}
+  if(e.code==='ArrowLeft') prevStep();
+});
+
+// ── PERSISTENT STORAGE ──
+let _saveTimer=null;
+function showSaveToast(){
+  const t=document.getElementById('save-toast');
+  if(!t)return;
+  t.style.opacity='1';
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{t.style.opacity='0';},1600);
+}
+
+function saveContacts(){
+  try{localStorage.setItem('brief-contacts',document.getElementById('contacts-container').innerHTML);}catch(e){}
+  showSaveToast();
+}
+
+function bindContactEditables(root){
+  root.querySelectorAll('[contenteditable="true"]').forEach(el=>{
+    el.addEventListener('input',saveContacts);
+  });
+}
+
+function initStorage(){
+  // 1. Static editable fields — assign index keys, restore, then save on input
+  const editables=document.querySelectorAll('[data-editable]');
+  editables.forEach((el,i)=>{
+    el.contentEditable='true';
+    const saved=localStorage.getItem('brief-f'+i);
+    if(saved!==null) el.innerHTML=saved;
+    el.addEventListener('input',()=>{
+      try{localStorage.setItem('brief-f'+i,el.innerHTML);}catch(e){}
+      showSaveToast();
+    });
+  });
+
+  // 2. Contacts — restore saved HTML, re-bind listeners
+  const savedContacts=localStorage.getItem('brief-contacts');
+  if(savedContacts){
+    const c=document.getElementById('contacts-container');
+    c.innerHTML=savedContacts;
+    // Re-enable contenteditable on restored nodes
+    c.querySelectorAll('[data-editable]').forEach(el=>{el.contentEditable='true';});
+    c.querySelectorAll('[contenteditable="true"]').forEach(el=>{el.contentEditable='true';});
+  }
+  bindContactEditables(document.getElementById('contacts-container'));
+}
+
+function addContact(){
+  const container=document.getElementById('contacts-container');
+  const card=document.createElement('div');
+  card.className='contact-card';
+  card.style.marginTop='12px';
+  card.style.animation='glowRed 2s ease-in-out infinite';
+  card.innerHTML=`
+    <button class="remove-contact" onclick="removeContact(this)" title="Remove contact">&times;</button>
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;opacity:.7;margin-bottom:8px;">&#128222; EMERGENCY CONTACT</div>
+    <div style="font-size:26px;font-weight:900;margin-bottom:4px;" contenteditable="true">Name</div>
+    <div style="font-size:18px;font-weight:700;color:var(--gold);" contenteditable="true">Phone Number</div>
+    <div style="font-size:12px;opacity:.65;margin-top:8px;" contenteditable="true">Role / availability</div>
+  `;
+  container.appendChild(card);
+  bindContactEditables(card);
+  card.querySelector('[contenteditable]').focus();
+  saveContacts();
+}
+
+function removeContact(btn){
+  const card=btn.closest('.contact-card');
+  const container=document.getElementById('contacts-container');
+  if(container.querySelectorAll('.contact-card').length>1){
+    card.remove();
+    saveContacts();
+  }
+}
+
+initStorage();
+showSlide(0,0);
+setTimeout(()=>{const h=document.getElementById('click-hint');if(h)h.style.display='none';},7000);
+</script>
+</body>
+</html>

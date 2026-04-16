@@ -18,8 +18,8 @@ export function BingoAdminPhotoUpload({ taskId }: BingoAdminPhotoUploadProps) {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-    if (photos.length + files.length > 3) {
-      alert('Max 3 hero photos. You can add ' + (3 - photos.length) + ' more.')
+    if (photos.length + files.length > 20) {
+      alert('Max 20 photos. You can add ' + (20 - photos.length) + ' more.')
       if (fileRef.current) fileRef.current.value = ''
       return
     }
@@ -94,17 +94,17 @@ export function BingoAdminPhotoUpload({ taskId }: BingoAdminPhotoUploadProps) {
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-bold text-gray-900">Hero Photo</h3>
+          <h3 className="font-bold text-gray-900">Photo Carousel</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            First photo shown full-width at top of card · Max 3 · Drag to set focal point
+            Photos shown as carousel on participant view · Max 20 · Drag to set focal point
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">{photos.length} / 3</span>
+          <span className="text-sm text-gray-400">{photos.length} / 20</span>
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleUpload} className="hidden" />
           <button
             onClick={() => fileRef.current?.click()}
-            disabled={uploading || photos.length >= 3}
+            disabled={uploading || photos.length >= 20}
             className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium transition-colors"
           >
             {uploading ? 'Uploading...' : '+ Add Photo'}
@@ -145,7 +145,7 @@ export function BingoAdminPhotoUpload({ taskId }: BingoAdminPhotoUploadProps) {
               </div>
             </div>
           ))}
-          {photos.length < 3 && (
+          {photos.length < 20 && (
             <div
               className="rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors"
               style={{ aspectRatio: '4/3' }}
