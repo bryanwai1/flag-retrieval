@@ -15,16 +15,20 @@ export function useLeaderboard() {
 
   const fetchLeaderboard = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
+
+    // Fetch completed scans with team section and task section to filter cross-section completions
     const { data } = await supabase
       .from('team_scans')
-      .select('team_id, completed_at, teams(name), tasks(points)')
+      .select('team_id, completed_at, teams(name, section_id), tasks(points, section_id)')
       .eq('completed', true)
 
     const map = new Map<string, LeaderboardEntry>()
     for (const scan of data ?? []) {
-      const team = scan.teams as unknown as { name: string } | null
-      const task = scan.tasks as unknown as { points: number } | null
+      const team = scan.teams as unknown as { name: string; section_id: string } | null
+      const task = scan.tasks as unknown as { points: number; section_id: string } | null
       if (!team) continue
+      // Only count scans where the task belongs to the team's section
+      if (task && task.section_id !== team.section_id) continue
       const prev = map.get(scan.team_id) ?? {
         teamId: scan.team_id,
         teamName: team.name,
