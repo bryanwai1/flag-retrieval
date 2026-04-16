@@ -2126,7 +2126,8 @@ export function BingoDashAdmin() {
                     <tbody className="divide-y divide-gray-100">
                       {sectionTeams.map(team => {
                         const teamScans = scans.filter(s => s.team_id === team.id)
-                        const completedCount = teamScans.filter(s => s.completed).length
+                        const sectionTaskIds = new Set(sectionTasks.map(t => t.id))
+                        const completedCount = teamScans.filter(s => s.completed && sectionTaskIds.has(s.task_id)).length
                         const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
                         const pointsEarned = teamScans
                           .filter(s => s.completed)
@@ -2545,7 +2546,8 @@ export function BingoDashAdmin() {
         const completedLineIdx = completedBingoLines(slots, completedIds)
         const bingoSlotSet = new Set<number>()
         completedLineIdx.forEach(i => BINGO_LINES[i].forEach(idx => bingoSlotSet.add(idx)))
-        const tasksDone = teamScans.filter(s => s.completed).length
+        const sectionTaskIdSet = new Set(sectionTasksForTeam.map(t => t.id))
+        const tasksDone = teamScans.filter(s => s.completed && sectionTaskIdSet.has(s.task_id)).length
         const points = sectionTasksForTeam.reduce(
           (sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0,
         )
