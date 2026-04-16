@@ -379,8 +379,7 @@ function TeamControl({
   onAdvance: (delta: number) => void
   onSet: (pos: number) => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(String(team.position))
+  const [val, setVal] = useState('')
   const nextLanding = (d: number) => {
     const target = Math.min(TOTAL_TILES, team.position + d)
     const res = resolveJump(target, snakes, ladders)
@@ -411,28 +410,36 @@ function TeamControl({
           </button>
         ))}
       </div>
+      <div className="grid grid-cols-6 gap-1 text-xs font-black mt-1">
+        {[1, 2, 3, 4, 5, 6].map(d => (
+          <button key={d} onClick={() => onAdvance(-d)}
+            className="py-1 rounded bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-300">
+            -{d}
+          </button>
+        ))}
+      </div>
       <div className="mt-1.5 flex items-center gap-1">
-        <button onClick={() => onAdvance(-1)} className="flex-1 py-1 rounded bg-white/5 hover:bg-white/15 text-[10px] font-bold">-1</button>
         <button onClick={() => onSet(0)} className="flex-1 py-1 rounded bg-white/5 hover:bg-white/15 text-[10px] font-bold">Reset</button>
-        {!editing ? (
-          <button onClick={() => { setEditing(true); setVal(String(team.position)) }} className="flex-1 py-1 rounded bg-white/5 hover:bg-white/15 text-[10px] font-bold">Set…</button>
-        ) : (
-          <form
-            className="flex-[2] flex items-center gap-1"
-            onSubmit={e => {
-              e.preventDefault()
-              const n = Math.max(0, Math.min(TOTAL_TILES, parseInt(val) || 0))
-              onSet(n); setEditing(false)
-            }}
-          >
-            <input
-              autoFocus value={val} onChange={e => setVal(e.target.value)}
-              className="w-full px-1 py-0.5 rounded bg-black/40 text-white border border-white/20 text-[11px]"
-              type="number" min={0} max={TOTAL_TILES}
-            />
-            <button type="submit" className="px-1 py-0.5 rounded bg-amber-400 text-black text-[10px] font-black">OK</button>
-          </form>
-        )}
+        <form
+          className="flex-[2] flex items-center gap-1"
+          onSubmit={e => {
+            e.preventDefault()
+            const n = parseInt(val) || 0
+            if (val.startsWith('+') || val.startsWith('-')) {
+              onAdvance(n)
+            } else {
+              onSet(Math.max(0, Math.min(TOTAL_TILES, n)))
+            }
+            setVal('')
+          }}
+        >
+          <input
+            value={val} onChange={e => setVal(e.target.value)}
+            placeholder="±move or tile#"
+            className="w-full px-1.5 py-1 rounded bg-black/40 text-white border border-white/20 text-[11px] placeholder:text-white/30"
+          />
+          <button type="submit" className="px-2 py-1 rounded bg-amber-400 text-black text-[10px] font-black">Go</button>
+        </form>
       </div>
     </div>
   )
