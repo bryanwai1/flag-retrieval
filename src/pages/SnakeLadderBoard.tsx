@@ -175,8 +175,6 @@ export function SnakeLadderBoard() {
                 const { gridRow, gridCol } = tileToGridRC(n)
                 const data = tileMap.get(n)
                 const task = data?.task
-                const isSnakeHead = snakes[n] != null || snakes[String(n)] != null
-                const isLadderBottom = ladders[n] != null || ladders[String(n)] != null
                 // Vibrant classic snakes-and-ladders palette
                 const palette = ['#ec4899', '#f97316', '#a855f7', '#14b8a6', '#fbbf24', '#60a5fa', '#f472b6', '#fde68a']
                 const emptyBg = palette[(Math.floor((n - 1) / BOARD_SIZE) + ((n - 1) % BOARD_SIZE)) % palette.length]
