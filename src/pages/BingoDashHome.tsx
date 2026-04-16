@@ -319,7 +319,8 @@ function BoardScreen({
   const [popupLetters, setPopupLetters] = useState<string | null>(null)
   const lastBingoCountRef = useRef<number | null>(null)
 
-  const completedCount = scans.filter(s => s.completed).length
+  const gridTaskIds = new Set(gridTasks.map(t => t.id))
+  const completedCount = scans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
 
   const getStatus = (taskId: string): TileStatus => {
     const scan = scans.find(s => s.task_id === taskId)
