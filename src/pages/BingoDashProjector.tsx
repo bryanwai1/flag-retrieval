@@ -96,12 +96,13 @@ export function BingoDashProjector() {
 
   const rows: Row[] = sectionTeams.map(team => {
     const teamScans = scans.filter(s => s.team_id === team.id)
-    const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
-    const points = sectionTasks.reduce(
+    const gridTaskIds = new Set(gridTasks.map(t => t.id))
+    const completedIds = new Set(teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).map(s => s.task_id))
+    const points = gridTasks.reduce(
       (sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0,
     )
     const bingos = completedBingoLines(slots, completedIds).length
-    const tasksDone = teamScans.filter(s => s.completed).length
+    const tasksDone = completedIds.size
     return { team, points, bingos, tasksDone }
   })
 
