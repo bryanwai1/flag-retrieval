@@ -146,13 +146,14 @@ export function SnakeLadderAdmin() {
   // ── Teams CRUD ───────────────────────────────────────────────
   const addTeam = async () => {
     if (!activeGameId || !newTeamName.trim()) return
-    const { data } = await supabase.from('snake_teams').insert({
+    const { data, error } = await supabase.from('snake_teams').insert({
       game_id: activeGameId,
       name: newTeamName.trim(),
       hex_code: newTeamColor,
       emoji: newTeamEmoji,
       sort_order: teams.length,
     }).select().single()
+    if (error) { console.error('addTeam error:', error); alert('Failed to create team: ' + error.message); return }
     if (data) setTeams(prev => [...prev, data])
     setNewTeamName('')
   }
