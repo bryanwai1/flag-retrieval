@@ -230,6 +230,52 @@ export function SnakeLadderAdmin() {
     if (tileErr) throw new Error('Failed to create tiles: ' + tileErr.message)
   }
 
+  // ── Reseed clue texts (update pointer_1/2/3 in DB from static data) ──
+  const [reseeding, setReseeding] = useState(false)
+  const reseedClueTexts = async () => {
+    if (!activeGameId || tiles.length === 0) return
+    if (!confirm('This will overwrite all clue texts (pointer 1/2/3) for every tile in the active game with the latest static data. Continue?')) return
+    setReseeding(true)
+    try {
+      // Build map: task_id -> tile_number from current tiles
+      const taskToTile = new Map<string, number>()
+      for (const t of tiles) {
+        if (t.task_id) taskToTile.set(t.task_id, t.tile_number)
+      }
+
+      // Fetch all task pages for these task_ids
+      const taskIds = Array.from(taskToTile.keys())
+      const { data: pages, error: fetchErr } = await supabase
+        .from('bingo_task_pages')
+        .select('id, task_id')
+        .in('task_id', taskIds)
+      if (fetchErr || !pages) throw new Error('Failed to fetch pages: ' + fetchErr?.message)
+
+      // Update each page with new pointer values
+      let updated = 0
+      for (const page of pages) {
+        const tileNum = taskToTile.get(page.task_id)
+        if (tileNum == null) continue
+        const tileData = SNAKE_LADDER_TILES.find(t => t.tile === tileNum)
+        if (!tileData) continue
+        const { error } = await supabase
+          .from('bingo_task_pages')
+          .update({
+            pointer_1: tileData.point_1,
+            pointer_2: tileData.point_2,
+            pointer_3: tileData.point_3,
+          })
+          .eq('id', page.id)
+        if (!error) updated++
+      }
+      alert(`Updated clue texts for ${updated} tiles.`)
+    } catch (e: any) {
+      alert('Reseed failed: ' + e.message)
+    } finally {
+      setReseeding(false)
+    }
+  }
+
   // ── Library filter ───────────────────────────────────────────
   const filteredLibrary = useMemo(() => {
     const search = librarySearch.trim().toLowerCase()
@@ -280,12 +326,21 @@ export function SnakeLadderAdmin() {
           <button onClick={() => navigate('/')} className="text-xs text-white/60 hover:text-white">← Hub</button>
           <h1 className="text-xl font-black">🐍🪜 Snake and Ladder — Admin</h1>
         </div>
-        <button
-          onClick={() => navigate('/snake-ladder')}
-          className="text-xs font-bold bg-amber-400 text-black px-3 py-1.5 rounded-lg"
-        >
-          ▶ Play view
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={reseedClueTexts}
+            disabled={reseeding || !activeGameId}
+            className="text-xs font-bold bg-purple-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-40"
+          >
+            {reseeding ? 'Reseeding…' : 'Reseed Clue Texts'}
+          </button>
+          <button
+            onClick={() => navigate('/snake-ladder')}
+            className="text-xs font-bold bg-amber-400 text-black px-3 py-1.5 rounded-lg"
+          >
+            ▶ Play view
+          </button>
+        </div>
       </header>
 
       {/* Game selector */}
