@@ -2126,14 +2126,14 @@ export function BingoDashAdmin() {
                     <tbody className="divide-y divide-gray-100">
                       {sectionTeams.map(team => {
                         const teamScans = scans.filter(s => s.team_id === team.id)
-                        const sectionTaskIds = new Set(sectionTasks.map(t => t.id))
-                        const completedCount = teamScans.filter(s => s.completed && sectionTaskIds.has(s.task_id)).length
+                        const sectionGridTasks = sectionTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+                        const gridTaskIds = new Set(sectionGridTasks.map(t => t.id))
+                        const completedCount = teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
                         const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
                         const pointsEarned = teamScans
-                          .filter(s => s.completed)
-                          .reduce((sum, s) => sum + (sectionTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
-                        const pct = sectionTasks.length > 0 ? Math.round((completedCount / sectionTasks.length) * 100) : 0
-                        const sectionGridTasks = sectionTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+                          .filter(s => s.completed && gridTaskIds.has(s.task_id))
+                          .reduce((sum, s) => sum + (sectionGridTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
+                        const pct = sectionGridTasks.length > 0 ? Math.round((completedCount / sectionGridTasks.length) * 100) : 0
                         const teamSlots = buildBingoSlots(sectionGridTasks)
                         const teamBingoLines = completedBingoLines(teamSlots, completedIds).length
                         return (
@@ -2180,7 +2180,7 @@ export function BingoDashAdmin() {
                                   <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
                                 </div>
                                 <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
-                                  {completedCount}/{sectionTasks.length}
+                                  {completedCount}/{sectionGridTasks.length}
                                 </span>
                               </div>
                               {pointsEarned > 0 && (
@@ -2546,9 +2546,9 @@ export function BingoDashAdmin() {
         const completedLineIdx = completedBingoLines(slots, completedIds)
         const bingoSlotSet = new Set<number>()
         completedLineIdx.forEach(i => BINGO_LINES[i].forEach(idx => bingoSlotSet.add(idx)))
-        const sectionTaskIdSet = new Set(sectionTasksForTeam.map(t => t.id))
-        const tasksDone = teamScans.filter(s => s.completed && sectionTaskIdSet.has(s.task_id)).length
-        const points = sectionTasksForTeam.reduce(
+        const gridTaskIdSet = new Set(gridTasksForTeam.map(t => t.id))
+        const tasksDone = teamScans.filter(s => s.completed && gridTaskIdSet.has(s.task_id)).length
+        const points = gridTasksForTeam.reduce(
           (sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0,
         )
         return (
