@@ -250,7 +250,7 @@ export function SnakeLadderBoard() {
           task={openData?.task ?? null}
           teams={teamsByTile.get(openTileNumber) ?? []}
           onClose={() => setOpenTileNumber(null)}
-          onOpenCard={id => navigate(`/bingo-dash/task/${id}`)}
+          onOpenCard={id => navigate(`/bingo-dash/task/${id}?from=snake-ladder`)}
           onGoToAdmin={() => navigate('/snake-ladder/admin')}
         />
       )}

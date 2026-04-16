@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
@@ -14,6 +14,8 @@ import type { BingoTask } from '../types/database'
 export function BingoDashParticipant() {
   const { taskId } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const backPath = searchParams.get('from') === 'snake-ladder' ? '/snake-ladder' : '/bingo-dash'
   const { team, loading: teamLoading, isRegistered, registerTeam, leaveTeam } = useBingoDashTeam()
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
   const { photos, loading: photosLoading } = useBingoTaskPhotos(taskId)
@@ -186,7 +188,7 @@ export function BingoDashParticipant() {
         <div className="max-w-lg mx-auto relative z-10 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <button
-              onClick={() => navigate('/bingo-dash')}
+              onClick={() => navigate(backPath)}
               className="mt-1 flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-white/15 hover:bg-white/25 rounded-lg text-white/80 hover:text-white text-xs font-bold transition-colors"
             >
               ← Board
@@ -477,7 +479,7 @@ export function BingoDashParticipant() {
         {/* Return to board */}
         <div className="mt-6 animate-slide-up">
           <button
-            onClick={() => navigate('/bingo-dash')}
+            onClick={() => navigate(backPath)}
             className="w-full py-3.5 rounded-2xl text-white/70 font-bold text-sm uppercase tracking-wider border border-white/20 hover:bg-white/10 hover:text-white transition-all active:scale-95"
           >
             ← Return to Board

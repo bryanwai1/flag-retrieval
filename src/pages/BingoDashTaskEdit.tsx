@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { BingoAdminPhotoUpload } from '../components/BingoAdminPhotoUpload'
@@ -11,6 +11,8 @@ import type { BingoTask, BingoTaskPage } from '../types/database'
 export function BingoDashTaskEdit() {
   const { taskId } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const backPath = searchParams.get('from') === 'snake-ladder' ? '/snake-ladder/admin' : '/bingo-dash/admin'
   const [task, setTask] = useState<BingoTask | null>(null)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
@@ -193,7 +195,7 @@ export function BingoDashTaskEdit() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/bingo-dash/admin')} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <button onClick={() => navigate(backPath)} className="text-gray-400 hover:text-gray-600 transition-colors">
               ← Back
             </button>
             <div className="w-6 h-6 rounded-full shrink-0" style={{ backgroundColor: task.hex_code }} />

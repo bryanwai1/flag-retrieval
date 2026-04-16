@@ -464,7 +464,7 @@ export function SnakeLadderAdmin() {
           onUnassign={() => assignTile(tileEditing, null)}
           onCreate={() => createCardAndAssign(tileEditing)}
           onClose={() => setTileEditing(null)}
-          onEditCard={(id) => navigate(`/bingo-dash/admin/task/${id}`)}
+          onEditCard={(id) => navigate(`/bingo-dash/admin/task/${id}?from=snake-ladder`)}
         />
       )}
     </div>
@@ -627,7 +627,7 @@ function LibraryTab({
                   </div>
                   <div className="px-3 pb-3 flex gap-1.5">
                     <button
-                      onClick={() => navigate(`/bingo-dash/admin/task/${card.id}`)}
+                      onClick={() => navigate(`/bingo-dash/admin/task/${card.id}?from=snake-ladder`)}
                       className="flex-1 py-1.5 rounded bg-white/25 text-[11px] font-bold hover:bg-white/35"
                     >
                       Edit
