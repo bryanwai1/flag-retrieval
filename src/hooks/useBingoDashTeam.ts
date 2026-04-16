@@ -56,17 +56,18 @@ export function useBingoDashTeam() {
     const sectionId = settings?.active_section_id
     if (!sectionId) throw new Error('No active section — ask the admin to pick one.')
 
-    // Try to find existing team by name + password within the active section.
+    // Try to find existing team by name within the active section.
     const { data: existing } = await supabase
       .from('bingo_teams')
       .select('*')
       .eq('section_id', sectionId)
       .ilike('name', trimmedName)
-      .eq('password', trimmedPwd)
       .maybeSingle()
 
     let result: BingoTeam
     if (existing) {
+      // Team exists — verify password
+      if (existing.password !== trimmedPwd) throw new Error('Wrong password for this team name.')
       result = existing
     } else {
       const { data: created, error } = await supabase
