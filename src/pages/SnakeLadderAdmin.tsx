@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_SNAKES, DEFAULT_LADDERS } from '../lib/snakeLadder'
+import { SNAKE_LADDER_TILES } from '../lib/snakeLadderTiles'
 import type { BingoSection, BingoTask, SnakeGame, SnakeTeam, SnakeTile } from '../types/database'
 
 const PIECE_COLORS = [
@@ -83,6 +84,8 @@ export function SnakeLadderAdmin() {
     const { data, error } = await supabase.from('snake_games').insert({ name }).select().single()
     if (error || !data) return
     await supabase.from('snake_settings').upsert({ id: 'main', active_game_id: data.id })
+    // Auto-seed all tiles into the new game
+    try { await seedTilesForGame(data.id) } catch (e) { console.error('Auto-seed failed:', e) }
     setNewGameName(''); setShowNewGame(false)
     await loadAll()
   }
@@ -168,6 +171,62 @@ export function SnakeLadderAdmin() {
     if (!activeGame) return
     const { data } = await supabase.from('snake_games').update({ snakes, ladders }).eq('id', activeGame.id).select().single()
     if (data) setGames(prev => prev.map(g => g.id === data.id ? data : g))
+  }
+
+  // ── Seed tiles into a game ───────────────────────────────
+  const seedTilesForGame = async (gameId: string) => {
+    // 1. Find or create snake-ladder section
+    let sectionId = snakeSection?.id
+    if (!sectionId) {
+      const sectionsRes = await supabase.from('bingo_sections').select('*').eq('slug', 'snake-ladder').maybeSingle()
+      if (sectionsRes.data) {
+        sectionId = sectionsRes.data.id
+      } else {
+        const { data } = await supabase.from('bingo_sections').insert({
+          name: 'Snake & Ladder', slug: 'snake-ladder', sort_order: 99,
+        }).select().single()
+        if (!data) throw new Error('Failed to create section')
+        sectionId = data.id
+      }
+    }
+
+    // 2. Insert all bingo_tasks
+    const taskRows = SNAKE_LADDER_TILES.map(t => ({
+      section_id: sectionId!,
+      title: t.title,
+      color: t.category,
+      hex_code: t.hex_code,
+      category: t.category,
+      points: 3,
+      in_grid: false,
+      sort_order: t.tile,
+      task_type: 'standard' as const,
+    }))
+    const { data: createdTasks, error: taskErr } = await supabase
+      .from('bingo_tasks').insert(taskRows).select()
+    if (taskErr || !createdTasks) throw new Error('Failed to create tasks: ' + taskErr?.message)
+
+    // 3. Insert bingo_task_pages (pointer_1/2/3)
+    const pageRows = createdTasks.map((task, i) => ({
+      task_id: task.id,
+      page_order: 0,
+      pointer_1: SNAKE_LADDER_TILES[i].point_1,
+      pointer_2: SNAKE_LADDER_TILES[i].point_2,
+      pointer_3: SNAKE_LADDER_TILES[i].point_3,
+    }))
+    const { error: pageErr } = await supabase.from('bingo_task_pages').insert(pageRows)
+    if (pageErr) throw new Error('Failed to create pages: ' + pageErr.message)
+
+    // 4. Upsert snake_tiles linking tile_number -> task_id
+    const tileRows = createdTasks.map((task, i) => ({
+      game_id: gameId,
+      tile_number: SNAKE_LADDER_TILES[i].tile,
+      task_id: task.id,
+    }))
+    const { error: tileErr } = await supabase.from('snake_tiles').upsert(tileRows, {
+      onConflict: 'game_id,tile_number',
+    })
+    if (tileErr) throw new Error('Failed to create tiles: ' + tileErr.message)
   }
 
   // ── Library filter ───────────────────────────────────────────

@@ -197,19 +197,13 @@ export function SnakeLadderBoard() {
                     }}
                     title={task ? `${n}. ${task.title}` : `${n}. (empty) — click to assign`}
                   >
-                    {/* number */}
-                    <span className="absolute top-0.5 left-1 text-[9px] md:text-[11px] opacity-80 leading-none">{n}</span>
-                    {/* title for assigned tile */}
-                    {task && (
-                      <span className="px-1 pt-3 text-center leading-tight line-clamp-3 break-words">{task.title}</span>
-                    )}
-                    {/* Snake / ladder markers */}
-                    {isSnakeHead && (
-                      <span className="absolute bottom-0.5 right-1 text-base md:text-lg" title={`Snake → ${snakes[n] ?? snakes[String(n)]}`}>🐍</span>
-                    )}
-                    {isLadderBottom && (
-                      <span className="absolute bottom-0.5 right-1 text-base md:text-lg" title={`Ladder → ${ladders[n] ?? ladders[String(n)]}`}>🪜</span>
-                    )}
+                    {/* number — darker shade of tile color */}
+                    <span
+                      className="text-sm md:text-base font-black leading-none"
+                      style={{ color: task ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.7)' }}
+                    >
+                      {n}
+                    </span>
                   </button>
                 )
               })}
@@ -471,10 +465,10 @@ function TileModal({
         <p className="text-xs uppercase tracking-widest text-white/50 font-black mb-1">Tile {tileNumber}</p>
         {task ? (
           <>
-            <div className="rounded-xl p-4 mb-4" style={{ backgroundColor: task.hex_code }}>
-              <p className="text-xs uppercase tracking-widest font-black opacity-70">{task.color}</p>
+            <div className="rounded-xl p-4 mb-4 text-gray-900" style={{ backgroundColor: task.hex_code }}>
+              <p className="text-xs uppercase tracking-widest font-black opacity-60">{task.color}</p>
               <h3 className="text-2xl font-black leading-tight">{task.title}</h3>
-              {task.category && <p className="text-xs opacity-80 mt-1">📂 {task.category}</p>}
+              {task.category && <p className="text-xs opacity-70 mt-1">📂 {task.category}</p>}
             </div>
             <button
               onClick={() => onOpenCard(task.id)}
