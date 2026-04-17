@@ -19,6 +19,7 @@ export interface ShapeResult {
   round_id: string
   team_name: string
   completion_time: number // seconds
+  has_penalty: boolean
   created_at: string
 }
 
@@ -139,6 +140,11 @@ export function useShapeSequence() {
     await fetchResults()
   }
 
+  const setResultPenalty = async (resultId: string, hasPenalty: boolean) => {
+    await supabase.from('shape_results').update({ has_penalty: hasPenalty }).eq('id', resultId)
+    await fetchResults()
+  }
+
   const deleteResult = async (resultId: string) => {
     await supabase.from('shape_results').delete().eq('id', resultId)
     await fetchResults()
@@ -194,6 +200,7 @@ export function useShapeSequence() {
     setAllResultsVisible,
     addResult,
     updateResult,
+    setResultPenalty,
     deleteResult,
     clearRoundResults,
     addFacilitator,

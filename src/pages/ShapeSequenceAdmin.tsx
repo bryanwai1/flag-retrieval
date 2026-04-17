@@ -9,14 +9,14 @@ import {
   formatTime,
 } from './ShapeSequenceProjector'
 
-const ROUND_COUNT = 3
+const ROUND_COUNT = 6
 
 export function ShapeSequenceAdmin() {
   const {
     rounds, results, facilitators,
     upsertRound, setActiveRound, endRound,
     setAllResultsVisible,
-    addResult, deleteResult, clearRoundResults,
+    addResult, deleteResult, clearRoundResults, setResultPenalty,
     addFacilitator, renameFacilitator, deleteFacilitator,
   } = useShapeSequence()
 
@@ -281,7 +281,7 @@ export function ShapeSequenceAdmin() {
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
 
         {/* Round Tabs */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {Array.from({ length: ROUND_COUNT }, (_, i) => i + 1).map(n => {
             const r = rounds.find(r => r.round_number === n)
             const active = r?.is_active
@@ -495,7 +495,12 @@ export function ShapeSequenceAdmin() {
         </div>
 
         {/* Full cross-round scoreboard */}
-        <FullScoreboardAdmin rounds={rounds} results={results} onDelete={deleteResult} />
+        <FullScoreboardAdmin
+          rounds={rounds}
+          results={results}
+          onDelete={deleteResult}
+          onTogglePenalty={setResultPenalty}
+        />
 
       </main>
     </div>
@@ -506,23 +511,25 @@ function FullScoreboardAdmin({
   rounds,
   results,
   onDelete,
+  onTogglePenalty,
 }: {
   rounds: import('../hooks/useShapeSequence').ShapeRound[]
   results: import('../hooks/useShapeSequence').ShapeResult[]
   onDelete: (id: string) => void
+  onTogglePenalty: (id: string, hasPenalty: boolean) => void
 }) {
   const sortedRounds = [...rounds].sort((a, b) => a.round_number - b.round_number)
   const allTeams = Array.from(new Set(results.map(r => r.team_name))).sort()
 
   if (allTeams.length === 0) return null
 
-  type Cell = { resultId: string; time: number } | null
+  type Cell = { resultId: string; time: number; hasPenalty: boolean } | null
   type TeamRow = { name: string; cells: Cell[]; total: number }
 
   const rows: TeamRow[] = allTeams.map(team => {
     const cells = sortedRounds.map(round => {
       const r = results.find(res => res.round_id === round.id && res.team_name === team)
-      return r ? { resultId: r.id, time: r.completion_time } : null
+      return r ? { resultId: r.id, time: r.completion_time, hasPenalty: r.has_penalty ?? false } : null
     })
     const total = cells.reduce<number>((sum, c) => sum + (c?.time ?? 0), 0)
     return { name: team, cells, total }
@@ -564,7 +571,17 @@ function FullScoreboardAdmin({
                   <td key={ri} className="px-4 py-3 text-center tabular-nums">
                     {cell ? (
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="text-blue-600 font-black">{formatTime(cell.time)}</span>
+                        <button
+                          onClick={() => onTogglePenalty(cell.resultId, !cell.hasPenalty)}
+                          className={`font-black transition-colors ${
+                            cell.hasPenalty
+                              ? 'text-red-600 line-through decoration-2'
+                              : 'text-blue-600 hover:text-red-500'
+                          }`}
+                          title={cell.hasPenalty ? 'Penalty applied — click to remove' : 'Click to mark penalty'}
+                        >
+                          {formatTime(cell.time)}
+                        </button>
                         <button
                           onClick={() => { if (confirm(`Delete ${row.name}'s Round ${ri + 1} time?`)) onDelete(cell.resultId) }}
                           className="text-red-300 hover:text-red-500 text-xs transition-colors"

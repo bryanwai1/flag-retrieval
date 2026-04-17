@@ -110,27 +110,31 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
   const allTeams = Array.from(new Set(results.map(r => r.team_name)))
 
   // Build per-team data
-  type TeamRow = { name: string; times: (number | null)[]; total: number }
+  type Cell = { time: number; hasPenalty: boolean } | null
+  type TeamRow = { name: string; cells: Cell[]; total: number }
   const rows: TeamRow[] = allTeams.map(team => {
-    const times = sortedRounds.map(round => {
+    const cells = sortedRounds.map(round => {
       const r = results.find(res => res.round_id === round.id && res.team_name === team)
-      return r ? r.completion_time : null
+      return r ? { time: r.completion_time, hasPenalty: r.has_penalty ?? false } : null
     })
-    const total = times.reduce<number>((sum, t) => sum + (t ?? 0), 0)
-    return { name: team, times, total }
+    const total = cells.reduce<number>((sum, c) => sum + (c?.time ?? 0), 0)
+    return { name: team, cells, total }
   })
 
   // Sort: teams with all rounds filled first, then by total ascending
   rows.sort((a, b) => {
-    const aNulls = a.times.filter(t => t === null).length
-    const bNulls = b.times.filter(t => t === null).length
+    const aNulls = a.cells.filter(c => c === null).length
+    const bNulls = b.cells.filter(c => c === null).length
     if (aNulls !== bNulls) return aNulls - bNulls
     return a.total - b.total
   })
 
-  // Best time per round (index matches sortedRounds)
+  // Best time per round (index matches sortedRounds) — penalized times don't qualify as winner
   const bestPerRound = sortedRounds.map((_, ri) => {
-    const times = rows.map(r => r.times[ri]).filter((t): t is number => t !== null)
+    const times = rows
+      .map(r => r.cells[ri])
+      .filter((c): c is { time: number; hasPenalty: boolean } => c !== null && !c.hasPenalty)
+      .map(c => c.time)
     return times.length > 0 ? Math.min(...times) : null
   })
 
@@ -177,15 +181,19 @@ function FullScoreboard({ rounds, results }: { rounds: ShapeRound[]; results: Sh
             >
               <td className="px-6 py-4 text-blue-400 text-lg font-bold">R{round.round_number}</td>
               {rows.map((row) => {
-                const t = row.times[ri]
-                const isRoundWinner = t !== null && t === bestPerRound[ri]
+                const cell = row.cells[ri]
+                const t = cell?.time ?? null
+                const hasPenalty = cell?.hasPenalty ?? false
+                const isRoundWinner = t !== null && !hasPenalty && t === bestPerRound[ri]
                 return (
                   <td
                     key={row.name}
                     className="px-4 py-4 text-center text-lg font-bold tabular-nums"
                     style={{
-                      color: isRoundWinner ? '#34d399' : t ? '#93c5fd' : '#ffffff20',
+                      color: hasPenalty ? '#f87171' : isRoundWinner ? '#34d399' : t ? '#93c5fd' : '#ffffff20',
                       textShadow: isRoundWinner ? '0 0 12px rgba(52,211,153,0.9), 0 0 24px rgba(52,211,153,0.5)' : undefined,
+                      textDecoration: hasPenalty ? 'line-through' : undefined,
+                      textDecorationThickness: hasPenalty ? '2px' : undefined,
                     }}
                   >
                     {t !== null ? formatTime(t) : '—'}

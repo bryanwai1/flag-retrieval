@@ -1312,16 +1312,29 @@ function nextStep(){
   const max=getMax(cur);
   if(step<max){step++;showSlide(cur,step);}
   else if(cur<total-1){cur++;step=0;showSlide(cur,0);}
+  pushSync();
 }
 function prevStep(){
   hideHint();
   if(step>0){step--;showSlide(cur,step);}
   else if(cur>0){cur--;step=getMax(cur);showSlide(cur,step);}
+  pushSync();
 }
 function jumpToSection(s){
   hideHint();
-  for(let i=0;i<slides.length;i++){if(parseInt(slides[i].dataset.section)===s){cur=i;step=0;showSlide(cur,0);return;}}
+  for(let i=0;i<slides.length;i++){if(parseInt(slides[i].dataset.section)===s){cur=i;step=0;showSlide(cur,0);pushSync();return;}}
 }
+
+// ── REALTIME SYNC HOOKS ──
+// Push helper — no-op until module script installs window.__briefingSync
+function pushSync(){ if(window.__briefingSync) window.__briefingSync.push(cur,step); }
+// Exposed to module script so it can pull remote state and apply it locally
+window.__briefingGetState = () => ({ cur, step });
+window.__briefingApplyRemote = (c, s) => {
+  if(c===cur && s===step) return;
+  cur=c; step=s;
+  showSlide(cur,step);
+};
 
 function handleSlideClick(e){
   if(e.target.closest('[contenteditable="true"]')) return;
@@ -1492,6 +1505,66 @@ document.addEventListener('keydown',e=>{
 initStorage();
 showSlide(0,0);
 setTimeout(()=>{const h=document.getElementById('click-hint');if(h)h.style.display='none';},7000);
+</script>
+
+<!-- ── SUPABASE REALTIME SYNC ── -->
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SUPABASE_URL  = 'https://hqzvootetvvxcqzdhbjd.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxenZvb3RldHZ2eGNxemRoYmpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMDEzNTksImV4cCI6MjA5MTU3NzM1OX0.L6rTy3TAyGZOIcbmBdk2jbLPo9UHmzKHoYkuXxvPFbw';
+const SYNC_KEY = 'briefing-leader-pos';
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let applying = false;
+let lastVal = null;
+let pushTimer = null;
+
+function applyRemote(val){
+  if(!val || !window.__briefingApplyRemote) return;
+  const [cs, ss] = String(val).split(',');
+  const c = parseInt(cs, 10), s = parseInt(ss, 10);
+  if(Number.isNaN(c) || Number.isNaN(s)) return;
+  applying = true;
+  try { window.__briefingApplyRemote(c, s); } finally { applying = false; }
+  lastVal = val;
+}
+
+window.__briefingSync = {
+  push(c, s){
+    if(applying) return;
+    const v = `${c},${s}`;
+    if(v === lastVal) return;
+    lastVal = v;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(async () => {
+      try { await sb.from('settings').upsert({ key: SYNC_KEY, value: v }); }
+      catch(e){ console.warn('[briefing sync] push failed', e); }
+    }, 80);
+  }
+};
+
+// Initial pull — apply remote if it exists, else seed from current local state
+(async () => {
+  try {
+    const { data } = await sb.from('settings').select('value').eq('key', SYNC_KEY).maybeSingle();
+    if(data && data.value){
+      applyRemote(data.value);
+    } else if(window.__briefingGetState){
+      const { cur, step } = window.__briefingGetState();
+      window.__briefingSync.push(cur, step);
+    }
+  } catch(e){ console.warn('[briefing sync] initial pull failed', e); }
+})();
+
+// Subscribe to remote changes
+sb.channel('briefing-leader-sync')
+  .on('postgres_changes',
+    { event: '*', schema: 'public', table: 'settings', filter: `key=eq.${SYNC_KEY}` },
+    (payload) => { applyRemote(payload.new && payload.new.value); }
+  )
+  .subscribe();
 </script>
 </body>
 </html>
