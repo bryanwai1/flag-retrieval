@@ -29,6 +29,10 @@ export function BingoDashParticipant() {
   const [completing, setCompleting] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  // Marshal password state
+  const [marshalPassword, setMarshalPassword] = useState('')
+  const [marshalInput, setMarshalInput] = useState('')
+  const [marshalError, setMarshalError] = useState('')
   // Answer-input state: one string per answer row
   const [answerInputs, setAnswerInputs] = useState<string[]>([])
   const [carouselIdx, setCarouselIdx] = useState(0)
@@ -59,6 +63,12 @@ export function BingoDashParticipant() {
       }
     })
   }, [taskId])
+
+  // Load marshal password from settings
+  useEffect(() => {
+    supabase.from('bingo_settings').select('marshal_password').eq('id', 'main').single()
+      .then(({ data }) => { if (data?.marshal_password) setMarshalPassword(data.marshal_password) })
+  }, [])
 
   // Persist answer inputs to localStorage
   useEffect(() => {
@@ -443,21 +453,44 @@ export function BingoDashParticipant() {
                 boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
               }}
             >
-              {(task.completion_warning || !task.completion_warning) && (
+              {task.require_marshal && (
                 <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
                   <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                     <span className="text-2xl">👮</span>
                     <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
                   </div>
                   <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
-                    {task.completion_warning || 'Only tap Complete AFTER receiving your Completion Card from the Marshal!'}
+                    {task.completion_warning || 'Enter the Marshal password to complete this challenge.'}
                   </p>
                   <span className="text-2xl flex-shrink-0">🛑</span>
                 </div>
               )}
+
+              {task.require_marshal && (
+                <div className="mb-4">
+                  <input
+                    type="password"
+                    value={marshalInput}
+                    onChange={e => { setMarshalInput(e.target.value); setMarshalError('') }}
+                    placeholder="Marshal password..."
+                    className="w-full px-4 py-3 rounded-2xl border-2 text-center text-lg font-bold focus:outline-none transition-colors bg-white/10 text-white placeholder-white/30"
+                    style={{ borderColor: marshalError ? '#ef4444' : marshalInput ? task.hex_code : 'rgba(255,255,255,0.2)' }}
+                  />
+                  {marshalError && (
+                    <p className="text-red-400 text-xs font-bold text-center mt-2">{marshalError}</p>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={async () => {
                   if (!scanRecord) return
+                  if (task.require_marshal) {
+                    if (marshalInput.trim() !== marshalPassword) {
+                      setMarshalError('Wrong marshal password.')
+                      return
+                    }
+                  }
                   setCompleting(true)
                   try {
                     await toggleComplete(scanRecord.id, true)

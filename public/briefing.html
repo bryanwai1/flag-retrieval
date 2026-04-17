@@ -321,6 +321,142 @@ body{display:flex;flex-direction:column;}
   border:none;color:rgba(255,255,255,.4);font-size:16px;cursor:pointer;width:28px;height:28px;
   border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;}
 .contact-card .remove-contact:hover{background:var(--red);color:#fff;}
+
+/* ── QR BUTTON ── */
+.qr-btn{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);
+  padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;
+  letter-spacing:1px;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.qr-btn:hover{background:rgba(255,184,28,.2);border-color:var(--gold);color:var(--gold);}
+
+/* ── QR MODAL ── */
+.qr-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(8px);}
+.qr-overlay.open{display:flex;}
+.qr-card{background:linear-gradient(135deg,#0F172A,#1B2340);border:2px solid rgba(255,184,28,.3);
+  border-radius:24px;padding:36px 40px;text-align:center;max-width:380px;width:90%;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;}
+.qr-card h3{font-size:20px;font-weight:900;color:#fff;margin-bottom:4px;}
+.qr-card p{font-size:13px;color:rgba(255,255,255,.6);margin-bottom:18px;}
+.qr-card .qr-img-wrap{background:#fff;border-radius:16px;padding:16px;display:inline-block;margin-bottom:16px;}
+.qr-card .qr-img-wrap img{display:block;width:180px;height:180px;}
+.qr-card .qr-url{font-size:11px;color:rgba(255,255,255,.4);word-break:break-all;
+  background:rgba(255,255,255,.06);padding:8px 14px;border-radius:8px;margin-top:8px;}
+.qr-close{position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(255,255,255,.4);
+  font-size:24px;cursor:pointer;width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.qr-close:hover{background:rgba(255,255,255,.1);color:#fff;}
+.qr-actions{display:flex;gap:8px;margin-top:14px;}
+.qr-action-btn{flex:1;background:rgba(255,184,28,.15);color:var(--gold);border:1px solid rgba(255,184,28,.4);
+  padding:10px 14px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.5px;
+  transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;}
+.qr-action-btn:hover{background:rgba(255,184,28,.3);border-color:var(--gold);}
+.qr-action-btn.copied{background:rgba(0,196,140,.2);border-color:var(--teal);color:var(--teal);}
+
+/* ── VIEW TOGGLE ── */
+.view-toggle{display:inline-flex;align-items:center;gap:0;border-radius:6px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.15);margin-left:8px;}
+.view-toggle .vt-btn{background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:none;
+  padding:7px 12px;cursor:pointer;font-size:11px;font-weight:700;transition:all .2s;
+  display:flex;align-items:center;gap:4px;}
+.view-toggle .vt-btn:not(:last-child){border-right:1px solid rgba(255,255,255,.1);}
+.view-toggle .vt-btn.active{background:rgba(219,0,17,.3);color:#fff;}
+.view-toggle .vt-btn:hover:not(.active){background:rgba(255,255,255,.1);color:#fff;}
+
+/* ── MOBILE STYLES ── */
+body.mobile{overflow-y:auto;}
+body.mobile #top-nav{flex-wrap:nowrap;}
+body.mobile .tab-btn{padding:8px 10px;font-size:10px;gap:4px;}
+body.mobile .tab-btn .t-label{display:none;}
+body.mobile .t-icon{font-size:16px;}
+
+body.mobile #slide-area{overflow:visible;position:relative;}
+body.mobile .slide{position:relative;display:none;padding:20px 16px;min-height:calc(100vh - 100px);}
+body.mobile .slide.active{display:flex;}
+
+body.mobile .inner{max-width:100%!important;}
+body.mobile .inner.wide{max-width:100%!important;}
+
+body.mobile .big-title{font-size:36px;letter-spacing:1px;}
+body.mobile .section-title{font-size:24px;}
+body.mobile .label{font-size:9px;padding:4px 12px;}
+
+/* Mobile: stack two-column layouts */
+body.mobile .two-col{grid-template-columns:1fr;gap:16px;}
+body.mobile .pts.cols2{grid-template-columns:1fr;gap:10px;}
+body.mobile .pts.cols3{grid-template-columns:1fr;gap:10px;}
+
+/* Mobile: vertical timeline */
+body.mobile .timeline{flex-direction:column;gap:12px;align-items:stretch;}
+body.mobile .tl-item{flex-direction:row;align-items:center;gap:14px;}
+body.mobile .tl-item:not(:last-child)::after{display:none;}
+body.mobile .tl-dot{width:52px;height:52px;font-size:22px;margin-bottom:0;flex-shrink:0;}
+body.mobile .tl-time{font-size:18px;margin-bottom:0;}
+body.mobile .tl-label{text-align:left;font-size:12px;}
+
+/* Mobile: bingo section */
+body.mobile .bingo-grid{gap:3px;}
+body.mobile .bc{width:auto;height:40px;font-size:7px;padding:2px;}
+
+/* Mobile: step cards stack */
+body.mobile .step-card{flex-direction:column;}
+body.mobile .step-demo{width:100%;height:80px;padding:10px;}
+body.mobile .step-body{padding:12px 16px;}
+body.mobile .step-title{font-size:16px;}
+body.mobile .step-sub{font-size:11px;}
+
+/* Mobile: bingo slide two-col override */
+body.mobile [data-section="1"] .inner > div[style*="display:flex"]{flex-direction:column!important;gap:16px!important;}
+body.mobile [data-section="1"] .bingo-grid{margin:0 auto;}
+
+/* Mobile: point cards */
+body.mobile .pt{padding:12px 14px;gap:12px;}
+body.mobile .pt-icon{font-size:28px;}
+body.mobile .pt-label{font-size:15px;}
+body.mobile .pt-sub{font-size:11px;}
+
+/* Mobile: budget big number */
+body.mobile [data-section="4"] div[style*="font-size:110px"]{font-size:64px!important;}
+
+/* Mobile: return ring */
+body.mobile .return-ring{width:110px;height:110px;}
+body.mobile .return-ring .rr-t{font-size:26px;}
+
+/* Mobile: bottom bar */
+body.mobile #bottom-bar{flex-wrap:wrap;gap:8px;padding:8px 12px;justify-content:center;}
+body.mobile .slide-info{font-size:11px;width:100%;text-align:center;}
+body.mobile .btn{padding:7px 16px;font-size:11px;}
+
+/* Mobile: transport */
+body.mobile .transport-row{gap:10px;}
+body.mobile .tr-chip{padding:14px 18px;font-size:12px;}
+body.mobile .tr-chip .tri{font-size:28px;}
+
+/* Mobile: blobs smaller */
+body.mobile .blob{filter:blur(40px);opacity:.08;}
+body.mobile .blob1{width:150px;height:150px;}
+body.mobile .blob2{width:120px;height:120px;}
+body.mobile .blob3{width:100px;height:100px;}
+
+/* Mobile: chip */
+body.mobile .chip{font-size:12px;padding:8px 18px;}
+
+/* Mobile: announce */
+body.mobile .announce{padding:18px 20px;}
+body.mobile .announce .a-icon{font-size:40px;}
+body.mobile .announce h2{font-size:22px;}
+
+/* Mobile: money floats hidden */
+body.mobile [style*="moneyFloat"]{display:none!important;}
+
+/* Mobile: slide logo smaller */
+body.mobile .slide-logo svg{width:36px;}
+
+/* Mobile: click hint */
+body.mobile .click-hint{bottom:auto;top:12px;font-size:11px;}
+
+/* Hide QR and view toggle on mobile */
+body.mobile .qr-btn{display:none;}
+body.mobile .view-toggle{display:none;}
 </style>
 </head>
 <body>
@@ -328,15 +464,15 @@ body{display:flex;flex-direction:column;}
 
 <nav id="top-nav">
   <div class="nav-tabs" id="nav-tabs">
-    <button class="tab-btn active" data-section="0" onclick="jumpToSection(0)"><span class="t-icon">&#128197;</span> Overview</button>
-    <button class="tab-btn" data-section="1" onclick="jumpToSection(1)"><span class="t-icon">&#127919;</span> The Goal</button>
-    <button class="tab-btn" data-section="2" onclick="jumpToSection(2)"><span class="t-icon">&#128506;</span> Location</button>
-    <button class="tab-btn" data-section="3" onclick="jumpToSection(3)"><span class="t-icon">&#128737;</span> Safety</button>
-    <button class="tab-btn" data-section="4" onclick="jumpToSection(4)"><span class="t-icon">&#128176;</span> Budget</button>
-    <button class="tab-btn" data-section="5" onclick="jumpToSection(5)"><span class="t-icon">&#128647;</span> Transport</button>
-    <button class="tab-btn" data-section="6" onclick="jumpToSection(6)"><span class="t-icon">&#128081;</span> Leaders</button>
-    <button class="tab-btn" data-section="7" onclick="jumpToSection(7)"><span class="t-icon">&#128680;</span> Emergency</button>
-    <button class="tab-btn" data-section="8" onclick="jumpToSection(8)"><span class="t-icon">&#127937;</span> Return</button>
+    <button class="tab-btn active" data-section="0" onclick="jumpToSection(0)"><span class="t-icon">&#128197;</span><span class="t-label"> Overview</span></button>
+    <button class="tab-btn" data-section="1" onclick="jumpToSection(1)"><span class="t-icon">&#127919;</span><span class="t-label"> The Goal</span></button>
+    <button class="tab-btn" data-section="2" onclick="jumpToSection(2)"><span class="t-icon">&#128506;</span><span class="t-label"> Location</span></button>
+    <button class="tab-btn" data-section="3" onclick="jumpToSection(3)"><span class="t-icon">&#128737;</span><span class="t-label"> Safety</span></button>
+    <button class="tab-btn" data-section="4" onclick="jumpToSection(4)"><span class="t-icon">&#128176;</span><span class="t-label"> Budget</span></button>
+    <button class="tab-btn" data-section="5" onclick="jumpToSection(5)"><span class="t-icon">&#128647;</span><span class="t-label"> Transport</span></button>
+    <button class="tab-btn" data-section="6" onclick="jumpToSection(6)"><span class="t-icon">&#128081;</span><span class="t-label"> Leaders</span></button>
+    <button class="tab-btn" data-section="7" onclick="jumpToSection(7)"><span class="t-icon">&#128680;</span><span class="t-label"> Emergency</span></button>
+    <button class="tab-btn" data-section="8" onclick="jumpToSection(8)"><span class="t-icon">&#127937;</span><span class="t-label"> Return</span></button>
   </div>
 </nav>
 
@@ -984,6 +1120,28 @@ body{display:flex;flex-direction:column;}
     <a href="/" class="btn btn-prev" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;">&#127968; Hub</a>
     <button class="btn btn-prev" onclick="prevStep()">&#8592; Prev</button>
     <button class="btn btn-next" onclick="nextStep()">Next &#8594;</button>
+    <button class="qr-btn" onclick="toggleQR()" title="Share mobile link">&#128241; QR</button>
+    <div class="view-toggle" id="view-toggle">
+      <button class="vt-btn active" data-view="desktop" onclick="setView('desktop')">&#128187; Desktop</button>
+      <button class="vt-btn" data-view="mobile" onclick="setView('mobile')">&#128241; Mobile</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="qr-overlay" id="qr-overlay" onclick="if(event.target===this)toggleQR()">
+  <div class="qr-card">
+    <button class="qr-close" onclick="toggleQR()">&times;</button>
+    <h3>&#128241; Mobile Briefing</h3>
+    <p>Scan to open on phone (portrait optimized)</p>
+    <div class="qr-img-wrap">
+      <img id="qr-img" alt="QR Code" width="180" height="180">
+    </div>
+    <div class="qr-url" id="qr-url-display"></div>
+    <div class="qr-actions">
+      <button class="qr-action-btn" id="qr-copy-btn" onclick="copyMobileLink()">&#128203; Copy Link</button>
+      <button class="qr-action-btn" id="qr-share-btn" onclick="shareMobileLink()">&#128228; Share</button>
+    </div>
   </div>
 </div>
 
@@ -1251,6 +1409,85 @@ function removeContact(btn){
     saveContacts();
   }
 }
+
+// ── MOBILE DETECTION & VIEW TOGGLE ──
+function getMobileUrl(){
+  const u=new URL(window.location.href);
+  u.searchParams.set('mobile','1');
+  return u.toString();
+}
+
+function setView(mode){
+  document.querySelectorAll('.vt-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===mode));
+  if(mode==='mobile'){
+    document.body.classList.add('mobile');
+  } else {
+    document.body.classList.remove('mobile');
+  }
+  // Re-render current slide to fix layout
+  showSlide(cur,step);
+}
+
+// Auto-detect ?mobile=1
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('mobile')==='1'){
+    document.body.classList.add('mobile');
+    // Update toggle buttons if visible
+    document.querySelectorAll('.vt-btn').forEach(b=>b.classList.toggle('active',b.dataset.view==='mobile'));
+  }
+})();
+
+// ── QR CODE ──
+function toggleQR(){
+  const ov=document.getElementById('qr-overlay');
+  const isOpen=ov.classList.contains('open');
+  if(!isOpen){
+    const mobileUrl=getMobileUrl();
+    const qrImg=document.getElementById('qr-img');
+    // Use QR Server API — works offline-free, just needs internet
+    qrImg.src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&bgcolor=ffffff&color=0F172A&data='+encodeURIComponent(mobileUrl);
+    document.getElementById('qr-url-display').textContent=mobileUrl;
+  }
+  ov.classList.toggle('open');
+}
+
+function copyMobileLink(){
+  const url=getMobileUrl();
+  const btn=document.getElementById('qr-copy-btn');
+  const done=()=>{
+    const orig=btn.innerHTML;
+    btn.innerHTML='\u2705 Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{btn.innerHTML=orig;btn.classList.remove('copied');},1600);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(()=>fallbackCopy(url,done));
+  }else{fallbackCopy(url,done);}
+}
+function fallbackCopy(text,cb){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');cb&&cb();}catch(_){}
+  document.body.removeChild(ta);
+}
+async function shareMobileLink(){
+  const url=getMobileUrl();
+  if(navigator.share){
+    try{await navigator.share({title:'HSBC KL City Hunt \u2014 Leader\u2019s Briefing',text:'Mobile briefing link',url});}catch(_){/* user cancelled */}
+  }else{
+    copyMobileLink();
+  }
+}
+
+// Close QR on Escape
+document.addEventListener('keydown',e=>{
+  if(e.code==='Escape'){
+    const ov=document.getElementById('qr-overlay');
+    if(ov.classList.contains('open')){ov.classList.remove('open');e.preventDefault();}
+  }
+});
 
 initStorage();
 showSlide(0,0);

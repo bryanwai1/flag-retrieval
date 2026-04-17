@@ -46,6 +46,11 @@ export function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
     setSaving(true)
     try {
       await onSave({ color: color.trim(), hex_code: hexCode, title: title.trim(), sort_order: sortOrder, points })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message
+        : typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message)
+        : 'Unknown error'
+      alert('Failed to save task: ' + msg)
     } finally {
       setSaving(false)
     }

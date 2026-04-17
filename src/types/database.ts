@@ -103,6 +103,7 @@ export interface BingoTask {
   answer_question: string | null
   answer_text: string | null
   completion_warning: string | null
+  require_marshal: boolean
   created_at: string
 }
 
@@ -111,6 +112,7 @@ export interface BingoSettings {
   timer_seconds: number
   timer_end_at: string | null
   active_section_id: string | null
+  marshal_password: string
   created_at: string
 }
 
@@ -135,6 +137,15 @@ export interface BingoScan {
   scanned_at: string
   completed: boolean
   completed_at: string | null
+}
+
+export interface BingoMember {
+  id: string
+  team_id: string
+  section_id: string
+  name: string
+  password: string
+  created_at: string
 }
 
 // ── Snake and Ladder ──────────────────────────────────────────

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 
 const PRESET_COLORS = [
@@ -373,6 +373,8 @@ export function BingoDashAdmin() {
   const [showForm, setShowForm] = useState(false)
   const [qrTask, setQrTask] = useState<BingoTask | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [showJoinLink, setShowJoinLink] = useState(false)
+  const [joinLinkCopied, setJoinLinkCopied] = useState(false)
 
   // Add challenge form
   const [formTitle, setFormTitle] = useState('')
@@ -438,6 +440,8 @@ export function BingoDashAdmin() {
 
   // Team grid viewer modal
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
+  const [members, setMembers] = useState<BingoMember[]>([])
+  const [newGroupName, setNewGroupName] = useState('')
 
   // Library: compartment filter
   const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
@@ -574,13 +578,14 @@ export function BingoDashAdmin() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
-    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes] = await Promise.all([
+    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes] = await Promise.all([
       supabase.from('bingo_tasks').select('*').order('sort_order'),
       supabase.from('bingo_teams').select('*').order('created_at'),
       supabase.from('bingo_scans').select('*'),
       supabase.from('bingo_sections').select('*').order('sort_order'),
       supabase.from('bingo_categories').select('*').order('sort_order'),
       supabase.from('bingo_challenge_sections').select('*').order('sort_order'),
+      supabase.from('bingo_members').select('*').order('created_at'),
     ])
     if (tasksRes.data) setTasks(tasksRes.data)
     if (teamsRes.data) setTeams(teamsRes.data)
@@ -591,6 +596,7 @@ export function BingoDashAdmin() {
     }
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (challengeSectionsRes.data) setChallengeSections(challengeSectionsRes.data)
+    if (membersRes.data) setMembers(membersRes.data)
     setLoading(false)
   }, [])
 
@@ -1077,6 +1083,23 @@ export function BingoDashAdmin() {
     await updateTeam(id, { section_id: newSectionId })
   }
 
+  const createGroup = async (sectionId: string) => {
+    const name = newGroupName.trim()
+    if (!name) return
+    if (teams.some(t => t.section_id === sectionId && t.name.toLowerCase() === name.toLowerCase())) {
+      alert(`Group "${name}" already exists in this compartment.`)
+      return
+    }
+    const { data, error } = await supabase
+      .from('bingo_teams')
+      .insert({ name, password: '', section_id: sectionId })
+      .select()
+      .single()
+    if (error || !data) { alert('Failed to create group'); return }
+    setTeams(prev => [...prev, data])
+    setNewGroupName('')
+  }
+
   const copyLink = (taskId: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/bingo-dash/task/${taskId}`)
     setCopiedId(taskId)
@@ -1174,6 +1197,12 @@ export function BingoDashAdmin() {
             <span className="text-sm text-gray-400 hidden sm:block">
               {scopedTasks.length} challenges · {scopedTeams.length} teams
             </span>
+            <button
+              onClick={() => { setShowJoinLink(true); setJoinLinkCopied(false) }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 border border-emerald-200 hover:bg-emerald-50 transition-colors"
+            >
+              Join Link / QR
+            </button>
             <a href="/bingo-dash" target="_blank" rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-violet-600 border border-violet-200 hover:bg-violet-50 transition-colors">
               Player View ↗
@@ -1291,6 +1320,30 @@ export function BingoDashAdmin() {
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── Marshal Password ──────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Marshal Password</h2>
+          <p className="text-xs text-gray-400 mb-3">Participants must enter this password to complete challenges that have "Require Marshal" enabled.</p>
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={settings?.marshal_password ?? ''}
+              onChange={e => setSettings(prev => prev ? { ...prev, marshal_password: e.target.value } : prev)}
+              placeholder="Marshal password..."
+              className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-mono font-bold focus:outline-none focus:border-violet-400"
+            />
+            <button
+              onClick={() => {
+                if (!settings) return
+                updateSettings({ marshal_password: settings.marshal_password })
+              }}
+              className="px-5 py-2.5 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 transition-colors"
+            >
+              Save
+            </button>
           </div>
         </section>
 
@@ -1746,6 +1799,20 @@ export function BingoDashAdmin() {
                                     )}
                                   </div>
                                   <p className="text-white/40 text-xs mt-0.5">{task.in_grid ? '✓ In grid' : 'Off grid'}</p>
+                                  <button
+                                    onClick={async () => {
+                                      const newVal = !task.require_marshal
+                                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, require_marshal: newVal } : t))
+                                      await supabase.from('bingo_tasks').update({ require_marshal: newVal }).eq('id', task.id)
+                                    }}
+                                    className={`mt-1.5 text-xs font-bold px-2 py-0.5 rounded-full transition-colors ${
+                                      task.require_marshal
+                                        ? 'bg-yellow-400/30 text-yellow-200 hover:bg-yellow-400/50'
+                                        : 'bg-white/10 text-white/30 hover:bg-white/20'
+                                    }`}
+                                  >
+                                    {task.require_marshal ? '🔒 Marshal ON' : '🔓 Marshal OFF'}
+                                  </button>
                                 </div>
                                 <div className="px-3 pb-3 flex flex-wrap gap-1.5">
                                   <button onClick={() => navigate(`/bingo-dash/admin/task/${task.id}`)}
@@ -2098,7 +2165,6 @@ export function BingoDashAdmin() {
           {sections.map(section => {
             const sectionTeams = teams.filter(t => t.section_id === section.id)
             const sectionTasks = tasks.filter(t => t.section_id === section.id)
-            if (sectionTeams.length === 0) return null
             return (
               <div key={section.id} className="mb-10">
                 {/* Compartment header */}
@@ -2107,15 +2173,34 @@ export function BingoDashAdmin() {
                   {settings?.active_section_id === section.id && (
                     <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>
                   )}
-                  <span className="text-xs text-gray-400 font-medium">{sectionTeams.length} team{sectionTeams.length !== 1 ? 's' : ''}</span>
+                  <span className="text-xs text-gray-400 font-medium">{sectionTeams.length} group{sectionTeams.length !== 1 ? 's' : ''}</span>
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+
+                {/* Create group form */}
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={e => setNewGroupName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') createGroup(section.id) }}
+                    placeholder="New group name..."
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-violet-400"
+                  />
+                  <button
+                    onClick={() => createGroup(section.id)}
+                    disabled={!newGroupName.trim()}
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 disabled:opacity-40 transition-colors"
+                  >
+                    + Create Group
+                  </button>
+                </div>
+                {sectionTeams.length > 0 && (<div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Team</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Group</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Members</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Bingos</th>
@@ -2153,17 +2238,19 @@ export function BingoDashAdmin() {
                               />
                             </td>
                             <td className="px-4 py-3">
-                              <input
-                                type="text"
-                                defaultValue={team.password}
-                                key={`${team.id}-pwd-${team.password}`}
-                                onBlur={e => {
-                                  const v = e.target.value
-                                  if (v !== team.password) updateTeam(team.id, { password: v })
-                                }}
-                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-1 rounded select-all border border-transparent hover:border-gray-300 focus:border-violet-400 focus:outline-none w-28"
-                              />
+                              {(() => {
+                                const teamMembers = members.filter(m => m.team_id === team.id)
+                                return (
+                                  <div>
+                                    <span className="text-sm font-bold text-gray-700">{teamMembers.length}</span>
+                                    {teamMembers.length > 0 && (
+                                      <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                                        {teamMembers.map(m => m.name).join(', ')}
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </td>
                             <td className="px-4 py-3">
                               <select
@@ -2208,13 +2295,13 @@ export function BingoDashAdmin() {
                       })}
                     </tbody>
                   </table>
-                  <p className="text-xs text-gray-300 px-4 py-2">Tap <span className="font-bold text-violet-500">View Grid</span> to see a team's 5×5 board.</p>
-                </div>
+                  <p className="text-xs text-gray-300 px-4 py-2">Tap <span className="font-bold text-violet-500">View Grid</span> to see a group's 5×5 board.</p>
+                </div>)}
               </div>
             )
           })}
           {teams.length === 0 && (
-            <p className="text-gray-400 text-sm">No teams yet. Teams register when they scan a QR code.</p>
+            <p className="text-gray-400 text-sm">No groups yet. Create groups above for participants to join.</p>
           )}
         </section>
         )}
@@ -2627,6 +2714,102 @@ export function BingoDashAdmin() {
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />Bingo</span>
                 </div>
               </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Join Link / QR Modal ───────────────────────────────────────────── */}
+      {showJoinLink && (() => {
+        const currentSection = sections.find(s => s.id === currentSectionId)
+        const joinUrl = currentSection
+          ? `${window.location.origin}/bingo-dash/play/${currentSection.slug}`
+          : ''
+
+        const handleCopy = () => {
+          navigator.clipboard.writeText(joinUrl).then(() => {
+            setJoinLinkCopied(true)
+            setTimeout(() => setJoinLinkCopied(false), 2000)
+          })
+        }
+
+        const handleDownloadQR = () => {
+          const svg = document.getElementById('join-qr-svg')
+          if (!svg) return
+          const svgData = new XMLSerializer().serializeToString(svg)
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          const img = new Image()
+          img.onload = () => {
+            canvas.width = 1024
+            canvas.height = 1024
+            if (ctx) {
+              ctx.fillStyle = '#ffffff'
+              ctx.fillRect(0, 0, 1024, 1024)
+              ctx.drawImage(img, 0, 0, 1024, 1024)
+            }
+            const a = document.createElement('a')
+            a.download = `bingo-dash-join-${currentSection?.slug ?? 'qr'}.png`
+            a.href = canvas.toDataURL('image/png')
+            a.click()
+          }
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+        }
+
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+            onClick={() => setShowJoinLink(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-bounce-in"
+              onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Player Join Link</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Share this link or QR code for <span className="font-bold text-gray-600">{currentSection?.name ?? 'this section'}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowJoinLink(false)}
+                  className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+              </div>
+
+              {!currentSection ? (
+                <div className="p-8 text-center text-gray-400">
+                  <p className="text-sm">No section selected.</p>
+                </div>
+              ) : (
+                <div className="p-6 flex flex-col items-center gap-5">
+                  {/* QR Code */}
+                  <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                    <QRCodeSVG id="join-qr-svg" value={joinUrl} size={280} level="H" />
+                  </div>
+
+                  {/* URL + Copy */}
+                  <div className="w-full flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-xs font-mono text-gray-600 break-all select-all border border-gray-200">
+                      {joinUrl}
+                    </div>
+                    <button onClick={handleCopy}
+                      className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                        joinLinkCopied
+                          ? 'bg-green-100 text-green-700 border border-green-300'
+                          : 'bg-gray-900 text-white hover:bg-gray-700'
+                      }`}>
+                      {joinLinkCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+
+                  {/* Download */}
+                  <button onClick={handleDownloadQR}
+                    className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors hover:scale-[1.02] active:scale-95">
+                    Download QR as PNG
+                  </button>
+
+                  {/* Section switcher hint */}
+                  <p className="text-[11px] text-gray-300 text-center">
+                    Switch sections in the header to get a different join link.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )
