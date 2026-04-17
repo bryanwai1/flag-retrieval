@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { useTeams } from '../hooks/useTeams'
+import { useSetting } from '../hooks/useSettings'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { CardParticleCanvas } from '../components/CardParticleCanvas'
 import type { Task } from '../types/database'
@@ -22,6 +23,8 @@ export function ProjectorView() {
   const { tasks, loading: tasksLoading } = useTasks()
   const { byPoints, loading: lbLoading } = useLeaderboard()
   const { teams, loading: teamsLoading } = useTeams()
+  const [manualOrder, setManualOrder] = useSetting('flag-retrieval-ranking-order', '')
+  const [editRank, setEditRank] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [startTime, setStartTime] = useState<number | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -66,9 +69,27 @@ export function ProjectorView() {
 
   // Merge all registered teams with leaderboard data (so teams with 0 show too)
   const lbMap = new Map(byPoints.map(e => [e.teamId, e]))
-  const allTeamRows = teams
+  const autoRows = teams
     .map(t => lbMap.get(t.id) ?? { teamId: t.id, teamName: t.name, flagsCompleted: 0, pointsGathered: 0, lastCompletedAt: null })
     .sort((a, b) => b.pointsGathered - a.pointsGathered || b.flagsCompleted - a.flagsCompleted || a.teamName.localeCompare(b.teamName))
+
+  // Apply manual ranking override if present
+  let manualIds: string[] = []
+  try { manualIds = manualOrder ? JSON.parse(manualOrder) : [] } catch { manualIds = [] }
+  const rowById = new Map(autoRows.map(r => [r.teamId, r]))
+  const orderedFromManual = manualIds.map(id => rowById.get(id)).filter((r): r is NonNullable<typeof r> => !!r)
+  const orderedIds = new Set(orderedFromManual.map(r => r.teamId))
+  const allTeamRows = [...orderedFromManual, ...autoRows.filter(r => !orderedIds.has(r.teamId))]
+
+  const moveRank = (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= allTeamRows.length) return
+    const newIds = allTeamRows.map(r => r.teamId)
+    ;[newIds[index], newIds[target]] = [newIds[target], newIds[index]]
+    setManualOrder(JSON.stringify(newIds))
+  }
+
+  const resetRank = () => { setManualOrder('') }
 
   const handleSelect = (task: Task) => {
     setSelectedTask(prev => (prev?.id === task.id ? null : task))
@@ -83,6 +104,30 @@ export function ProjectorView() {
       >
         ← Admin
       </a>
+
+      {/* Edit ranking toggle */}
+      <div className="absolute top-5 left-28 z-20 flex items-center gap-2">
+        <button
+          onClick={() => setEditRank(v => !v)}
+          className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all backdrop-blur-sm ${
+            editRank
+              ? 'bg-yellow-400/25 border border-yellow-400/60 text-yellow-200'
+              : 'bg-white/10 border border-white/20 text-white/50 hover:text-white hover:bg-white/20'
+          }`}
+          title="Manually reorder teams"
+        >
+          {editRank ? '✓ Done' : '↕ Edit Rank'}
+        </button>
+        {editRank && manualOrder && (
+          <button
+            onClick={resetRank}
+            className="px-3 py-2 rounded-xl text-xs font-bold bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition-all backdrop-blur-sm"
+            title="Clear manual order, return to auto-sort"
+          >
+            Reset
+          </button>
+        )}
+      </div>
 
       {/* Timer controls */}
       <div className="absolute top-5 right-6 z-20 flex items-center gap-3">
@@ -249,10 +294,27 @@ export function ProjectorView() {
                       }}
                     >
                       <td className="px-4 py-2 text-center w-10">
-                        {i < 3
-                          ? <span className="text-base">{MEDALS[i]}</span>
-                          : <span className="text-white/40 font-bold">{i + 1}</span>
-                        }
+                        {editRank ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <button
+                              onClick={() => moveRank(i, -1)}
+                              disabled={i === 0}
+                              className="px-1.5 py-0 leading-none rounded bg-white/10 text-white text-xs hover:bg-yellow-400/30 disabled:opacity-20 transition"
+                              title="Move up"
+                            >▲</button>
+                            <span className="text-white/40 text-[10px] font-bold leading-none">{i + 1}</span>
+                            <button
+                              onClick={() => moveRank(i, 1)}
+                              disabled={i === allTeamRows.length - 1}
+                              className="px-1.5 py-0 leading-none rounded bg-white/10 text-white text-xs hover:bg-yellow-400/30 disabled:opacity-20 transition"
+                              title="Move down"
+                            >▼</button>
+                          </div>
+                        ) : i < 3 ? (
+                          <span className="text-base">{MEDALS[i]}</span>
+                        ) : (
+                          <span className="text-white/40 font-bold">{i + 1}</span>
+                        )}
                       </td>
                       <td className="px-4 py-2 text-white font-bold truncate max-w-[200px]">{entry.teamName}</td>
                       <td className="px-4 py-2 text-center text-white font-black">{entry.flagsCompleted}</td>
