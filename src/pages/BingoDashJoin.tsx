@@ -49,41 +49,15 @@ function JoinScreen({
   const [password, setPassword] = useState('')
   const [search, setSearch] = useState('')
   const [selectedTeam, setSelectedTeam] = useState<BingoTeam | null>(null)
-  const [isReturningMember, setIsReturningMember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: name only — look up member, decide next step
-  const handleNext = async (e: React.FormEvent) => {
+  // Step 1: name only — always advance to group picker so everyone picks from the same list
+  const handleNext = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    setSubmitting(true)
     setError('')
-    try {
-      const { data: existing } = await supabase
-        .from('bingo_members')
-        .select('*')
-        .eq('section_id', sectionId)
-        .ilike('name', name.trim())
-        .maybeSingle()
-
-      if (existing) {
-        const existingTeam = groups.find(g => g.id === existing.team_id)
-        if (existingTeam) {
-          setSelectedTeam(existingTeam)
-          setIsReturningMember(true)
-          setStep(3)
-          setSubmitting(false)
-          return
-        }
-      }
-      setIsReturningMember(false)
-      setStep(2)
-      setSubmitting(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
-      setSubmitting(false)
-    }
+    setStep(2)
   }
 
   // Step 2: pick a group → advance to password step
@@ -243,7 +217,7 @@ function JoinScreen({
         >
           <button
             onClick={() => {
-              setStep(isReturningMember ? 1 : 2)
+              setStep(2)
               setPassword('')
               setError('')
             }}
