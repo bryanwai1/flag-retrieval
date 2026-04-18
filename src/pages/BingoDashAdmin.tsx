@@ -292,6 +292,7 @@ function CategoryGroupBlock({
                   {categories.filter(c => c.section_id === task.section_id).map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
+                  <option value="__new__">+ New category…</option>
                 </select>
               ) : (
                 <button
@@ -442,6 +443,7 @@ export function BingoDashAdmin() {
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
   const [members, setMembers] = useState<BingoMember[]>([])
   const [newGroupName, setNewGroupName] = useState('')
+  const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState<string | null>(null)
 
   // Library: compartment filter
   const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
@@ -642,21 +644,33 @@ export function BingoDashAdmin() {
   }
 
   // ── Category CRUD ─────────────────────────────────────────────────────────
-  const createCategory = async (sectionId: string) => {
-    const name = newCategoryName.trim()
-    if (!name || !sectionId) return
-    if (categories.some(c => c.section_id === sectionId && c.name === name)) {
-      alert(`Category "${name}" already exists in this compartment.`)
-      return
-    }
+  const createCategoryByName = async (sectionId: string, rawName: string): Promise<BingoCategory | null> => {
+    const name = rawName.trim()
+    if (!name || !sectionId) return null
+    const existing = categories.find(c => c.section_id === sectionId && c.name === name)
+    if (existing) return existing
     const maxOrder = categories.filter(c => c.section_id === sectionId)
       .reduce((m, c) => Math.max(m, c.sort_order), -1)
     const { data, error } = await supabase.from('bingo_categories')
       .insert({ section_id: sectionId, name, sort_order: maxOrder + 1 })
       .select().single()
-    if (error || !data) { alert('Failed to create category'); return }
+    if (error || !data) { alert('Failed to create category'); return null }
     setCategories(prev => [...prev, data])
-    setNewCategoryName('')
+    return data
+  }
+
+  const createCategory = async (sectionId: string) => {
+    const created = await createCategoryByName(sectionId, newCategoryName)
+    if (created) setNewCategoryName('')
+  }
+
+  // Handle the "+ New category…" sentinel from category <select>s.
+  // Returns the chosen category name, or null if the user cancelled.
+  const promptAndCreateCategory = async (sectionId: string): Promise<string | null> => {
+    const raw = window.prompt('New category name:')
+    if (!raw || !raw.trim()) return null
+    const cat = await createCategoryByName(sectionId, raw)
+    return cat?.name ?? null
   }
 
   const renameCategory = async (id: string, sectionId: string, newName: string) => {
@@ -919,7 +933,9 @@ export function BingoDashAdmin() {
         category: tileCategory.trim(), points: tilePoints,
         task_type: tileTaskType,
         answer_question: tileTaskType === 'answer' ? tileAnswerQuestion.trim() || null : null,
-        answer_text: tileTaskType === 'answer' ? tileAnswerText.trim() || null : null,
+        answer_text: tileTaskType === 'answer'
+          ? tileAnswerText.split('\n').map(l => l.trim()).filter(Boolean).join('\n') || null
+          : null,
       }
       // Moving a tile to another section: drop it off the grid in the source
       // section so we don't leave a dangling slot reference behind.
@@ -1011,8 +1027,16 @@ export function BingoDashAdmin() {
 
   const saveCategoryInline = async (taskId: string, categoryName: string) => {
     setEditingCategoryId(null)
-    await supabase.from('bingo_tasks').update({ category: categoryName }).eq('id', taskId)
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, category: categoryName } : t))
+    let finalName = categoryName
+    if (categoryName === '__new__') {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+      const created = await promptAndCreateCategory(task.section_id)
+      if (!created) return
+      finalName = created
+    }
+    await supabase.from('bingo_tasks').update({ category: finalName }).eq('id', taskId)
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, category: finalName } : t))
   }
 
   const matchesBulkCategory = (t: BingoTask, categoryKey: string) => {
@@ -1045,7 +1069,9 @@ export function BingoDashAdmin() {
         category: formCategory.trim(), sort_order: nextOrder, points: formPoints,
         task_type: formTaskType,
         answer_question: formTaskType === 'answer' ? formAnswerQuestion.trim() || null : null,
-        answer_text: formTaskType === 'answer' ? formAnswerText.trim() || null : null,
+        answer_text: formTaskType === 'answer'
+          ? formAnswerText.split('\n').map(l => l.trim()).filter(Boolean).join('\n') || null
+          : null,
       })
       setFormTitle(''); setFormColor(''); setFormHex('#3B82F6'); setFormCategory(''); setFormPoints(0)
       setFormTaskType('standard'); setFormAnswerQuestion(''); setFormAnswerText('')
@@ -1071,6 +1097,28 @@ export function BingoDashAdmin() {
   const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
     await supabase.from('bingo_teams').update(updates).eq('id', id)
+  }
+
+  const uploadTeamPhoto = async (teamId: string, file: File) => {
+    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} too large (max 5 MB).`); return }
+    if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return }
+    setUploadingTeamPhoto(teamId)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const fileName = `${teamId}-${Date.now()}.${ext}`
+      const path = `bingo-media/team-photos/${fileName}`
+      const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
+      if (error) { alert(`Upload failed: ${error.message}`); return }
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
+      await updateTeam(teamId, { photo_url: urlData.publicUrl })
+    } finally {
+      setUploadingTeamPhoto(null)
+    }
+  }
+
+  const removeTeamPhoto = async (teamId: string) => {
+    if (!confirm('Remove this group\u2019s photo?')) return
+    await updateTeam(teamId, { photo_url: null })
   }
 
   const moveTeamToSection = async (id: string, newSectionId: string) => {
@@ -1210,6 +1258,10 @@ export function BingoDashAdmin() {
             <a href="/bingo-dash/projector" target="_blank" rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-600 border border-amber-200 hover:bg-amber-50 transition-colors">
               Scoreboard ↗
+            </a>
+            <a href="/bingo-dash/colmar-intro" target="_blank" rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors">
+              Intro Slide ↗
             </a>
             <button
               onClick={() => setActiveTab('teams')}
@@ -1579,12 +1631,21 @@ export function BingoDashAdmin() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                    <select value={formCategory} onChange={async e => {
+                      if (e.target.value === '__new__') {
+                        if (!currentSectionId) return
+                        const name = await promptAndCreateCategory(currentSectionId)
+                        if (name) setFormCategory(name)
+                        return
+                      }
+                      setFormCategory(e.target.value)
+                    }}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
                       <option value="">— Uncategorized —</option>
                       {categories.filter(c => c.section_id === currentSectionId).map(c => (
                         <option key={c.id} value={c.name}>{c.name}</option>
                       ))}
+                      <option value="__new__">+ New category…</option>
                     </select>
                   </div>
                   <div className="w-24">
@@ -1781,6 +1842,7 @@ export function BingoDashAdmin() {
                                       {categories.filter(c => c.section_id === task.section_id).map(c => (
                                         <option key={c.id} value={c.name}>{c.name}</option>
                                       ))}
+                                      <option value="__new__">+ New category…</option>
                                     </select>
                                   ) : (
                                     <button
@@ -2010,12 +2072,21 @@ export function BingoDashAdmin() {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                    <select value={formCategory} onChange={async e => {
+                      if (e.target.value === '__new__') {
+                        if (!currentSectionId) return
+                        const name = await promptAndCreateCategory(currentSectionId)
+                        if (name) setFormCategory(name)
+                        return
+                      }
+                      setFormCategory(e.target.value)
+                    }}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
                       <option value="">— Uncategorized —</option>
                       {categories.filter(c => c.section_id === currentSectionId).map(c => (
                         <option key={c.id} value={c.name}>{c.name}</option>
                       ))}
+                      <option value="__new__">+ New category…</option>
                     </select>
                   </div>
                   <div className="w-24">
@@ -2199,7 +2270,9 @@ export function BingoDashAdmin() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Photo</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Group</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Members</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
@@ -2224,6 +2297,43 @@ export function BingoDashAdmin() {
                         return (
                           <tr key={team.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-3">
+                              <div className="relative group/photo">
+                                <label
+                                  className={`block w-12 h-12 rounded-full overflow-hidden border-2 ${team.photo_url ? 'border-violet-200' : 'border-dashed border-gray-300'} bg-gray-50 cursor-pointer hover:border-violet-400 transition-colors ${uploadingTeamPhoto === team.id ? 'opacity-60' : ''}`}
+                                  title={team.photo_url ? 'Click to replace photo' : 'Click to upload photo'}
+                                >
+                                  {team.photo_url ? (
+                                    <img src={team.photo_url} alt={`${team.name} photo`} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">
+                                      {uploadingTeamPhoto === team.id ? '\u2026' : '+'}
+                                    </div>
+                                  )}
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingTeamPhoto === team.id}
+                                    onChange={e => {
+                                      const f = e.target.files?.[0]
+                                      e.target.value = ''
+                                      if (f) uploadTeamPhoto(team.id, f)
+                                    }}
+                                  />
+                                </label>
+                                {team.photo_url && uploadingTeamPhoto !== team.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTeamPhoto(team.id)}
+                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity shadow"
+                                    title="Remove photo"
+                                  >
+                                    &times;
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
                               <input
                                 type="text"
                                 defaultValue={team.name}
@@ -2238,11 +2348,35 @@ export function BingoDashAdmin() {
                               />
                             </td>
                             <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={4}
+                                defaultValue={team.password}
+                                placeholder="—"
+                                key={`${team.id}-pwd-${team.password}`}
+                                onBlur={e => {
+                                  const v = e.target.value.replace(/\D/g, '').slice(0, 4)
+                                  if (v !== team.password) updateTeam(team.id, { password: v })
+                                  e.target.value = v
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                className={`w-20 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-mono tracking-widest text-center bg-transparent ${
+                                  team.password ? 'text-gray-800' : 'text-gray-300'
+                                }`}
+                                title={team.password ? 'Team password (set by team leader)' : 'Not set yet — first joiner becomes team leader'}
+                              />
+                            </td>
+                            <td className="px-4 py-3">
                               {(() => {
                                 const teamMembers = members.filter(m => m.team_id === team.id)
+                                const isFull = teamMembers.length >= 4
                                 return (
                                   <div>
-                                    <span className="text-sm font-bold text-gray-700">{teamMembers.length}</span>
+                                    <span className={`text-sm font-bold ${isFull ? 'text-red-500' : 'text-gray-700'}`}>
+                                      {teamMembers.length} / 4
+                                    </span>
                                     {teamMembers.length > 0 && (
                                       <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">
                                         {teamMembers.map(m => m.name).join(', ')}
@@ -2401,12 +2535,20 @@ export function BingoDashAdmin() {
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select value={tileCategory} onChange={e => setTileCategory(e.target.value)}
+                  <select value={tileCategory} onChange={async e => {
+                    if (e.target.value === '__new__') {
+                      const name = await promptAndCreateCategory(tileSectionId)
+                      if (name) setTileCategory(name)
+                      return
+                    }
+                    setTileCategory(e.target.value)
+                  }}
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
                     <option value="">— Uncategorized —</option>
                     {categories.filter(c => c.section_id === tileSectionId).map(c => (
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
+                    <option value="__new__">+ New category…</option>
                   </select>
                 </div>
                 <div className="w-24">

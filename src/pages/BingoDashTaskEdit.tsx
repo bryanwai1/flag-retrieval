@@ -60,14 +60,17 @@ export function BingoDashTaskEdit() {
   const handleAnswerSave = async () => {
     if (!task) return
     setAnswerSaving(true)
-    const { error } = await supabase.from('bingo_tasks').update({
+    const cleanedAnswerText = answerText.split('\n').map(l => l.trim()).filter(Boolean).join('\n')
+    const payload = {
       task_type: taskType,
       answer_question: taskType === 'answer' ? answerQuestion.trim() || null : null,
-      answer_text: taskType === 'answer' ? answerText.trim() || null : null,
-    }).eq('id', task.id)
+      answer_text: taskType === 'answer' ? cleanedAnswerText || null : null,
+    }
+    const { error } = await supabase.from('bingo_tasks').update(payload).eq('id', task.id)
     setAnswerSaving(false)
     if (error) { alert('Failed to save: ' + error.message); return }
-    setTask({ ...task, task_type: taskType, answer_question: answerQuestion.trim() || null, answer_text: answerText.trim() || null })
+    setAnswerText(cleanedAnswerText)
+    setTask({ ...task, ...payload })
   }
 
   const handleAddPage = async () => {

@@ -14,6 +14,7 @@ function formatTime(totalSeconds: number): string {
 }
 
 const GRID_SIZE = 25
+const MAX_TEAM_MEMBERS = 4
 const BINGO_WORD = 'BINGO'
 const BINGO_LINES = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
@@ -34,21 +35,25 @@ function JoinScreen({
   sectionName,
   sectionId,
   groups,
+  memberCounts,
   onJoinGroup,
 }: {
   sectionName: string
   sectionId: string
   groups: BingoTeam[]
+  memberCounts: Record<string, number>
   onJoinGroup: (memberName: string, password: string, teamId: string) => Promise<void>
 }) {
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [search, setSearch] = useState('')
+  const [selectedTeam, setSelectedTeam] = useState<BingoTeam | null>(null)
+  const [isReturningMember, setIsReturningMember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: check if returning member
+  // Step 1: name only — look up member, decide next step
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -63,28 +68,40 @@ function JoinScreen({
         .maybeSingle()
 
       if (existing) {
-        if (existing.password !== password.trim()) {
-          setError('Wrong password for this name.')
+        const existingTeam = groups.find(g => g.id === existing.team_id)
+        if (existingTeam) {
+          setSelectedTeam(existingTeam)
+          setIsReturningMember(true)
+          setStep(3)
           setSubmitting(false)
           return
         }
-        await onJoinGroup(name.trim(), password.trim(), existing.team_id)
-        return
       }
-      setSubmitting(false)
+      setIsReturningMember(false)
       setStep(2)
+      setSubmitting(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setSubmitting(false)
     }
   }
 
-  // Step 2: pick a group
-  const handlePickGroup = async (teamId: string) => {
+  // Step 2: pick a group → advance to password step
+  const handlePickGroup = (team: BingoTeam) => {
+    setSelectedTeam(team)
+    setPassword('')
+    setError('')
+    setStep(3)
+  }
+
+  // Step 3: submit password
+  const handleSubmitPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedTeam || password.length !== 4) return
     setSubmitting(true)
     setError('')
     try {
-      await onJoinGroup(name.trim(), password.trim(), teamId)
+      await onJoinGroup(name.trim(), password, selectedTeam.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join group')
       setSubmitting(false)
@@ -95,8 +112,10 @@ function JoinScreen({
     g.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  const selectedIsLeaderSetup = !!selectedTeam && !selectedTeam.password
+
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4 py-8">
       <ParticleBackground />
 
       <div className="relative z-10 text-center mb-10 animate-slide-up">
@@ -112,7 +131,7 @@ function JoinScreen({
           style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
         >
           <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
-          <p className="text-gray-400 text-center text-sm mb-6">Enter your name and password</p>
+          <p className="text-gray-400 text-center text-sm mb-6">Enter your name to begin</p>
 
           <form onSubmit={handleNext} className="flex flex-col gap-3">
             <input
@@ -123,16 +142,6 @@ function JoinScreen({
               className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
               style={{ borderColor: name ? '#a855f7' : '#e5e7eb' }}
               autoFocus
-              maxLength={40}
-              disabled={submitting}
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setError('') }}
-              placeholder="Password..."
-              className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-              style={{ borderColor: password ? '#a855f7' : '#e5e7eb' }}
               maxLength={40}
               disabled={submitting}
             />
@@ -155,7 +164,7 @@ function JoinScreen({
           </form>
 
           <p className="text-center text-xs text-gray-300 mt-5">
-            Use the same name + password to re-join your group.
+            Use the same name to re-join your group.
           </p>
         </div>
       )}
@@ -171,9 +180,9 @@ function JoinScreen({
           >
             &larr; Back
           </button>
-          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join a Group</h2>
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Pick Your Group</h2>
           <p className="text-gray-400 text-center text-sm mb-4">
-            Hi <span className="text-purple-500 font-bold">{name}</span>! Pick your group.
+            Hi <span className="text-purple-500 font-bold">{name}</span>! Choose which group to join.
           </p>
 
           <input
@@ -186,31 +195,108 @@ function JoinScreen({
             autoFocus
           />
 
-          {error && (
-            <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3">
-              <span>🚫</span>
-              <p className="text-red-600 font-bold text-sm">{error}</p>
-            </div>
-          )}
-
           <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
             {filteredGroups.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-6">
                 {search ? 'No groups match your search.' : 'No groups available yet.'}
               </p>
             ) : (
-              filteredGroups.map(group => (
-                <button
-                  key={group.id}
-                  onClick={() => handlePickGroup(group.id)}
-                  disabled={submitting}
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-gray-200 text-left font-bold text-gray-800 text-lg hover:border-purple-400 hover:bg-purple-50 transition-all duration-150 active:scale-[0.98] disabled:opacity-40"
-                >
-                  {group.name}
-                </button>
-              ))
+              filteredGroups.map(group => {
+                const count = memberCounts[group.id] ?? 0
+                const isFull = count >= MAX_TEAM_MEMBERS
+                const hasLeader = !!group.password
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => !isFull && handlePickGroup(group)}
+                    disabled={isFull}
+                    className={`w-full px-5 py-4 rounded-2xl border-2 text-left font-bold text-lg transition-all duration-150 ${
+                      isFull
+                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-200 text-gray-800 hover:border-purple-400 hover:bg-purple-50 active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{group.name}</span>
+                      <span className={`text-xs font-mono ${isFull ? 'text-red-400' : 'text-gray-400'}`}>
+                        {count} / {MAX_TEAM_MEMBERS}
+                      </span>
+                    </div>
+                    {!hasLeader && !isFull && (
+                      <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Be the team leader · set password</span>
+                    )}
+                    {isFull && (
+                      <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Full</span>
+                    )}
+                  </button>
+                )
+              })
             )}
           </div>
+        </div>
+      )}
+
+      {step === 3 && selectedTeam && (
+        <div
+          className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
+          style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
+        >
+          <button
+            onClick={() => {
+              setStep(isReturningMember ? 1 : 2)
+              setPassword('')
+              setError('')
+            }}
+            className="text-sm text-purple-500 font-bold mb-4 hover:text-purple-700 transition-colors"
+          >
+            &larr; Back
+          </button>
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">
+            {selectedIsLeaderSetup ? 'Set Team Password' : 'Enter Team Password'}
+          </h2>
+          <p className="text-gray-400 text-center text-sm mb-1">
+            Group: <span className="text-purple-500 font-bold">{selectedTeam.name}</span>
+          </p>
+          <p className="text-gray-400 text-center text-xs mb-5">
+            {selectedIsLeaderSetup
+              ? "You're the team leader. Pick a 4-digit password — your teammates will use it to join."
+              : 'Ask your team leader for the 4-digit code.'}
+          </p>
+
+          <form onSubmit={handleSubmitPassword} className="flex flex-col gap-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={password}
+              onChange={e => {
+                setPassword(e.target.value.replace(/\D/g, '').slice(0, 4))
+                setError('')
+              }}
+              placeholder="• • • •"
+              className="w-full px-5 py-4 rounded-2xl border-2 text-4xl font-black focus:outline-none transition-colors text-center tracking-[0.6em]"
+              style={{ borderColor: password.length === 4 ? '#a855f7' : '#e5e7eb' }}
+              autoFocus
+              maxLength={4}
+              disabled={submitting}
+            />
+
+            {error && (
+              <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <span>🚫</span>
+                <p className="text-red-600 font-bold text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={password.length !== 4 || submitting}
+              className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
+              style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+            >
+              {submitting ? 'Joining...' : selectedIsLeaderSetup ? 'Set & Join 🏴' : 'Join Group →'}
+            </button>
+          </form>
         </div>
       )}
     </div>
@@ -560,6 +646,7 @@ export function BingoDashJoin() {
   const [section, setSection] = useState<BingoSection | null>(null)
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null)
   const [groups, setGroups] = useState<BingoTeam[]>([])
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [settings, setSettings] = useState<BingoSettings | null>(null)
@@ -607,6 +694,18 @@ export function BingoDashJoin() {
           .eq('section_id', data.id)
           .order('name')
           .then(({ data: g }) => { if (g) setGroups(g) })
+
+        // Load member counts per team (for the full/available indicator)
+        supabase
+          .from('bingo_members')
+          .select('team_id')
+          .eq('section_id', data.id)
+          .then(({ data: m }) => {
+            if (!m) return
+            const counts: Record<string, number> = {}
+            for (const row of m) counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+            setMemberCounts(counts)
+          })
 
         // Load grid tasks for this section
         supabase
@@ -657,8 +756,25 @@ export function BingoDashJoin() {
   // Join a group: create or find the member record, then enter the board
   const joinGroup = async (memberName: string, password: string, teamId: string) => {
     if (!section || !sectionSlug) throw new Error('Section not found')
+    if (!/^\d{4}$/.test(password)) throw new Error('Password must be 4 digits.')
 
-    // Check if member already exists for this section
+    // Re-fetch team for the latest password state (first-joiner race-safety).
+    const { data: teamData, error: teamErr } = await supabase
+      .from('bingo_teams').select('*').eq('id', teamId).single()
+    if (teamErr || !teamData) throw new Error('Group not found')
+
+    // Team password: leader sets it the first time; everyone else verifies.
+    let liveTeam: BingoTeam = teamData
+    if (!teamData.password) {
+      const { data: updated, error: pErr } = await supabase
+        .from('bingo_teams').update({ password }).eq('id', teamId).select().single()
+      if (pErr || !updated) throw new Error('Could not set team password.')
+      liveTeam = updated
+    } else if (teamData.password !== password) {
+      throw new Error('Wrong team password.')
+    }
+
+    // Look up existing member for this section
     const { data: existing } = await supabase
       .from('bingo_members')
       .select('*')
@@ -666,13 +782,24 @@ export function BingoDashJoin() {
       .ilike('name', memberName)
       .maybeSingle()
 
+    // Enforce 4-member cap (don't block a returning member on their own team)
+    const isReturningSameTeam = existing?.team_id === teamId
+    if (!isReturningSameTeam) {
+      const { count } = await supabase
+        .from('bingo_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', teamId)
+      if ((count ?? 0) >= MAX_TEAM_MEMBERS) {
+        throw new Error(`This team is full (${MAX_TEAM_MEMBERS} / ${MAX_TEAM_MEMBERS}).`)
+      }
+    }
+
     let member: BingoMember
     if (existing) {
-      // Update team_id if they're switching groups
-      if (existing.team_id !== teamId) {
-        await supabase.from('bingo_members').update({ team_id: teamId }).eq('id', existing.id)
+      if (existing.team_id !== teamId || existing.password !== password) {
+        await supabase.from('bingo_members').update({ team_id: teamId, password }).eq('id', existing.id)
       }
-      member = { ...existing, team_id: teamId }
+      member = { ...existing, team_id: teamId, password }
     } else {
       const { data: created, error } = await supabase
         .from('bingo_members')
@@ -683,15 +810,13 @@ export function BingoDashJoin() {
       member = created
     }
 
-    // Fetch the team data
-    const { data: teamData } = await supabase.from('bingo_teams').select('*').eq('id', teamId).single()
-    if (!teamData) throw new Error('Group not found')
-
     localStorage.setItem(MEMBER_ID_KEY(sectionSlug), member.id)
     localStorage.setItem(MEMBER_DATA_KEY(sectionSlug), JSON.stringify(member))
-    localStorage.setItem(TEAM_ID_KEY(sectionSlug), teamData.id)
-    localStorage.setItem(TEAM_DATA_KEY(sectionSlug), JSON.stringify(teamData))
-    setTeam(teamData)
+    localStorage.setItem(TEAM_ID_KEY(sectionSlug), liveTeam.id)
+    localStorage.setItem(TEAM_DATA_KEY(sectionSlug), JSON.stringify(liveTeam))
+    setGroups(prev => prev.map(g => g.id === liveTeam.id ? liveTeam : g))
+    setMemberCounts(prev => ({ ...prev, [liveTeam.id]: (prev[liveTeam.id] ?? 0) + (existing ? 0 : 1) }))
+    setTeam(liveTeam)
     setPageState('board')
   }
 
@@ -731,7 +856,7 @@ export function BingoDashJoin() {
   }
 
   if (pageState === 'join' && section) {
-    return <JoinScreen sectionName={section.name} sectionId={section.id} groups={groups} onJoinGroup={joinGroup} />
+    return <JoinScreen sectionName={section.name} sectionId={section.id} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} />
   }
 
   if (pageState === 'board' && team && section) {

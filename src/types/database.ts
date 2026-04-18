@@ -127,6 +127,7 @@ export interface BingoTeam {
   section_id: string
   name: string
   password: string
+  photo_url: string | null
   created_at: string
 }
 

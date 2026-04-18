@@ -48,7 +48,7 @@ export function BingoDashParticipant() {
       if (data) {
         setTask(data)
         if (data.task_type === 'answer' && data.answer_text) {
-          const rows = data.answer_text.split('\n')
+          const rows = data.answer_text.split('\n').map((r: string) => r.trim()).filter(Boolean)
           // Restore saved answers from localStorage
           const saved = localStorage.getItem(`bingo-answers-${taskId}`)
           if (saved) {
@@ -79,7 +79,7 @@ export function BingoDashParticipant() {
 
   // Derived: the answer rows expected by the task
   const answerRows = task?.task_type === 'answer' && task.answer_text
-    ? task.answer_text.split('\n').map(r => r.trim())
+    ? task.answer_text.split('\n').map(r => r.trim()).filter(Boolean)
     : []
 
   const normalize = (s: string) => s.replace(/\s/g, '').toLowerCase()
