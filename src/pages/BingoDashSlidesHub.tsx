@@ -18,6 +18,14 @@ const SLIDES: Slide[] = [
     accent: '#e6b84a',
     available: true,
   },
+  {
+    href: '/bingo-dash/slides/awards',
+    title: 'AWARD SLIDES',
+    subtitle: 'Ceremony · Consolation → Bronze → Silver → Gold',
+    icon: '🏆',
+    accent: '#fbbf24',
+    available: true,
+  },
 ]
 
 export function BingoDashSlidesHub() {

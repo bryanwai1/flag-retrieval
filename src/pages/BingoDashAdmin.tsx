@@ -2277,6 +2277,7 @@ export function BingoDashAdmin() {
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Bingos</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs" title="Bonus points from other games — added to total for award ranking">Bonus</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Grid</th>
                         <th className="text-right px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Actions</th>
                       </tr>
@@ -2411,6 +2412,24 @@ export function BingoDashAdmin() {
                             <td className="px-4 py-3">
                               <span className="text-sm font-black text-amber-600">{teamBingoLines}</span>
                               <span className="text-xs text-gray-400 ml-1">/ 12</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                step="1"
+                                defaultValue={team.bonus_points ?? 0}
+                                placeholder="0"
+                                key={`${team.id}-bonus-${team.bonus_points ?? 0}`}
+                                onBlur={e => {
+                                  const n = parseInt(e.target.value, 10)
+                                  const v = Number.isFinite(n) ? n : 0
+                                  if (v !== (team.bonus_points ?? 0)) updateTeam(team.id, { bonus_points: v })
+                                  e.target.value = String(v)
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                className="w-20 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-mono text-center text-gray-800 bg-transparent"
+                                title="Extra points from other games — factored into award ranking"
+                              />
                             </td>
                             <td className="px-4 py-3">
                               <button

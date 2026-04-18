@@ -128,6 +128,7 @@ export interface BingoTeam {
   name: string
   password: string
   photo_url: string | null
+  bonus_points: number
   created_at: string
 }
 
