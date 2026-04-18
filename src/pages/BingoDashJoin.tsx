@@ -33,13 +33,11 @@ type TileStatus = 'locked' | 'scanned' | 'completed'
 
 function JoinScreen({
   sectionName,
-  sectionId,
   groups,
   memberCounts,
   onJoinGroup,
 }: {
   sectionName: string
-  sectionId: string
   groups: BingoTeam[]
   memberCounts: Record<string, number>
   onJoinGroup: (memberName: string, password: string, teamId: string) => Promise<void>
@@ -830,7 +828,7 @@ export function BingoDashJoin() {
   }
 
   if (pageState === 'join' && section) {
-    return <JoinScreen sectionName={section.name} sectionId={section.id} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} />
+    return <JoinScreen sectionName={section.name} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} />
   }
 
   if (pageState === 'board' && team && section) {
