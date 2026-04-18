@@ -2271,8 +2271,8 @@ export function BingoDashAdmin() {
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Photo</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Group</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Password</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs min-w-[180px]">Group</th>
+                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs min-w-[110px]">Password</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Members</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
                         <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
