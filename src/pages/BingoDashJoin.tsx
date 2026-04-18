@@ -27,6 +27,10 @@ const MEMBER_DATA_KEY = (sectionSlug: string) => `bingo-join-member-data-${secti
 const TEAM_ID_KEY = (sectionSlug: string) => `bingo-join-team-${sectionSlug}`
 const TEAM_DATA_KEY = (sectionSlug: string) => `bingo-join-data-${sectionSlug}`
 
+// Shared with useBingoDashTeam so the task page recognizes the user without re-registering.
+const GLOBAL_TEAM_ID_KEY = 'bingo-dash-team-id'
+const GLOBAL_TEAM_DATA_KEY = 'bingo-dash-team-data'
+
 type TileStatus = 'locked' | 'scanned' | 'completed'
 
 /* ── Join Screen (2-step funnel) ──────────────────────────────────────────────── */
@@ -645,12 +649,20 @@ export function BingoDashJoin() {
             const parsed = JSON.parse(cachedTeamData)
             setTeam(parsed)
             setPageState('board')
+            localStorage.setItem(GLOBAL_TEAM_ID_KEY, cachedTeamId)
+            localStorage.setItem(GLOBAL_TEAM_DATA_KEY, cachedTeamData)
             // Validate team still exists in background
             supabase.from('bingo_teams').select('*').eq('id', cachedTeamId).single().then(({ data: t }) => {
-              if (t) { setTeam(t); localStorage.setItem(TEAM_DATA_KEY(sectionSlug), JSON.stringify(t)) }
+              if (t) {
+                setTeam(t)
+                const json = JSON.stringify(t)
+                localStorage.setItem(TEAM_DATA_KEY(sectionSlug), json)
+                localStorage.setItem(GLOBAL_TEAM_DATA_KEY, json)
+              }
               else {
                 localStorage.removeItem(MEMBER_ID_KEY(sectionSlug)); localStorage.removeItem(MEMBER_DATA_KEY(sectionSlug))
                 localStorage.removeItem(TEAM_ID_KEY(sectionSlug)); localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
+                localStorage.removeItem(GLOBAL_TEAM_ID_KEY); localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
                 setTeam(null); setPageState('join')
               }
             })
@@ -782,10 +794,13 @@ export function BingoDashJoin() {
       member = created
     }
 
+    const liveTeamJson = JSON.stringify(liveTeam)
     localStorage.setItem(MEMBER_ID_KEY(sectionSlug), member.id)
     localStorage.setItem(MEMBER_DATA_KEY(sectionSlug), JSON.stringify(member))
     localStorage.setItem(TEAM_ID_KEY(sectionSlug), liveTeam.id)
-    localStorage.setItem(TEAM_DATA_KEY(sectionSlug), JSON.stringify(liveTeam))
+    localStorage.setItem(TEAM_DATA_KEY(sectionSlug), liveTeamJson)
+    localStorage.setItem(GLOBAL_TEAM_ID_KEY, liveTeam.id)
+    localStorage.setItem(GLOBAL_TEAM_DATA_KEY, liveTeamJson)
     setGroups(prev => prev.map(g => g.id === liveTeam.id ? liveTeam : g))
     setMemberCounts(prev => ({ ...prev, [liveTeam.id]: (prev[liveTeam.id] ?? 0) + (existing ? 0 : 1) }))
     setTeam(liveTeam)
@@ -799,6 +814,8 @@ export function BingoDashJoin() {
       localStorage.removeItem(TEAM_ID_KEY(sectionSlug))
       localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
     }
+    localStorage.removeItem(GLOBAL_TEAM_ID_KEY)
+    localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
     setTeam(null)
     setPageState('join')
   }
