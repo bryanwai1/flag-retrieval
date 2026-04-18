@@ -60,7 +60,7 @@ export function BingoDashColmarIntro() {
            }} />
 
       {/* Stage ─────────────────────────────────────────────────────── */}
-      <div className="relative z-10 h-full w-full flex flex-col items-center px-8 py-8 sm:py-10 overflow-hidden">
+      <div className="relative z-10 h-full w-full flex flex-col items-center px-8 py-4 sm:py-6 overflow-hidden">
 
         {/* Subtitle ribbon */}
         <div
@@ -75,9 +75,9 @@ export function BingoDashColmarIntro() {
 
         {/* Main title */}
         <h1
-          className="mt-3 sm:mt-4 text-center font-black leading-none animate-gold-title"
+          className="mt-3 sm:mt-4 text-center font-black leading-none whitespace-nowrap animate-gold-title"
           style={{
-            fontSize: 'clamp(2.4rem, 7.8vw, 7rem)',
+            fontSize: 'clamp(1.8rem, 7vw, 6.5rem)',
             letterSpacing: '0.05em',
             animation: 'title-slam 0.9s cubic-bezier(0.22, 1, 0.36, 1) 1.1s both, gold-sweep 6s linear 1.1s infinite',
           }}
@@ -161,39 +161,39 @@ function TopDownRoadMap() {
   // Medieval buildings scattered as a town cluster (top-down view).
   // x,y is top-left corner of the building footprint on 1000×500 viewBox.
   const BUILDINGS = [
-    { x: 210, y: 105, w:  80, h: 62, roof: 'hip',   accent: '#8b5a17', delay: 0.6 },
-    { x: 335, y:  78, w: 145, h: 98, roof: 'gable', accent: '#8b2e1f', delay: 0.75 }, // church/hall (red roof)
-    { x: 520, y: 110, w:  88, h: 70, roof: 'hip',   accent: '#8b5a17', delay: 0.9 },
-    { x: 230, y: 232, w: 112, h: 86, roof: 'gable', accent: '#8b5a17', delay: 1.05 },
-    { x: 400, y: 212, w: 140, h: 108, roof: 'gable', accent: '#6b3e15', delay: 1.2 },  // market hall
-    { x: 700, y: 240, w: 112, h: 82, roof: 'hip',   accent: '#8b5a17', delay: 1.35 },
-    { x: 128, y: 320, w:  76, h: 60, roof: 'hip',   accent: '#8b5a17', delay: 1.5 },
-    { x: 278, y: 358, w:  72, h: 55, roof: 'hip',   accent: '#8b5a17', delay: 1.65 },
-    { x: 380, y: 358, w:  95, h: 65, roof: 'gable', accent: '#8b5a17', delay: 1.8 },
-    { x: 568, y: 350, w:  95, h: 65, roof: 'gable', accent: '#8b2e1f', delay: 1.95 }, // tavern (red roof)
+    { x: 220, y: 105, w:  80, h: 62, roof: 'hip',   accent: '#8b5a17', delay: 0.6 },
+    { x: 400, y:  78, w: 145, h: 98, roof: 'gable', accent: '#8b2e1f', delay: 0.75 }, // church/hall (red roof)
+    { x: 620, y: 110, w:  88, h: 70, roof: 'hip',   accent: '#8b5a17', delay: 0.9 },
+    { x: 270, y: 232, w: 112, h: 86, roof: 'gable', accent: '#8b5a17', delay: 1.05 },
+    { x: 475, y: 212, w: 140, h: 108, roof: 'gable', accent: '#6b3e15', delay: 1.2 },  // market hall
+    { x: 830, y: 240, w: 112, h: 82, roof: 'hip',   accent: '#8b5a17', delay: 1.35 },
+    { x: 140, y: 320, w:  76, h: 60, roof: 'hip',   accent: '#8b5a17', delay: 1.5 },
+    { x: 330, y: 358, w:  72, h: 55, roof: 'hip',   accent: '#8b5a17', delay: 1.65 },
+    { x: 455, y: 358, w:  95, h: 65, roof: 'gable', accent: '#8b5a17', delay: 1.8 },
+    { x: 680, y: 350, w:  95, h: 65, roof: 'gable', accent: '#8b2e1f', delay: 1.95 }, // tavern (red roof)
   ] as const
 
   // Teams wander the medieval streets, weaving between buildings with many turns.
   // Each path stays in the corridors between buildings.
-  //   vert streets  : x ≈ 215 / 310 / 370 / 498 / 555 / 685 / 820
+  //   vert streets  : x ≈ 255 / 360 / 430 / 580 / 655 / 780 / 955
   //   horiz streets : y ≈ 200 / 345 / 430
   const TEAMS = [
-    { color: '#c8a018', label: '1', start: [310, -40], end: [555, 225],
-      d: 'M 310 -40 L 310 200 L 370 200 L 370 345 L 555 345 L 555 225', delay: 2.2 },
-    { color: '#2a7fb3', label: '2', start: [650, -40], end: [240, 460],
-      d: 'M 650 -40 L 650 200 L 555 200 L 555 345 L 240 345 L 240 460', delay: 2.5 },
-    { color: '#d27224', label: '3', start: [-40, 205], end: [498, 60],
-      d: 'M -40 205 L 215 205 L 215 345 L 370 345 L 370 200 L 498 200 L 498 60', delay: 2.8 },
-    { color: '#c0392b', label: '4', start: [502, 540], end: [650, 60],
-      d: 'M 502 540 L 502 430 L 820 430 L 820 200 L 650 200 L 650 60', delay: 3.1 },
-    { color: '#2f8f52', label: '5', start: [820, 540], end: [880, 200],
-      d: 'M 820 540 L 820 430 L 555 430 L 555 345 L 685 345 L 685 200 L 880 200', delay: 3.4 },
+    { color: '#c8a018', label: '1', start: [360, -40], end: [655, 225],
+      d: 'M 360 -40 L 360 200 L 430 200 L 430 345 L 655 345 L 655 225', delay: 2.2 },
+    { color: '#2a7fb3', label: '2', start: [780, -40], end: [285, 460],
+      d: 'M 780 -40 L 780 200 L 655 200 L 655 345 L 285 345 L 285 460', delay: 2.5 },
+    { color: '#d27224', label: '3', start: [-40, 205], end: [580, 60],
+      d: 'M -40 205 L 255 205 L 255 345 L 430 345 L 430 200 L 580 200 L 580 60', delay: 2.8 },
+    { color: '#c0392b', label: '4', start: [580, 540], end: [780, 60],
+      d: 'M 580 540 L 580 430 L 955 430 L 955 200 L 780 200 L 780 60', delay: 3.1 },
+    { color: '#2f8f52', label: '5', start: [955, 540], end: [1050, 200],
+      d: 'M 955 540 L 955 430 L 655 430 L 655 345 L 780 345 L 780 200 L 1050 200', delay: 3.4 },
   ] as const
 
   return (
     <svg
-      viewBox="0 0 1000 500"
-      className="w-full h-full max-h-[55vh] drop-shadow-[0_10px_30px_rgba(60,30,10,0.45)]"
+      viewBox="0 0 1200 500"
+      className="w-full h-full max-h-[48vh] drop-shadow-[0_10px_30px_rgba(60,30,10,0.45)]"
       style={{ overflow: 'visible' }}
     >
       <defs>
@@ -206,11 +206,11 @@ function TopDownRoadMap() {
 
       {/* Faint parchment grid — like a surveyor's map */}
       <g opacity="0.14" stroke="#6b3e15" strokeWidth="0.4">
-        {Array.from({ length: 11 }, (_, i) => (
+        {Array.from({ length: 13 }, (_, i) => (
           <line key={`v${i}`} x1={i * 100} y1="0" x2={i * 100} y2="500" strokeDasharray="2 4" />
         ))}
         {Array.from({ length: 6 }, (_, i) => (
-          <line key={`h${i}`} x1="0" y1={i * 100} x2="1000" y2={i * 100} strokeDasharray="2 4" />
+          <line key={`h${i}`} x1="0" y1={i * 100} x2="1200" y2={i * 100} strokeDasharray="2 4" />
         ))}
       </g>
 
@@ -221,7 +221,7 @@ function TopDownRoadMap() {
       {TEAMS.map((t, i) => <TeamPath key={i} {...t} />)}
 
       {/* Compass rose */}
-      <g transform="translate(920 70)">
+      <g transform="translate(1120 70)">
         <g style={{ animation: 'compass-spin-in 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both' }}>
           <circle cx="0" cy="0" r="40" fill="rgba(244,228,193,0.5)" stroke="#5c3a1f" strokeWidth="1.4" />
           <circle cx="0" cy="0" r="33" fill="none" stroke="#5c3a1f" strokeWidth="0.7" strokeDasharray="2 3" />
@@ -232,7 +232,7 @@ function TopDownRoadMap() {
       </g>
 
       {/* Wax seal bottom-right */}
-      <g transform="translate(920 450)">
+      <g transform="translate(1120 450)">
         <g style={{ animation: 'bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 4.8s both, seal-pulse 3.5s ease-in-out 5.6s infinite' }}>
           <circle cx="0" cy="0" r="20" fill="#7a2314" stroke="#4a0f08" strokeWidth="1.5" />
           <circle cx="0" cy="0" r="14" fill="none" stroke="#d68c28" strokeWidth="1" strokeDasharray="2 2" />
