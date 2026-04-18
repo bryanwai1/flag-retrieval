@@ -113,6 +113,20 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [loaded, setLoaded] = useState(false)
   const [slideIdx, setSlideIdx] = useState(0)
+  const [showJudgePanel, setShowJudgePanel] = useState(false)
+
+  const adjustBonus = async (teamId: string, delta: number) => {
+    const current = teams.find(t => t.id === teamId)?.bonus_points ?? 0
+    const next = Math.max(0, current + delta)
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, bonus_points: next } : t))
+    await supabase.from('bingo_teams').update({ bonus_points: next }).eq('id', teamId)
+  }
+
+  const setBonus = async (teamId: string, value: number) => {
+    const v = Math.max(0, Math.floor(value))
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, bonus_points: v } : t))
+    await supabase.from('bingo_teams').update({ bonus_points: v }).eq('id', teamId)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -184,6 +198,14 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      if (!typing && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault()
+        setShowJudgePanel(p => !p)
+        return
+      }
+      if (typing) return
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
         e.preventDefault()
         setSlideIdx(i => Math.min(SLIDE_COUNT - 1, i + 1))
@@ -191,12 +213,13 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
         e.preventDefault()
         setSlideIdx(i => Math.max(0, i - 1))
       } else if (e.key === 'Escape') {
-        navigate('/bingo-dash/slides/awards')
+        if (showJudgePanel) setShowJudgePanel(false)
+        else navigate('/bingo-dash/slides/awards')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate])
+  }, [navigate, showJudgePanel])
 
   if (!loaded) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading…</div>
@@ -266,8 +289,91 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
 
       {/* Bottom hint */}
       <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/30 uppercase tracking-[0.35em] z-40 font-semibold pointer-events-none">
-        {slideIdx < SLIDE_COUNT - 1 ? '▶ Click / Space / → to continue' : '✦ End of Awards · Esc to exit'}
+        {slideIdx < SLIDE_COUNT - 1 ? '▶ Click / Space / → to continue · Press B for bonus' : '✦ End of Awards · Esc to exit'}
       </div>
+
+      {/* Judge panel: toggle with B — adjust bonus points live */}
+      {showJudgePanel && (
+        <div
+          onClick={e => e.stopPropagation()}
+          className="absolute top-0 right-0 bottom-0 w-[380px] max-w-[90vw] bg-gray-950/95 border-l border-white/10 text-white z-50 shadow-2xl flex flex-col"
+          style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <div>
+              <p className="text-xs text-amber-400 font-bold uppercase tracking-widest">Bonus Points</p>
+              <p className="text-sm text-white/60 mt-0.5">Ranks update live · Press B to close</p>
+            </div>
+            <button
+              onClick={() => setShowJudgePanel(false)}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg leading-none"
+              title="Close (B or Esc)"
+            >
+              ×
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {ranked.map((r, i) => (
+              <div
+                key={r.team.id}
+                className="bg-white/5 hover:bg-white/10 rounded-lg p-3 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-mono text-white/40 w-5 text-right">#{i + 1}</span>
+                    <span className="font-bold text-sm truncate">{r.team.name}</span>
+                  </div>
+                  <span className="text-xs font-mono text-amber-400 whitespace-nowrap ml-2">
+                    {r.total} pts
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => adjustBonus(r.team.id, -5)}
+                    className="w-8 h-8 rounded bg-white/10 hover:bg-red-500/40 text-sm font-bold transition-colors"
+                  >−5</button>
+                  <button
+                    onClick={() => adjustBonus(r.team.id, -1)}
+                    className="w-8 h-8 rounded bg-white/10 hover:bg-red-500/40 text-sm font-bold transition-colors"
+                  >−1</button>
+                  <input
+                    type="number"
+                    value={r.bonusPoints}
+                    onChange={e => setBonus(r.team.id, parseInt(e.target.value, 10) || 0)}
+                    onClick={e => (e.target as HTMLInputElement).select()}
+                    className="flex-1 bg-white/10 rounded text-center font-mono font-bold py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400/50 min-w-0"
+                  />
+                  <button
+                    onClick={() => adjustBonus(r.team.id, 1)}
+                    className="w-8 h-8 rounded bg-white/10 hover:bg-emerald-500/40 text-sm font-bold transition-colors"
+                  >+1</button>
+                  <button
+                    onClick={() => adjustBonus(r.team.id, 5)}
+                    className="w-8 h-8 rounded bg-white/10 hover:bg-emerald-500/40 text-sm font-bold transition-colors"
+                  >+5</button>
+                </div>
+                <p className="text-[10px] text-white/40 mt-1.5 font-mono">
+                  Base {r.basePoints} + Bonus {r.bonusPoints} · {r.bingos} bingo{r.bingos === 1 ? '' : 's'}
+                </p>
+              </div>
+            ))}
+            {ranked.length === 0 && (
+              <p className="text-white/40 text-sm text-center py-8">No teams yet</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Judge toggle button */}
+      {!showJudgePanel && (
+        <button
+          onClick={e => { e.stopPropagation(); setShowJudgePanel(true) }}
+          className="absolute bottom-4 right-6 z-40 text-[10px] text-white/40 hover:text-amber-300 uppercase tracking-[0.3em] font-bold transition-colors"
+          title="Adjust bonus points (B)"
+        >
+          ✎ Bonus (B)
+        </button>
+      )}
     </div>
   )
 }
