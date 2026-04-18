@@ -1094,6 +1094,13 @@ export function BingoDashAdmin() {
     await fetchAll()
   }
 
+  const removeMember = async (memberId: string, memberName: string, teamName: string) => {
+    if (!confirm(`Remove "${memberName}" from ${teamName}?`)) return
+    setMembers(prev => prev.filter(m => m.id !== memberId))
+    const { error } = await supabase.from('bingo_members').delete().eq('id', memberId)
+    if (error) { alert('Failed to remove member'); await fetchAll() }
+  }
+
   const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
     await supabase.from('bingo_teams').update(updates).eq('id', id)
@@ -2369,7 +2376,7 @@ export function BingoDashAdmin() {
                                 title={team.password ? 'Team password (set by team leader)' : 'Not set yet — first joiner becomes team leader'}
                               />
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 min-w-[200px]">
                               {(() => {
                                 const teamMembers = members.filter(m => m.team_id === team.id)
                                 const isFull = teamMembers.length >= 4
@@ -2379,9 +2386,24 @@ export function BingoDashAdmin() {
                                       {teamMembers.length} / 4
                                     </span>
                                     {teamMembers.length > 0 && (
-                                      <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">
-                                        {teamMembers.map(m => m.name).join(', ')}
-                                      </p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {teamMembers.map(m => (
+                                          <span
+                                            key={m.id}
+                                            className="inline-flex items-center gap-1 bg-gray-100 rounded-full pl-2 pr-1 py-0.5 text-[11px] text-gray-700"
+                                          >
+                                            {m.name}
+                                            <button
+                                              type="button"
+                                              onClick={() => removeMember(m.id, m.name, team.name)}
+                                              className="w-4 h-4 rounded-full bg-gray-300 hover:bg-red-500 hover:text-white text-gray-600 text-[10px] font-bold leading-none flex items-center justify-center transition-colors"
+                                              title={`Remove ${m.name}`}
+                                            >
+                                              &times;
+                                            </button>
+                                          </span>
+                                        ))}
+                                      </div>
                                     )}
                                   </div>
                                 )
