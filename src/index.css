@@ -144,3 +144,136 @@ body {
   animation: silver-sweep 3.5s linear infinite;
   filter: drop-shadow(0 0 30px rgba(200,210,255,0.18));
 }
+
+/* ── Colmar Bingo Hunt intro slide ───────────────────────────── */
+@keyframes gold-sweep {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes ink-draw {
+  from { stroke-dashoffset: var(--dash, 2000); }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes path-trail {
+  from { stroke-dashoffset: 1400; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes banner-unfurl {
+  0%   { transform: scaleX(0); opacity: 0; }
+  60%  { transform: scaleX(1.05); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+@keyframes map-rise {
+  0%   { transform: translateY(40px) scale(0.96); opacity: 0; filter: blur(6px); }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; filter: blur(0);   }
+}
+@keyframes marker-drop {
+  0%   { transform: translateY(-24px) scale(0.5); opacity: 0; }
+  70%  { transform: translateY(3px)   scale(1.1); opacity: 1; }
+  100% { transform: translateY(0)     scale(1);   opacity: 1; }
+}
+@keyframes compass-spin-in {
+  0%   { transform: rotate(-180deg) scale(0); opacity: 0; }
+  100% { transform: rotate(0)       scale(1); opacity: 0.9; }
+}
+@keyframes gold-dust {
+  0%   { transform: translate3d(0, 100vh, 0) scale(0.6); opacity: 0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.9; }
+  100% { transform: translate3d(var(--dx, 0px), -10vh, 0) scale(1.2); opacity: 0; }
+}
+@keyframes sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  50%      { transform: rotate(1.2deg); }
+}
+@keyframes seal-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(214,140,40,0.6)); }
+  50%      { transform: scale(1.04); filter: drop-shadow(0 0 24px rgba(250,190,80,0.9)); }
+}
+@keyframes pin-drop {
+  0%   { transform: translateY(-110px) scale(0.3); opacity: 0; }
+  55%  { transform: translateY(8px)    scale(1.15); opacity: 1; }
+  75%  { transform: translateY(-4px)   scale(0.96); }
+  100% { transform: translateY(0)      scale(1); opacity: 1; }
+}
+@keyframes camera-flash {
+  0%   { opacity: 0; transform: scale(0.3); }
+  18%  { opacity: 0.95; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+@keyframes shutter-ring {
+  0%   { opacity: 0.95; transform: scale(0.2); }
+  100% { opacity: 0;    transform: scale(2.4); }
+}
+@keyframes dash-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -60; }
+}
+@keyframes route-draw {
+  from { stroke-dashoffset: var(--route-len, 1600); }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes route-glow {
+  from { opacity: 0; }
+  to   { opacity: 0.22; }
+}
+@keyframes route-reveal {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes fade-in-dashed {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-gold-title {
+  background: linear-gradient(
+    100deg,
+    #8b5a17 0%,
+    #c48c33 18%,
+    #f2cc6b 30%,
+    #fff1b8 40%,
+    #f2cc6b 50%,
+    #c48c33 62%,
+    #8b5a17 78%,
+    #c48c33 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-sweep 6s linear infinite;
+  filter: drop-shadow(0 2px 0 rgba(60,30,10,0.35)) drop-shadow(0 0 26px rgba(250,190,80,0.35));
+}
+
+.colmar-parchment {
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255,220,160,0.25), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, rgba(140,70,20,0.25),   transparent 55%),
+    radial-gradient(ellipse at 50% 50%, #efd9a8 0%, #d9b472 55%, #a87a39 100%);
+}
+
+.colmar-grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(60,30,10,0.22) 1px, transparent 1.5px),
+                    radial-gradient(rgba(80,45,15,0.14) 1px, transparent 1.5px);
+  background-size: 7px 7px, 11px 11px;
+  background-position: 0 0, 3px 4px;
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.colmar-vignette::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(50,20,5,0.55) 100%);
+  pointer-events: none;
+}

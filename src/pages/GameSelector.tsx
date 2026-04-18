@@ -41,6 +41,7 @@ export function GameSelector() {
         <GameCard
           href="/bingo-dash"
           adminHref="/bingo-dash/admin"
+          slidesHref="/bingo-dash/slides"
           icon="🎯"
           title="BINGO DASH"
           description="Scan challenges · Complete tasks · Track your team"
@@ -120,6 +121,7 @@ function GameCard({
   href,
   adminHref,
   faciHref,
+  slidesHref,
   icon,
   title,
   description,
@@ -130,6 +132,7 @@ function GameCard({
   href: string
   adminHref: string
   faciHref?: string
+  slidesHref?: string
   icon: string
   title: string
   description: string
@@ -179,6 +182,15 @@ function GameCard({
             style={{ color: accent, border: `1.5px solid ${accent}44` }}
           >
             ⚙ Admin Panel
+          </a>
+        )}
+        {slidesHref && (
+          <a
+            href={slidesHref}
+            className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+            style={{ color: accent, border: `1.5px solid ${accent}44` }}
+          >
+            🎞 Event Slides
           </a>
         )}
       </div>

@@ -21,6 +21,8 @@ const BingoDashAdmin        = lazy(() => import('./pages/BingoDashAdmin').then(m
 const BingoDashTaskEdit     = lazy(() => import('./pages/BingoDashTaskEdit').then(m => ({ default: m.BingoDashTaskEdit })))
 const BingoDashProjector    = lazy(() => import('./pages/BingoDashProjector').then(m => ({ default: m.BingoDashProjector })))
 const BingoDashJoin         = lazy(() => import('./pages/BingoDashJoin').then(m => ({ default: m.BingoDashJoin })))
+const BingoDashColmarIntro  = lazy(() => import('./pages/BingoDashColmarIntro').then(m => ({ default: m.BingoDashColmarIntro })))
+const BingoDashSlidesHub    = lazy(() => import('./pages/BingoDashSlidesHub').then(m => ({ default: m.BingoDashSlidesHub })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/bingo-dash/admin/task/:taskId" element={<BingoDashTaskEdit />} />
           <Route path="/bingo-dash/projector" element={<BingoDashProjector />} />
           <Route path="/bingo-dash/play/:sectionSlug" element={<BingoDashJoin />} />
+          <Route path="/bingo-dash/colmar-intro" element={<BingoDashColmarIntro />} />
+          <Route path="/bingo-dash/slides" element={<BingoDashSlidesHub />} />
           <Route path="/snake-ladder" element={<SnakeLadderBoard />} />
           <Route path="/snake-ladder/admin" element={<SnakeLadderAdmin />} />
         </Routes>
