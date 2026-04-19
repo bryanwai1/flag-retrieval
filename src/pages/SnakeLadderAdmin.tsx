@@ -771,7 +771,7 @@ function TeamsTab({
                 onChange={e => updateTeam(team.id, { emoji: e.target.value.slice(0, 2) })}
                 className="w-12 px-2 py-1 rounded border border-gray-200 text-center text-lg"
               />
-              <span className="text-xs text-gray-400">Tile {team.position}</span>
+              <span className="text-xs text-gray-400">Tile {team.position} · {team.points ?? 0} pts</span>
               <button onClick={() => deleteTeam(team.id)} className="text-red-500 hover:text-red-700 text-sm font-black px-2">✕</button>
             </div>
           ))}

@@ -176,6 +176,7 @@ export interface SnakeTeam {
   emoji: string | null
   position: number
   sort_order: number
+  points: number
   created_at: string
 }
 

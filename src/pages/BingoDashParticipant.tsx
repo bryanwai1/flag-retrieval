@@ -37,7 +37,7 @@ export function BingoDashParticipant() {
   const [snakeTeams, setSnakeTeams] = useState<SnakeTeam[]>([])
   const [snakeSnakes, setSnakeSnakes] = useState<Record<string, number>>({})
   const [snakeLadders, setSnakeLadders] = useState<Record<string, number>>({})
-  const [snakeResult, setSnakeResult] = useState<{ team: SnakeTeam; landed: number; jump: 'snake' | 'ladder' | null; to: number } | null>(null)
+  const [snakeResult, setSnakeResult] = useState<{ team: SnakeTeam; landed: number; jump: 'snake' | 'ladder' | null; to: number; newPoints: number } | null>(null)
   const [snakeMoving, setSnakeMoving] = useState(false)
   // Marshal password state
   const [marshalPassword, setMarshalPassword] = useState('')
@@ -362,6 +362,7 @@ export function BingoDashParticipant() {
                   Landed on tile {snakeResult.landed}
                   {snakeResult.jump ? ` → ${snakeResult.to} (${snakeResult.jump === 'snake' ? 'slid down' : 'climbed up'})` : ''}
                 </p>
+                <p className="text-white font-black text-lg mt-2">+50 pts · Total {snakeResult.newPoints}</p>
                 <button
                   onClick={() => navigate(backPath)}
                   className="mt-5 w-full py-3 rounded-2xl text-white font-black uppercase tracking-wider transition-all active:scale-95"
@@ -396,9 +397,10 @@ export function BingoDashParticipant() {
                           setSnakeMoving(true)
                           const landed = Math.max(0, Math.min(TOTAL_TILES, snakeTile))
                           const resolved = resolveJump(landed, snakeSnakes, snakeLadders)
+                          const newPoints = (st.points ?? 0) + 50
                           try {
-                            await supabase.from('snake_teams').update({ position: resolved.final }).eq('id', st.id)
-                            setSnakeResult({ team: st, landed, jump: resolved.jump, to: resolved.final })
+                            await supabase.from('snake_teams').update({ position: resolved.final, points: newPoints }).eq('id', st.id)
+                            setSnakeResult({ team: st, landed, jump: resolved.jump, to: resolved.final, newPoints })
                           } finally {
                             setSnakeMoving(false)
                           }
@@ -413,9 +415,9 @@ export function BingoDashParticipant() {
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <p className="font-black text-white text-sm truncate">{st.name}</p>
-                          <p className="text-[11px] text-white/50">On tile {st.position || '—'}</p>
+                          <p className="text-[11px] text-white/50">On tile {st.position || '—'} · {st.points ?? 0} pts</p>
                         </div>
-                        <span className="text-white/40 text-lg font-black">→</span>
+                        <span className="text-green-300 text-xs font-black">+50</span>
                       </button>
                     ))}
                   </div>

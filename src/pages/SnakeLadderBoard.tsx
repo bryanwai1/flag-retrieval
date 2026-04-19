@@ -399,8 +399,8 @@ function TeamStatus({ team }: { team: SnakeTeam }) {
       <div className="flex-1 min-w-0">
         <p className="font-black text-sm truncate">{team.name}</p>
         <p className="text-[10px] text-white/50">
-          On tile {team.position || '—'}
-          {team.position >= TOTAL_TILES && ' · 🏁 Finished!'}
+          Tile {team.position || '—'} · {team.points ?? 0} pts
+          {team.position >= TOTAL_TILES && ' · 🏁'}
         </p>
       </div>
     </div>
