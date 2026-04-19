@@ -559,9 +559,12 @@ function IntroSlide({ slideIdx }: { slideIdx: number }) {
 }
 
 // ── Holding slide ─────────────────────────────────────────────────────────
+// Layout mirrors PrizeSlide so the hero image lands where the team photo
+// will appear on the next slides (pretitle → title → photo → name-line).
 function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwardConfig | null }) {
   const total = config?.total_points ?? 0
   const img = config?.image_url ?? null
+  const photoSize = TIER.first.photoSize
   return (
     <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
       <div
@@ -575,49 +578,60 @@ function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwa
         }}
       />
 
-      {img && (
-        <div
-          className="relative z-10 mb-10 rounded-3xl overflow-hidden"
-          style={{
-            width: 'min(60vw, 560px)',
-            aspectRatio: '16/9',
-            boxShadow: '0 0 60px rgba(253,224,71,0.35), 0 20px 60px rgba(0,0,0,0.4)',
-            animation: 'pop-bounce-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both',
-            border: '2px solid rgba(253,224,71,0.35)',
-          }}
-        >
-          <img src={img} alt="Awards" className="w-full h-full object-cover" />
-        </div>
-      )}
-
       <p
-        className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.6em] text-amber-200/80"
-        style={{ animation: 'slide-down-fade 0.55s ease-out 0.4s both' }}
+        className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] text-amber-200/80"
+        style={{ animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}
       >
         Total Prize Pool
       </p>
 
       <h1
-        className="relative z-10 mt-4 font-black leading-none animate-gold-title"
+        className="relative z-10 mt-3 mb-8 font-black leading-none animate-gold-title"
         style={{
-          fontSize: 'clamp(4rem, 16vw, 12rem)',
-          letterSpacing: '0.04em',
-          animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both, gold-sweep 6s linear 0.55s infinite',
+          fontSize: 'clamp(2.6rem, 9vw, 7rem)',
+          letterSpacing: '0.05em',
+          animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, gold-sweep 6s linear 0.3s infinite',
         }}
       >
-        {total.toLocaleString()}
+        {total.toLocaleString()} pts
       </h1>
 
+      <div
+        className="relative z-10"
+        style={{ animation: 'pop-bounce-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both' }}
+      >
+        <div
+          className="relative flex items-center justify-center"
+          style={{
+            width: `${photoSize}px`,
+            height: `${photoSize}px`,
+            borderRadius: '50%',
+            background: TIER.first.ringBg,
+            padding: TIER.first.ringWidth,
+            boxShadow: `0 0 70px ${TIER.first.ringGlow}, inset 0 0 22px rgba(0,0,0,0.3)`,
+            animation: 'medal-pulse 2.8s ease-in-out 1.1s infinite',
+          }}
+        >
+          <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
+            {img ? (
+              <img src={img} alt="Awards" className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-7xl text-white/40">🏆</div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <p
-        className="relative z-10 mt-2 text-white/70 text-lg sm:text-2xl font-light tracking-widest uppercase"
-        style={{ animation: 'slide-up-fade 0.6s ease-out 1s both' }}
+        className="relative z-10 mt-8 text-white/70 text-lg sm:text-2xl font-light tracking-widest uppercase"
+        style={{ animation: 'slide-up-fade 0.6s ease-out 1.35s both' }}
       >
         points up for grabs
       </p>
 
       <p
         className="relative z-10 mt-10 text-white/40 text-xs uppercase tracking-[0.4em]"
-        style={{ animation: 'slide-up-fade 0.6s ease-out 1.3s both' }}
+        style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
       >
         ▶ Continue for the winners
       </p>

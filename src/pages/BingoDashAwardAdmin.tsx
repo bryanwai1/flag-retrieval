@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { BingoSection } from '../types/database'
+import type { BingoSection, BingoTeam } from '../types/database'
 import {
   SLIDE_LABELS,
   addSlide,
@@ -45,10 +45,14 @@ export function BingoDashAwardAdmin() {
   const [section, setSection] = useState<BingoSection | null>(null)
   const [configId, setConfigId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftConfig>(EMPTY_DRAFT)
+  const [teams, setTeams] = useState<BingoTeam[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingTeamId, setUploadingTeamId] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const teamFileRef = useRef<HTMLInputElement>(null)
+  const pendingTeamRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!sectionSlug) return
@@ -83,6 +87,13 @@ export function BingoDashAwardAdmin() {
           slide_points: (cfg.slide_points && typeof cfg.slide_points === 'object') ? cfg.slide_points : {},
         })
       }
+      const { data: teamRows } = await supabase
+        .from('bingo_teams')
+        .select('*')
+        .eq('section_id', sec.id)
+        .order('name')
+      if (cancelled) return
+      setTeams(teamRows ?? [])
       setLoaded(true)
     })()
     return () => { cancelled = true }
@@ -118,6 +129,38 @@ export function BingoDashAwardAdmin() {
   const setSlidePoints = (id: AwardSlideId, value: number) => {
     const v = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0))
     setDraft(d => ({ ...d, slide_points: { ...d.slide_points, [id]: v } }))
+  }
+
+  const uploadTeamPhoto = async (teamId: string, file: File) => {
+    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} too large (max 5 MB).`); return }
+    if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return }
+    setUploadingTeamId(teamId)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const fileName = `${teamId}-${Date.now()}.${ext}`
+      const path = `bingo-media/team-photos/${fileName}`
+      const { error } = await supabase.storage.from('media').upload(path, file)
+      if (error) { alert(`Upload failed: ${error.message}`); return }
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
+      const photo_url = urlData.publicUrl
+      setTeams(prev => prev.map(t => t.id === teamId ? { ...t, photo_url } : t))
+      const { error: updateErr } = await supabase.from('bingo_teams').update({ photo_url }).eq('id', teamId)
+      if (updateErr) alert(`Save failed: ${updateErr.message}`)
+    } finally {
+      setUploadingTeamId(null)
+    }
+  }
+
+  const removeTeamPhoto = async (teamId: string) => {
+    if (!confirm('Remove this group\u2019s photo?')) return
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, photo_url: null } : t))
+    const { error } = await supabase.from('bingo_teams').update({ photo_url: null }).eq('id', teamId)
+    if (error) alert(`Failed: ${error.message}`)
+  }
+
+  const pickTeamPhoto = (teamId: string) => {
+    pendingTeamRef.current = teamId
+    teamFileRef.current?.click()
   }
 
   const uploadImage = async (file: File) => {
@@ -280,6 +323,75 @@ export function BingoDashAwardAdmin() {
                 }}
               />
             </div>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="flex items-baseline justify-between mb-1">
+              <h2 className="font-black text-gray-900">Team photos</h2>
+              <span className="text-[11px] text-gray-400">{teams.filter(t => t.photo_url).length} / {teams.length} set</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">Shown on the prize reveal slides · max 5 MB each</p>
+
+            <input
+              ref={teamFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                const id = pendingTeamRef.current
+                pendingTeamRef.current = null
+                if (f && id) uploadTeamPhoto(id, f)
+                if (teamFileRef.current) teamFileRef.current.value = ''
+              }}
+            />
+
+            {teams.length === 0 ? (
+              <p className="text-sm text-gray-400 italic text-center py-4">No teams in this compartment yet.</p>
+            ) : (
+              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {teams.map(t => {
+                  const isUploading = uploadingTeamId === t.id
+                  return (
+                    <li key={t.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                      <button
+                        onClick={() => pickTeamPhoto(t.id)}
+                        disabled={isUploading}
+                        className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm hover:ring-2 hover:ring-amber-400 transition-all disabled:opacity-50"
+                        title={t.photo_url ? 'Replace photo' : 'Upload photo'}
+                      >
+                        {t.photo_url ? (
+                          <img src={t.photo_url} alt={t.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-3xl text-gray-400">👥</div>
+                        )}
+                      </button>
+                      <p className="text-xs font-bold text-center w-full truncate" title={t.name}>{t.name}</p>
+                      <div className="flex gap-1 text-[10px] font-bold uppercase tracking-wider">
+                        <button
+                          onClick={() => pickTeamPhoto(t.id)}
+                          disabled={isUploading}
+                          className="text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                        >
+                          {isUploading ? 'Uploading…' : (t.photo_url ? 'Replace' : 'Upload')}
+                        </button>
+                        {t.photo_url && !isUploading && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <button
+                              onClick={() => removeTeamPhoto(t.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
 
           <section className="bg-white rounded-2xl border border-gray-200 p-6">
