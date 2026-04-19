@@ -167,6 +167,28 @@ export function SnakeLadderAdmin() {
     setTeams(prev => prev.filter(t => t.id !== id))
   }
 
+  // Swap a team with its neighbour in the given direction. Rewrites sort_order
+  // on both rows so team numbers (sort_order + 1) stay 1..N contiguous.
+  const moveTeam = async (id: string, direction: 'up' | 'down') => {
+    const ordered = [...teams].sort((a, b) => a.sort_order - b.sort_order)
+    const i = ordered.findIndex(t => t.id === id)
+    if (i === -1) return
+    const j = direction === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= ordered.length) return
+    const a = ordered[i]
+    const b = ordered[j]
+    // Optimistic swap
+    setTeams(prev => prev.map(t => {
+      if (t.id === a.id) return { ...t, sort_order: b.sort_order }
+      if (t.id === b.id) return { ...t, sort_order: a.sort_order }
+      return t
+    }))
+    await Promise.all([
+      supabase.from('snake_teams').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('snake_teams').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ])
+  }
+
   // ── Snakes/Ladders config ────────────────────────────────────
   const updateBoardConfig = async (snakes: Record<string, number>, ladders: Record<string, number>) => {
     if (!activeGame) return
@@ -431,6 +453,7 @@ export function SnakeLadderAdmin() {
                 addTeam={addTeam}
                 updateTeam={updateTeam}
                 deleteTeam={deleteTeam}
+                moveTeam={moveTeam}
               />
             )}
             {tab === 'jumps' && (
@@ -655,7 +678,7 @@ function LibraryTab({
 
 function TeamsTab({
   teams, newTeamName, setNewTeamName, newTeamColor, setNewTeamColor,
-  newTeamEmoji, setNewTeamEmoji, addTeam, updateTeam, deleteTeam,
+  newTeamEmoji, setNewTeamEmoji, addTeam, updateTeam, deleteTeam, moveTeam,
 }: {
   teams: SnakeTeam[]
   newTeamName: string; setNewTeamName: (v: string) => void
@@ -664,7 +687,9 @@ function TeamsTab({
   addTeam: () => void
   updateTeam: (id: string, patch: Partial<SnakeTeam>) => void
   deleteTeam: (id: string) => void
+  moveTeam: (id: string, direction: 'up' | 'down') => void
 }) {
+  const ordered = [...teams].sort((a, b) => a.sort_order - b.sort_order)
   return (
     <div className="grid md:grid-cols-[320px_1fr] gap-6">
       <div className="bg-white rounded-2xl p-4 border border-gray-200 h-fit">
@@ -709,13 +734,27 @@ function TeamsTab({
         <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 mb-3">Teams ({teams.length})</h3>
         {teams.length === 0 && <p className="text-sm text-gray-500">No teams yet.</p>}
         <div className="flex flex-col gap-2">
-          {teams.map(team => (
+          {ordered.map((team, idx) => (
             <div key={team.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => moveTeam(team.id, 'up')}
+                  disabled={idx === 0}
+                  title="Move up"
+                  className="w-6 h-5 rounded text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                >▲</button>
+                <button
+                  onClick={() => moveTeam(team.id, 'down')}
+                  disabled={idx === ordered.length - 1}
+                  title="Move down"
+                  className="w-6 h-5 rounded text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                >▼</button>
+              </div>
               <div
                 className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center text-lg font-black"
                 style={{ backgroundColor: team.hex_code, color: '#fff', boxShadow: '0 0 0 1px #e5e7eb' }}
               >
-                {team.emoji || team.name.slice(0, 2).toUpperCase()}
+                {idx + 1}
               </div>
               <input
                 value={team.name}
