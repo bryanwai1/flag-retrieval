@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import {
-  BOARD_SIZE, TOTAL_TILES, tileToGridRC, tileToRC, resolveJump,
+  BOARD_SIZE, TOTAL_TILES, tileToGridRC, tileToRC,
 } from '../lib/snakeLadder'
 import type { BingoTask, SnakeGame, SnakeTeam, SnakeTile } from '../types/database'
 
@@ -17,7 +17,6 @@ export function SnakeLadderBoard() {
   const [teams, setTeams] = useState<SnakeTeam[]>([])
   const [loading, setLoading] = useState(true)
   const [openTileNumber, setOpenTileNumber] = useState<number | null>(null)
-  const [moving, setMoving] = useState<{ teamId: string; from: number; to: number } | null>(null)
 
   // ── Initial load: find the active game ─────────────────────────
   const loadAll = useCallback(async () => {
@@ -78,23 +77,6 @@ export function SnakeLadderBoard() {
 
   const snakes = game?.snakes ?? {}
   const ladders = game?.ladders ?? {}
-
-  // Move a team piece: applies snake/ladder jump automatically.
-  const moveTeamTo = async (team: SnakeTeam, rawTarget: number) => {
-    let target = Math.max(0, Math.min(TOTAL_TILES, rawTarget))
-    const resolved = resolveJump(target, snakes, ladders)
-    const final = resolved.final
-    if (resolved.jump) {
-      setMoving({ teamId: team.id, from: target, to: final })
-      setTimeout(() => setMoving(null), 1600)
-    }
-    target = final
-    // Optimistic update
-    setTeams(prev => prev.map(t => t.id === team.id ? { ...t, position: target } : t))
-    await supabase.from('snake_teams').update({ position: target }).eq('id', team.id)
-  }
-
-  const advanceTeam = (team: SnakeTeam, delta: number) => moveTeamTo(team, team.position + delta)
 
   // ── Render ───────────────────────────────────────────────────
   if (loading) {
@@ -211,7 +193,7 @@ export function SnakeLadderBoard() {
             <SnakeLadderOverlay snakes={snakes} ladders={ladders} />
 
             {/* Team pieces overlay */}
-            <TeamPiecesOverlay teamsByTile={teamsByTile} moving={moving} />
+            <TeamPiecesOverlay teamsByTile={teamsByTile} />
           </div>
         </div>
 
@@ -224,21 +206,14 @@ export function SnakeLadderBoard() {
             )}
             <div className="flex flex-col gap-2">
               {teams.map(team => (
-                <TeamControl
-                  key={team.id}
-                  team={team}
-                  snakes={snakes}
-                  ladders={ladders}
-                  onAdvance={d => advanceTeam(team, d)}
-                  onSet={p => moveTeamTo(team, p)}
-                />
+                <TeamStatus key={team.id} team={team} />
               ))}
             </div>
           </div>
 
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-xs text-white/60 leading-relaxed">
             <p className="font-bold text-white mb-1">How to play</p>
-            <p>Throw a physical die, then press <b>+N</b> on the team that rolled. Landing on a 🐍 head slides down; a 🪜 bottom climbs up. Tap any tile to open its activity card.</p>
+            <p>Tap any tile to open its activity card. Finish the task, then pick which team completed it — that team jumps to this tile (snakes and ladders apply automatically).</p>
           </div>
         </aside>
       </main>
@@ -250,7 +225,7 @@ export function SnakeLadderBoard() {
           task={openData?.task ?? null}
           teams={teamsByTile.get(openTileNumber) ?? []}
           onClose={() => setOpenTileNumber(null)}
-          onOpenCard={id => navigate(`/bingo-dash/task/${id}?from=snake-ladder`)}
+          onOpenCard={id => navigate(`/bingo-dash/task/${id}?from=snake-ladder&tile=${openTileNumber}`)}
           onGoToAdmin={() => navigate('/snake-ladder/admin')}
         />
       )}
@@ -326,12 +301,9 @@ function SnakeLadderOverlay({ snakes, ladders }: { snakes: Record<string | numbe
 
 function TeamPiecesOverlay({
   teamsByTile,
-  moving,
 }: {
   teamsByTile: Map<number, import('../types/database').SnakeTeam[]>
-  moving: { teamId: string; from: number; to: number } | null
 }) {
-  void moving
   const nodes: React.ReactElement[] = []
   teamsByTile.forEach((list, tile) => {
     const { row, col } = tileToRC(tile)
@@ -358,7 +330,7 @@ function TeamPiecesOverlay({
           }}
           title={`${team.name} — tile ${team.position}`}
         >
-          <span>{team.emoji || team.name.slice(0, 2).toUpperCase()}</span>
+          <span>{team.sort_order + 1}</span>
         </div>
       )
     })
@@ -366,80 +338,21 @@ function TeamPiecesOverlay({
   return <>{nodes}</>
 }
 
-function TeamControl({
-  team,
-  snakes,
-  ladders,
-  onAdvance,
-  onSet,
-}: {
-  team: SnakeTeam
-  snakes: Record<string | number, number>
-  ladders: Record<string | number, number>
-  onAdvance: (delta: number) => void
-  onSet: (pos: number) => void
-}) {
-  const [val, setVal] = useState('')
-  const nextLanding = (d: number) => {
-    const target = Math.min(TOTAL_TILES, team.position + d)
-    const res = resolveJump(target, snakes, ladders)
-    return res
-  }
+function TeamStatus({ team }: { team: SnakeTeam }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex-shrink-0 rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-2 border-white/60" style={{ backgroundColor: team.hex_code }}>
-          {team.emoji || team.name.slice(0, 2).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-black text-sm truncate">{team.name}</p>
-          <p className="text-[10px] text-white/50">
-            On tile {team.position || '—'}
-            {team.position > 0 && team.position < TOTAL_TILES && (
-              <> · next +1 → {nextLanding(1).final}{nextLanding(1).jump ? ` (${nextLanding(1).jump === 'snake' ? '🐍' : '🪜'})` : ''}</>
-            )}
-            {team.position >= TOTAL_TILES && ' · 🏁 Finished!'}
-          </p>
-        </div>
+    <div className="rounded-xl border border-white/10 bg-white/5 p-2.5 flex items-center gap-2">
+      <div
+        className="flex-shrink-0 rounded-full w-8 h-8 flex items-center justify-center font-black text-sm border-2 border-white/60"
+        style={{ backgroundColor: team.hex_code }}
+      >
+        {team.sort_order + 1}
       </div>
-      <div className="grid grid-cols-6 gap-1 text-xs font-black">
-        {[1, 2, 3, 4, 5, 6].map(d => (
-          <button key={d} onClick={() => onAdvance(d)}
-            className="py-1 rounded bg-white/10 hover:bg-white/20 active:scale-95">
-            +{d}
-          </button>
-        ))}
-      </div>
-      <div className="grid grid-cols-6 gap-1 text-xs font-black mt-1">
-        {[1, 2, 3, 4, 5, 6].map(d => (
-          <button key={d} onClick={() => onAdvance(-d)}
-            className="py-1 rounded bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-300">
-            -{d}
-          </button>
-        ))}
-      </div>
-      <div className="mt-1.5 flex items-center gap-1">
-        <button onClick={() => onSet(0)} className="flex-1 py-1 rounded bg-white/5 hover:bg-white/15 text-[10px] font-bold">Reset</button>
-        <form
-          className="flex-[2] flex items-center gap-1"
-          onSubmit={e => {
-            e.preventDefault()
-            const n = parseInt(val) || 0
-            if (val.startsWith('+') || val.startsWith('-')) {
-              onAdvance(n)
-            } else {
-              onSet(Math.max(0, Math.min(TOTAL_TILES, n)))
-            }
-            setVal('')
-          }}
-        >
-          <input
-            value={val} onChange={e => setVal(e.target.value)}
-            placeholder="±move or tile#"
-            className="w-full px-1.5 py-1 rounded bg-black/40 text-white border border-white/20 text-[11px] placeholder:text-white/30"
-          />
-          <button type="submit" className="px-2 py-1 rounded bg-amber-400 text-black text-[10px] font-black">Go</button>
-        </form>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-sm truncate">{team.name}</p>
+        <p className="text-[10px] text-white/50">
+          On tile {team.position || '—'}
+          {team.position >= TOTAL_TILES && ' · 🏁 Finished!'}
+        </p>
       </div>
     </div>
   )
@@ -503,7 +416,7 @@ function TileModal({
                   className="px-2.5 py-1 rounded-full text-xs font-black border-2 border-white/60"
                   style={{ backgroundColor: t.hex_code }}
                 >
-                  {t.emoji || '♟'} {t.name}
+                  {t.sort_order + 1} · {t.name}
                 </span>
               ))}
             </div>

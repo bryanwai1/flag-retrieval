@@ -9,13 +9,17 @@ import { BingoDashRegistration } from '../components/BingoDashRegistration'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { ParticleBackground } from '../components/ParticleBackground'
-import type { BingoTask } from '../types/database'
+import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
+import type { BingoTask, SnakeTeam } from '../types/database'
 
 export function BingoDashParticipant() {
   const { taskId } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const backPath = searchParams.get('from') === 'snake-ladder' ? '/snake-ladder' : '/bingo-dash'
+  const isSnakeLadder = searchParams.get('from') === 'snake-ladder'
+  const snakeTileParam = searchParams.get('tile')
+  const snakeTile = snakeTileParam ? parseInt(snakeTileParam, 10) : null
+  const backPath = isSnakeLadder ? '/snake-ladder' : '/bingo-dash'
   const { team, loading: teamLoading, isRegistered, registerTeam, leaveTeam } = useBingoDashTeam()
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
   const { photos, loading: photosLoading } = useBingoTaskPhotos(taskId)
@@ -29,6 +33,12 @@ export function BingoDashParticipant() {
   const [completing, setCompleting] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  // Snake & Ladder mode: team picker state
+  const [snakeTeams, setSnakeTeams] = useState<SnakeTeam[]>([])
+  const [snakeSnakes, setSnakeSnakes] = useState<Record<string, number>>({})
+  const [snakeLadders, setSnakeLadders] = useState<Record<string, number>>({})
+  const [snakeResult, setSnakeResult] = useState<{ team: SnakeTeam; landed: number; jump: 'snake' | 'ladder' | null; to: number } | null>(null)
+  const [snakeMoving, setSnakeMoving] = useState(false)
   // Marshal password state
   const [marshalPassword, setMarshalPassword] = useState('')
   const [marshalInput, setMarshalInput] = useState('')
@@ -70,6 +80,28 @@ export function BingoDashParticipant() {
       .then(({ data }) => { if (data?.marshal_password) setMarshalPassword(data.marshal_password) })
   }, [])
 
+  // Snake & Ladder mode: load teams + board config
+  useEffect(() => {
+    if (!isSnakeLadder) return
+    let cancelled = false
+    ;(async () => {
+      const settingsRes = await supabase.from('snake_settings').select('active_game_id').eq('id', 'main').maybeSingle()
+      const activeId = settingsRes.data?.active_game_id as string | null
+      if (!activeId || cancelled) return
+      const [gameRes, teamsRes] = await Promise.all([
+        supabase.from('snake_games').select('snakes, ladders').eq('id', activeId).single(),
+        supabase.from('snake_teams').select('*').eq('game_id', activeId).order('sort_order'),
+      ])
+      if (cancelled) return
+      if (gameRes.data) {
+        setSnakeSnakes((gameRes.data.snakes ?? {}) as Record<string, number>)
+        setSnakeLadders((gameRes.data.ladders ?? {}) as Record<string, number>)
+      }
+      if (teamsRes.data) setSnakeTeams(teamsRes.data)
+    })()
+    return () => { cancelled = true }
+  }, [isSnakeLadder])
+
   // Persist answer inputs to localStorage
   useEffect(() => {
     if (taskId && answerInputs.length > 0) {
@@ -90,16 +122,18 @@ export function BingoDashParticipant() {
   )
 
   useEffect(() => {
+    if (isSnakeLadder) return
     if (team && taskId && !scanRecorded) {
       recordScan(team.id, taskId).then((scan) => {
         setScanRecorded(true)
         if (scan) setScanRecord({ id: scan.id, completed: scan.completed })
       })
     }
-  }, [team, taskId, scanRecorded, recordScan])
+  }, [isSnakeLadder, team, taskId, scanRecorded, recordScan])
 
   // Auto-complete when answer-input card answer is correct
   useEffect(() => {
+    if (isSnakeLadder) return
     if (!answerMatches || !scanRecord || scanRecord.completed || completing) return
     setCompleting(true)
     toggleComplete(scanRecord.id, true).then(() => {
@@ -118,7 +152,7 @@ export function BingoDashParticipant() {
   }
 
   // ── Loading ─────────────────────────────────────────────────────────
-  if (teamLoading || !task) {
+  if ((!isSnakeLadder && teamLoading) || !task) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
@@ -126,8 +160,8 @@ export function BingoDashParticipant() {
     )
   }
 
-  // ── Registration ─────────────────────────────────────────────────────
-  if (!isRegistered) {
+  // ── Registration (Bingo Dash only — Snake & Ladder picks a team on completion) ─
+  if (!isSnakeLadder && !isRegistered) {
     return (
       <BingoDashRegistration
         onRegister={(name, pwd) => registerTeam(name, pwd)}
@@ -158,7 +192,7 @@ export function BingoDashParticipant() {
         <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
 
         <div className="relative z-10 text-center px-8 animate-bounce-in">
-          <div className="text-6xl mb-6">🎯</div>
+          <div className="text-6xl mb-6">{isSnakeLadder ? '🐍🪜' : '🎯'}</div>
           <p className="text-sm font-bold opacity-70 uppercase tracking-[0.2em] mb-2">
             {task.color} Challenge
           </p>
@@ -166,9 +200,13 @@ export function BingoDashParticipant() {
             {task.title}
           </h1>
           <div className="w-16 h-1 bg-white/40 rounded-full mx-auto mb-6" />
-          <p className="text-lg opacity-80 font-medium mb-2">
-            Team: {team?.name}
-          </p>
+          {isSnakeLadder ? (
+            snakeTile != null && (
+              <p className="text-lg opacity-80 font-medium mb-2">Tile {snakeTile}</p>
+            )
+          ) : (
+            <p className="text-lg opacity-80 font-medium mb-2">Team: {team?.name}</p>
+          )}
         </div>
 
         <button
@@ -204,7 +242,11 @@ export function BingoDashParticipant() {
               ← Board
             </button>
             <div>
-              <p className="text-sm font-bold opacity-80 uppercase tracking-wider">Team: {team?.name}</p>
+              <p className="text-sm font-bold opacity-80 uppercase tracking-wider">
+                {isSnakeLadder
+                  ? (snakeTile != null ? `🐍🪜 Tile ${snakeTile}` : '🐍🪜 Snake & Ladder')
+                  : `Team: ${team?.name}`}
+              </p>
               <h1 className="text-3xl font-black tracking-tight">{task.title}</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-sm opacity-70 uppercase tracking-wider">{task.color} Challenge</span>
@@ -216,30 +258,32 @@ export function BingoDashParticipant() {
               </div>
             </div>
           </div>
-          <div className="flex-shrink-0 mt-1">
-            {!showLeaveConfirm ? (
-              <button
-                onClick={() => setShowLeaveConfirm(true)}
-                className="text-xs text-white/40 hover:text-white/70 transition-colors"
-              >
-                Leave
-              </button>
-            ) : (
-              <div className="flex flex-col items-end gap-1">
-                <p className="text-xs text-white/60">Leave team?</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowLeaveConfirm(false)} className="text-xs text-white/40 hover:text-white/70 transition-colors">Cancel</button>
-                  <button
-                    onClick={handleLeave}
-                    disabled={leaving}
-                    className="text-xs text-red-400 hover:text-red-300 font-bold transition-colors disabled:opacity-50"
-                  >
-                    {leaving ? '...' : 'Yes, leave'}
-                  </button>
+          {!isSnakeLadder && (
+            <div className="flex-shrink-0 mt-1">
+              {!showLeaveConfirm ? (
+                <button
+                  onClick={() => setShowLeaveConfirm(true)}
+                  className="text-xs text-white/40 hover:text-white/70 transition-colors"
+                >
+                  Leave
+                </button>
+              ) : (
+                <div className="flex flex-col items-end gap-1">
+                  <p className="text-xs text-white/60">Leave team?</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowLeaveConfirm(false)} className="text-xs text-white/40 hover:text-white/70 transition-colors">Cancel</button>
+                    <button
+                      onClick={handleLeave}
+                      disabled={leaving}
+                      className="text-xs text-red-400 hover:text-red-300 font-bold transition-colors disabled:opacity-50"
+                    >
+                      {leaving ? '...' : 'Yes, leave'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -304,7 +348,81 @@ export function BingoDashParticipant() {
 
         {/* Complete Activity */}
         <div className="mt-8 animate-slide-up">
-          {scanRecord?.completed ? (
+          {isSnakeLadder ? (
+            snakeResult ? (
+              <div
+                className="rounded-3xl p-6 border-2 text-center"
+                style={{ borderColor: `${task.hex_code}99`, backgroundColor: `${task.hex_code}25` }}
+              >
+                <div className="text-4xl mb-2">{snakeResult.jump === 'snake' ? '🐍' : snakeResult.jump === 'ladder' ? '🪜' : '🎉'}</div>
+                <p className="text-2xl font-black mb-1 text-white">
+                  Team {snakeResult.team.sort_order + 1} · {snakeResult.team.name}
+                </p>
+                <p className="text-white/70 text-sm font-medium">
+                  Landed on tile {snakeResult.landed}
+                  {snakeResult.jump ? ` → ${snakeResult.to} (${snakeResult.jump === 'snake' ? 'slid down' : 'climbed up'})` : ''}
+                </p>
+                <button
+                  onClick={() => navigate(backPath)}
+                  className="mt-5 w-full py-3 rounded-2xl text-white font-black uppercase tracking-wider transition-all active:scale-95"
+                  style={{ backgroundColor: task.hex_code, boxShadow: `0 4px 0 ${task.hex_code}88` }}
+                >
+                  ← Back to Board
+                </button>
+              </div>
+            ) : (
+              <div
+                className="rounded-3xl p-5 border-2"
+                style={{
+                  borderColor: `${task.hex_code}99`,
+                  backgroundColor: `${task.hex_code}18`,
+                  boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
+                }}
+              >
+                <p className="text-white font-black text-lg text-center mb-1">Which team completed this?</p>
+                {snakeTile != null && (
+                  <p className="text-white/60 text-xs text-center mb-4">They will move to tile {snakeTile}</p>
+                )}
+                {snakeTeams.length === 0 ? (
+                  <p className="text-white/50 text-sm text-center py-4">No teams yet. Add teams in Snake & Ladder admin.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {snakeTeams.map(st => (
+                      <button
+                        key={st.id}
+                        disabled={snakeMoving || snakeTile == null}
+                        onClick={async () => {
+                          if (snakeTile == null) return
+                          setSnakeMoving(true)
+                          const landed = Math.max(0, Math.min(TOTAL_TILES, snakeTile))
+                          const resolved = resolveJump(landed, snakeSnakes, snakeLadders)
+                          try {
+                            await supabase.from('snake_teams').update({ position: resolved.final }).eq('id', st.id)
+                            setSnakeResult({ team: st, landed, jump: resolved.jump, to: resolved.final })
+                          } finally {
+                            setSnakeMoving(false)
+                          }
+                        }}
+                        className="flex items-center gap-3 p-3 rounded-2xl border-2 border-white/20 bg-black/30 hover:bg-black/40 hover:border-white/40 transition-all active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <div
+                          className="flex-shrink-0 rounded-full w-10 h-10 flex items-center justify-center font-black text-base border-2 border-white/60"
+                          style={{ backgroundColor: st.hex_code }}
+                        >
+                          {st.sort_order + 1}
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="font-black text-white text-sm truncate">{st.name}</p>
+                          <p className="text-[11px] text-white/50">On tile {st.position || '—'}</p>
+                        </div>
+                        <span className="text-white/40 text-lg font-black">→</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          ) : scanRecord?.completed ? (
             <div className="text-center">
               <div
                 className="p-6 rounded-2xl border-2"
