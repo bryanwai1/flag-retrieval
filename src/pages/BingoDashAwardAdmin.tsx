@@ -102,6 +102,7 @@ export function BingoDashAwardAdmin() {
   const slides = useMemo(() => buildAwardSlides(draft.slide_order), [draft.slide_order])
   const hasIntro = draft.slide_order.includes('intro')
   const hasHolding = draft.slide_order.includes('holding')
+  const hasLineup = draft.slide_order.includes('lineup')
 
   const moveSlide = (from: number, dir: -1 | 1) => {
     const to = from + dir
@@ -431,7 +432,9 @@ export function BingoDashAwardAdmin() {
                   ? '🏆 Award Ceremony title reveal'
                   : s.kind === 'holding'
                     ? `${draft.total_points} pts tease${draft.image_url ? ' · with image' : ''}`
-                    : `Team rank #${s.teamRank} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
+                    : s.kind === 'lineup'
+                      ? `${teams.length} team${teams.length === 1 ? '' : 's'} · grid w/ photos`
+                      : `Team rank #${s.teamRank} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
                 return (
                   <li
                     key={s.id}
@@ -517,6 +520,14 @@ export function BingoDashAwardAdmin() {
                 sublabel={hasHolding ? 'already added' : 'total points tease'}
                 accent="#fcd34d"
                 onClick={() => doAddSlide('holding')}
+              />
+              <AddButton
+                disabled={hasLineup}
+                emoji="👥"
+                label="Lineup"
+                sublabel={hasLineup ? 'already added' : 'all teams + photos'}
+                accent="#a5f3fc"
+                onClick={() => doAddSlide('lineup')}
               />
               {(['first', 'second', 'third', 'consolation'] as PrizeKind[]).map(kind => (
                 <AddButton

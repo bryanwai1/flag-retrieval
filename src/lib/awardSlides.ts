@@ -14,7 +14,14 @@
 // Reordering visible slides does not change who wins what.
 
 export type PrizeKind = 'consolation' | 'third' | 'second' | 'first'
-export type AwardSlideKind = 'intro' | 'holding' | PrizeKind
+export type SingletonKind = 'intro' | 'holding' | 'lineup'
+export type AwardSlideKind = SingletonKind | PrizeKind
+
+export const SINGLETON_KINDS: SingletonKind[] = ['intro', 'holding', 'lineup']
+
+export function isSingletonKind(kind: string): kind is SingletonKind {
+  return kind === 'intro' || kind === 'holding' || kind === 'lineup'
+}
 
 export type AwardSlideId = string
 
@@ -39,6 +46,7 @@ export const CANONICAL_KINDS: PrizeKind[] = ['first', 'second', 'third', 'consol
 export const SLIDE_LABELS: Record<AwardSlideKind, { label: string; emoji: string; accent: string }> = {
   intro:       { label: 'Animated opener',  emoji: '✨', accent: '#fde68a' },
   holding:     { label: 'Holding slide',    emoji: '⏳', accent: '#fcd34d' },
+  lineup:      { label: 'Team lineup',      emoji: '👥', accent: '#a5f3fc' },
   first:       { label: 'Grand Champion',   emoji: '🏆', accent: '#fde047' },
   second:      { label: 'First Runner-Up',  emoji: '🥈', accent: '#e5e7eb' },
   third:       { label: 'Second Runner-Up', emoji: '🥉', accent: '#f59e0b' },
@@ -51,8 +59,7 @@ export function isPrizeKind(kind: string): kind is PrizeKind {
 
 /** Parse a slide id into its kind + numeric suffix (suffix null for singletons). */
 export function parseSlideId(id: AwardSlideId): { kind: AwardSlideKind; index: number | null } {
-  if (id === 'intro') return { kind: 'intro', index: null }
-  if (id === 'holding') return { kind: 'holding', index: null }
+  if (isSingletonKind(id)) return { kind: id, index: null }
   const [kind, idxStr] = id.split(':') as [string, string]
   if (!isPrizeKind(kind)) throw new Error(`Unknown slide id: ${id}`)
   return { kind, index: parseInt(idxStr, 10) }
@@ -62,7 +69,7 @@ export function parseSlideId(id: AwardSlideId): { kind: AwardSlideKind; index: n
 export function countsFromOrder(order: AwardSlideId[]): PrizeCounts {
   const c = { consolation_count: 0, third_count: 0, second_count: 0, first_count: 0 }
   for (const id of order) {
-    if (id === 'intro' || id === 'holding') continue
+    if (isSingletonKind(id)) continue
     const [kind] = id.split(':')
     if (kind === 'consolation') c.consolation_count++
     else if (kind === 'third') c.third_count++
@@ -96,7 +103,7 @@ export function normalizeSlideOrder(
   for (const raw of saved) {
     if (typeof raw !== 'string') continue
     if (seen.has(raw)) continue
-    if (raw === 'intro' || raw === 'holding') {
+    if (isSingletonKind(raw)) {
       out.push(raw); seen.add(raw); continue
     }
     const parts = raw.split(':')
@@ -122,9 +129,9 @@ export function nextPrizeId(order: AwardSlideId[], kind: PrizeKind): AwardSlideI
   return `${kind}:${max + 1}`
 }
 
-/** Append a new slide of the given kind. Intro/holding are singletons. */
+/** Append a new slide of the given kind. Singletons (intro/holding/lineup) prepend. */
 export function addSlide(order: AwardSlideId[], kind: AwardSlideKind): AwardSlideId[] {
-  if (kind === 'intro' || kind === 'holding') {
+  if (isSingletonKind(kind)) {
     if (order.includes(kind)) return order
     return [kind, ...order]
   }
@@ -157,8 +164,7 @@ export function buildAwardSlides(order: AwardSlideId[]): AwardSlideDescriptor[] 
     }
   }
   return order.map(id => {
-    if (id === 'intro')   return { id, kind: 'intro',   rank: null, teamRank: null }
-    if (id === 'holding') return { id, kind: 'holding', rank: null, teamRank: null }
+    if (isSingletonKind(id)) return { id, kind: id, rank: null, teamRank: null }
     const [kind] = id.split(':') as [PrizeKind]
     const posInKind = byKind[kind].indexOf(id)
     return { id, kind, rank: posInKind + 1, teamRank: teamRankById[id] ?? null }

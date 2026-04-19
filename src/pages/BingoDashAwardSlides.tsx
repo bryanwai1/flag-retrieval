@@ -278,6 +278,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
         descriptor={current}
         ranked={rankedForSlide}
         config={config}
+        teams={teams}
       />
 
       {/* Top nav */}
@@ -489,15 +490,17 @@ function tierTitle(kind: 'consolation' | 'third' | 'second' | 'first', rank: num
 }
 
 function AwardSlideRenderer({
-  slideIdx, descriptor, ranked, config,
+  slideIdx, descriptor, ranked, config, teams,
 }: {
   slideIdx: number
   descriptor: AwardSlideDescriptor
   ranked: RankedTeam | null
   config: BingoAwardConfig | null
+  teams: BingoTeam[]
 }) {
   if (descriptor.kind === 'intro') return <IntroSlide slideIdx={slideIdx} />
   if (descriptor.kind === 'holding') return <HoldingSlide slideIdx={slideIdx} config={config} />
+  if (descriptor.kind === 'lineup') return <LineupSlide slideIdx={slideIdx} teams={teams} />
   const prizePoints = config?.slide_points?.[descriptor.id] ?? 0
   return <PrizeSlide slideIdx={slideIdx} descriptor={descriptor} ranked={ranked} prizePoints={prizePoints} />
 }
@@ -635,6 +638,92 @@ function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwa
       >
         ▶ Continue for the winners
       </p>
+    </div>
+  )
+}
+
+// ── Lineup slide: all teams with photos ───────────────────────────────────
+function LineupSlide({ slideIdx, teams }: { slideIdx: number; teams: BingoTeam[] }) {
+  const sorted = useMemo(
+    () => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
+    [teams],
+  )
+  const count = sorted.length
+  const cols = count <= 4 ? count : count <= 9 ? 3 : count <= 16 ? 4 : 5
+  const photoSize = count <= 6 ? 180 : count <= 12 ? 140 : count <= 20 ? 110 : 90
+
+  return (
+    <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 award-slide-enter">
+      <div
+        className="absolute top-1/2 left-1/2 pointer-events-none z-0"
+        style={{
+          width: '160vmax',
+          height: '160vmax',
+          background: `conic-gradient(from 0deg, transparent 0deg, #a5f3fc22 18deg, transparent 40deg, transparent 170deg, #a5f3fc22 200deg, transparent 230deg, transparent 360deg)`,
+          animation: 'award-spotlight 28s linear infinite',
+          opacity: 0.7,
+        }}
+      />
+
+      <p
+        className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] text-cyan-200/80"
+        style={{ animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}
+      >
+        Tonight's Contenders
+      </p>
+
+      <h1
+        className="relative z-10 mt-3 mb-8 font-black leading-none animate-gold-title"
+        style={{
+          fontSize: 'clamp(2rem, 6vw, 4.5rem)',
+          letterSpacing: '0.05em',
+          animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, gold-sweep 6s linear 0.3s infinite',
+        }}
+      >
+        👥 MEET THE TEAMS
+      </h1>
+
+      <div
+        className="relative z-10 grid gap-x-6 gap-y-4 max-w-[min(92vw,1400px)]"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
+        {sorted.map((t, i) => (
+          <div
+            key={t.id}
+            className="flex flex-col items-center gap-2"
+            style={{ animation: `pop-bounce-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.45 + i * 0.06}s both` }}
+          >
+            <div
+              className="relative flex items-center justify-center"
+              style={{
+                width: `${photoSize}px`,
+                height: `${photoSize}px`,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #67e8f9 0%, #a5f3fc 35%, #ecfeff 55%, #a5f3fc 75%, #67e8f9 100%)',
+                padding: '4px',
+                boxShadow: '0 0 28px rgba(165,243,252,0.5), inset 0 0 14px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
+                {t.photo_url ? (
+                  <img src={t.photo_url} alt={t.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-3xl text-white/40">👥</div>
+                )}
+              </div>
+            </div>
+            <p
+              className="font-bold text-white/90 leading-tight"
+              style={{ fontSize: photoSize >= 140 ? '0.95rem' : photoSize >= 110 ? '0.8rem' : '0.7rem' }}
+            >
+              {t.name}
+            </p>
+          </div>
+        ))}
+        {count === 0 && (
+          <p className="col-span-full text-white/60 text-lg">No teams yet.</p>
+        )}
+      </div>
     </div>
   )
 }
