@@ -159,6 +159,17 @@ export function BingoDashAwardAdmin() {
     if (error) alert(`Failed: ${error.message}`)
   }
 
+  const deleteTeam = async (teamId: string, teamName: string) => {
+    if (!confirm(`Delete team "${teamName}" and all their scan records? This cannot be undone.`)) return
+    const prev = teams
+    setTeams(p => p.filter(t => t.id !== teamId))
+    const { error } = await supabase.from('bingo_teams').delete().eq('id', teamId)
+    if (error) {
+      alert(`Failed to delete: ${error.message}`)
+      setTeams(prev)
+    }
+  }
+
   const pickTeamPhoto = (teamId: string) => {
     pendingTeamRef.current = teamId
     teamFileRef.current?.click()
@@ -354,7 +365,12 @@ export function BingoDashAwardAdmin() {
                 {teams.map(t => {
                   const isUploading = uploadingTeamId === t.id
                   return (
-                    <li key={t.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                    <li key={t.id} className="relative bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                      <button
+                        onClick={() => deleteTeam(t.id, t.name)}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white border border-gray-200 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-xs font-bold text-gray-400 flex items-center justify-center shadow-sm"
+                        title={`Delete team "${t.name}"`}
+                      >✕</button>
                       <button
                         onClick={() => pickTeamPhoto(t.id)}
                         disabled={isUploading}
