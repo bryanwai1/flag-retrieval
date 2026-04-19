@@ -17,6 +17,28 @@ export function SnakeLadderBoard() {
   const [teams, setTeams] = useState<SnakeTeam[]>([])
   const [loading, setLoading] = useState(true)
   const [openTileNumber, setOpenTileNumber] = useState<number | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  const toggleFullscreen = async () => {
+    const next = !fullscreen
+    setFullscreen(next)
+    try {
+      if (next && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+      } else if (!next && document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch { /* browser fullscreen API may be unavailable — CSS mode still works */ }
+  }
+
+  useEffect(() => {
+    const sync = () => {
+      // User pressed ESC or exited browser fullscreen — drop CSS mode too.
+      if (!document.fullscreenElement) setFullscreen(f => (f ? false : f))
+    }
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
 
   // ── Initial load: find the active game ─────────────────────────
   const loadAll = useCallback(async () => {
@@ -116,27 +138,52 @@ export function SnakeLadderBoard() {
   const openData = openTileNumber != null ? tileMap.get(openTileNumber) : undefined
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white relative overflow-x-hidden">
+    <div className={fullscreen ? 'fixed inset-0 z-50 bg-gray-950 text-white overflow-hidden' : 'min-h-screen bg-gray-950 text-white relative overflow-x-hidden'}>
       <ParticleBackground />
 
-      <header className="relative z-10 px-6 py-4 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/')} className="text-xs text-white/50 hover:text-white">← Hub</button>
-          <h1 className="text-2xl font-black tracking-tight">🐍🪜 {game.name}</h1>
-        </div>
-        <button
-          onClick={() => navigate('/snake-ladder/admin')}
-          className="text-xs font-bold text-amber-300 hover:text-amber-200 border border-amber-300/40 rounded-lg px-3 py-1.5"
-        >
-          ⚙ Admin
-        </button>
-      </header>
+      {!fullscreen && (
+        <header className="relative z-10 px-6 py-4 flex items-center justify-between border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/')} className="text-xs text-white/50 hover:text-white">← Hub</button>
+            <h1 className="text-2xl font-black tracking-tight">🐍🪜 {game.name}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleFullscreen}
+              className="text-xs font-bold text-white/70 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-3 py-1.5"
+            >
+              ⛶ Fullscreen
+            </button>
+            <button
+              onClick={() => navigate('/snake-ladder/admin')}
+              className="text-xs font-bold text-amber-300 hover:text-amber-200 border border-amber-300/40 rounded-lg px-3 py-1.5"
+            >
+              ⚙ Admin
+            </button>
+          </div>
+        </header>
+      )}
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[1fr_320px] gap-6">
+      {fullscreen && (
+        <button
+          onClick={toggleFullscreen}
+          className="fixed top-3 right-3 z-[60] text-xs font-bold text-white bg-black/60 hover:bg-black/80 border border-white/30 rounded-lg px-3 py-2 backdrop-blur-sm"
+        >
+          ✕ Exit Fullscreen
+        </button>
+      )}
+
+      <main
+        className={
+          fullscreen
+            ? 'relative z-10 w-screen h-screen flex items-center justify-center p-2'
+            : 'relative z-10 max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[1fr_320px] gap-6'
+        }
+      >
         {/* ── Board ────────────────────────────────── */}
-        <div className="relative">
+        <div className="relative" style={fullscreen ? { height: 'min(100vw, 100vh)', width: 'min(100vw, 100vh)', maxHeight: '100vh', maxWidth: '100vh' } : undefined}>
           <div
-            className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+            className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl h-full w-full"
             style={{
               aspectRatio: '1 / 1',
               backgroundImage:
@@ -198,24 +245,26 @@ export function SnakeLadderBoard() {
         </div>
 
         {/* ── Teams panel ───────────────────────────── */}
-        <aside className="flex flex-col gap-3">
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-            <h2 className="text-sm font-black uppercase tracking-widest text-white/60 mb-3">Teams</h2>
-            {teams.length === 0 && (
-              <p className="text-sm text-white/50">No teams yet. Add some in Admin.</p>
-            )}
-            <div className="flex flex-col gap-2">
-              {teams.map(team => (
-                <TeamStatus key={team.id} team={team} />
-              ))}
+        {!fullscreen && (
+          <aside className="flex flex-col gap-3">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <h2 className="text-sm font-black uppercase tracking-widest text-white/60 mb-3">Teams</h2>
+              {teams.length === 0 && (
+                <p className="text-sm text-white/50">No teams yet. Add some in Admin.</p>
+              )}
+              <div className="flex flex-col gap-2">
+                {teams.map(team => (
+                  <TeamStatus key={team.id} team={team} />
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-xs text-white/60 leading-relaxed">
-            <p className="font-bold text-white mb-1">How to play</p>
-            <p>Tap any tile to open its activity card. Finish the task, then pick which team completed it — that team jumps to this tile (snakes and ladders apply automatically).</p>
-          </div>
-        </aside>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 text-xs text-white/60 leading-relaxed">
+              <p className="font-bold text-white mb-1">How to play</p>
+              <p>Tap any tile to open its activity card. Finish the task, then pick which team completed it — that team jumps to this tile (snakes and ladders apply automatically).</p>
+            </div>
+          </aside>
+        )}
       </main>
 
       {/* Tile modal */}
