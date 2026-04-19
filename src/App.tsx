@@ -24,6 +24,7 @@ const BingoDashJoin         = lazy(() => import('./pages/BingoDashJoin').then(m 
 const BingoDashColmarIntro  = lazy(() => import('./pages/BingoDashColmarIntro').then(m => ({ default: m.BingoDashColmarIntro })))
 const BingoDashSlidesHub    = lazy(() => import('./pages/BingoDashSlidesHub').then(m => ({ default: m.BingoDashSlidesHub })))
 const BingoDashAwardSlides  = lazy(() => import('./pages/BingoDashAwardSlides').then(m => ({ default: m.BingoDashAwardSlides })))
+const BingoDashAwardAdmin   = lazy(() => import('./pages/BingoDashAwardAdmin').then(m => ({ default: m.BingoDashAwardAdmin })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/bingo-dash/slides" element={<BingoDashSlidesHub />} />
           <Route path="/bingo-dash/slides/awards" element={<BingoDashAwardSlides />} />
           <Route path="/bingo-dash/slides/awards/:sectionSlug" element={<BingoDashAwardSlides />} />
+          <Route path="/bingo-dash/slides/awards/:sectionSlug/admin" element={<BingoDashAwardAdmin />} />
           <Route path="/snake-ladder" element={<SnakeLadderBoard />} />
           <Route path="/snake-ladder/admin" element={<SnakeLadderAdmin />} />
         </Routes>

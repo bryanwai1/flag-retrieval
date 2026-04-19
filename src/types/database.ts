@@ -132,6 +132,20 @@ export interface BingoTeam {
   created_at: string
 }
 
+export interface BingoAwardConfig {
+  id: string
+  section_id: string
+  total_points: number
+  image_url: string | null
+  consolation_count: number
+  third_count: number
+  second_count: number
+  first_count: number
+  slide_order: string[]
+  slide_points: Record<string, number>
+  created_at: string
+}
+
 export interface BingoScan {
   id: string
   team_id: string

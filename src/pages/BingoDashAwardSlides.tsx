@@ -3,15 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFullscreen } from '../hooks/useFullscreen'
 import { ParticleBackground } from '../components/ParticleBackground'
-import type { BingoSection, BingoTeam, BingoScan, BingoTask } from '../types/database'
-
-const SLIDE_COUNT = 6 // 3 consolation + bronze + silver + gold, played from last to first
+import {
+  buildAwardSlides,
+  normalizeSlideOrder,
+  type AwardSlideDescriptor,
+} from '../lib/awardSlides'
+import type { BingoSection, BingoTeam, BingoScan, BingoTask, BingoAwardConfig } from '../types/database'
 
 const BINGO_LINES: number[][] = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
   [0, 5, 10, 15, 20], [1, 6, 11, 16, 21], [2, 7, 12, 17, 22], [3, 8, 13, 18, 23], [4, 9, 14, 19, 24],
   [0, 6, 12, 18, 24], [4, 8, 12, 16, 20],
 ]
+
+const DEFAULT_COUNTS = { consolation_count: 3, third_count: 1, second_count: 1, first_count: 1 }
 
 export function BingoDashAwardSlides() {
   const { sectionSlug } = useParams<{ sectionSlug?: string }>()
@@ -56,10 +61,9 @@ function SectionPicker() {
         ) : sections.map((s, i) => {
           const isActive = s.id === activeId
           return (
-            <button
+            <div
               key={s.id}
-              onClick={() => navigate(`/bingo-dash/slides/awards/${s.slug}`)}
-              className="animate-bounce-in flex flex-col items-center gap-4 px-10 py-10 rounded-3xl w-72 hover:scale-105 transition-transform text-left"
+              className="animate-bounce-in flex flex-col items-center gap-4 px-10 py-10 rounded-3xl w-72"
               style={{
                 animationDelay: `${0.25 + i * 0.08}s`,
                 opacity: 0,
@@ -80,13 +84,20 @@ function SectionPicker() {
                   </span>
                 )}
               </div>
-              <span
-                className="w-full py-3 rounded-xl text-center text-sm font-black tracking-wider"
+              <button
+                onClick={() => navigate(`/bingo-dash/slides/awards/${s.slug}`)}
+                className="w-full py-3 rounded-xl text-center text-sm font-black tracking-wider hover:scale-105 transition-transform"
                 style={{ background: '#fbbf24', color: '#000' }}
               >
                 ▶ RUN AWARDS
-              </span>
-            </button>
+              </button>
+              <button
+                onClick={() => navigate(`/bingo-dash/slides/awards/${s.slug}/admin`)}
+                className="w-full py-2 rounded-xl text-center text-[11px] font-bold tracking-[0.2em] uppercase text-white/70 hover:text-white border border-white/15 hover:border-white/40 transition-colors"
+              >
+                ⚙ Configure
+              </button>
+            </div>
           )
         })}
       </div>
@@ -111,6 +122,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
   const [teams, setTeams] = useState<BingoTeam[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
+  const [config, setConfig] = useState<BingoAwardConfig | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [slideIdx, setSlideIdx] = useState(0)
   const [showJudgePanel, setShowJudgePanel] = useState(false)
@@ -134,15 +146,17 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
       const { data: sec } = await supabase.from('bingo_sections').select('*').eq('slug', sectionSlug).maybeSingle()
       if (!sec || cancelled) { setLoaded(true); return }
       setSection(sec)
-      const [{ data: t }, { data: s }, { data: gt }] = await Promise.all([
+      const [{ data: t }, { data: s }, { data: gt }, { data: cfg }] = await Promise.all([
         supabase.from('bingo_teams').select('*').eq('section_id', sec.id).order('name'),
         supabase.from('bingo_scans').select('*'),
         supabase.from('bingo_tasks').select('*').eq('section_id', sec.id).eq('in_grid', true).order('sort_order'),
+        supabase.from('bingo_award_configs').select('*').eq('section_id', sec.id).maybeSingle(),
       ])
       if (cancelled) return
       setTeams(t ?? [])
       setScans(s ?? [])
       setGridTasks(gt ?? [])
+      setConfig(cfg ?? null)
       setLoaded(true)
     })()
     return () => { cancelled = true }
@@ -150,7 +164,6 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
 
   const ranked: RankedTeam[] = useMemo(() => {
     if (!teams.length || !gridTasks.length) {
-      // Even without grid tasks we can still rank by bonus only
       return teams
         .map<RankedTeam>(team => ({
           team,
@@ -187,14 +200,15 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
     return computed
   }, [teams, scans, gridTasks])
 
-  // Pad to fixed 6 slots; null slots render as "no team".
-  const top6: (RankedTeam | null)[] = useMemo(() => {
-    return Array.from({ length: SLIDE_COUNT }, (_, i) => ranked[i] ?? null)
-  }, [ranked])
+  const slides: AwardSlideDescriptor[] = useMemo(() => {
+    const counts = config ?? DEFAULT_COUNTS
+    const order = normalizeSlideOrder(config?.slide_order ?? null, counts)
+    return buildAwardSlides(order)
+  }, [config])
 
-  // Slides are played bottom-up: slide 0 = 6th place, slide 5 = 1st place.
-  const currentRank = SLIDE_COUNT - slideIdx // 6,5,4,3,2,1
-  const current: RankedTeam | null = top6[currentRank - 1] ?? null
+  const totalSlides = slides.length
+  const safeSlideIdx = Math.min(slideIdx, Math.max(0, totalSlides - 1))
+  const current = slides[safeSlideIdx]
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -208,7 +222,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
       if (typing) return
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
         e.preventDefault()
-        setSlideIdx(i => Math.min(SLIDE_COUNT - 1, i + 1))
+        setSlideIdx(i => Math.min(totalSlides - 1, i + 1))
       } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
         e.preventDefault()
         setSlideIdx(i => Math.max(0, i - 1))
@@ -219,7 +233,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, showJudgePanel])
+  }, [navigate, showJudgePanel, totalSlides])
 
   if (!loaded) {
     return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading…</div>
@@ -232,17 +246,39 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
       </div>
     )
   }
+  if (!current) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-white gap-4 p-8 text-center">
+        <p className="text-2xl font-black">No slides configured yet.</p>
+        <a
+          href={`/bingo-dash/slides/awards/${section.slug}/admin`}
+          className="text-amber-400 hover:text-amber-300 underline"
+        >
+          Open the award admin to add prizes
+        </a>
+      </div>
+    )
+  }
+
+  const rankedForSlide: RankedTeam | null =
+    current.teamRank != null ? (ranked[current.teamRank - 1] ?? null) : null
 
   return (
     <div
       className="h-screen w-screen overflow-hidden relative cursor-pointer select-none"
-      onClick={() => setSlideIdx(i => Math.min(SLIDE_COUNT - 1, i + 1))}
+      onClick={() => setSlideIdx(i => Math.min(totalSlides - 1, i + 1))}
       style={{
         background: 'radial-gradient(ellipse at 50% 35%, #3b1f66 0%, #180a33 55%, #06020f 100%)',
         fontFamily: `'Cinzel', 'Trajan Pro', 'Palatino Linotype', Georgia, serif`,
       }}
     >
-      <AwardSlide key={slideIdx} slideIdx={slideIdx} rank={currentRank} ranked={current} />
+      <AwardSlideRenderer
+        key={safeSlideIdx}
+        slideIdx={safeSlideIdx}
+        descriptor={current}
+        ranked={rankedForSlide}
+        config={config}
+      />
 
       {/* Top nav */}
       <div className="absolute top-5 left-6 right-6 flex items-center justify-between text-[11px] text-white/50 font-semibold uppercase tracking-[0.25em] z-40">
@@ -253,7 +289,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
         >
           ← Awards Home
         </a>
-        <span className="hidden sm:inline">{section.name} · Slide {slideIdx + 1} / {SLIDE_COUNT}</span>
+        <span className="hidden sm:inline">{section.name} · Slide {safeSlideIdx + 1} / {totalSlides}</span>
         <button
           onClick={e => { e.stopPropagation(); toggleFullscreen() }}
           className="hover:text-white transition-colors"
@@ -264,21 +300,21 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
 
       {/* Progress dots */}
       <div className="absolute top-14 left-0 right-0 flex items-center justify-center gap-2 z-40">
-        {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
+        {Array.from({ length: totalSlides }).map((_, i) => (
           <span
             key={i}
             className="w-2 h-2 rounded-full transition-all"
             style={{
-              background: i <= slideIdx ? '#fbbf24' : 'rgba(255,255,255,0.18)',
-              boxShadow: i === slideIdx ? '0 0 10px #fbbf24' : 'none',
-              transform: i === slideIdx ? 'scale(1.4)' : 'scale(1)',
+              background: i <= safeSlideIdx ? '#fbbf24' : 'rgba(255,255,255,0.18)',
+              boxShadow: i === safeSlideIdx ? '0 0 10px #fbbf24' : 'none',
+              transform: i === safeSlideIdx ? 'scale(1.4)' : 'scale(1)',
             }}
           />
         ))}
       </div>
 
       {/* Back button */}
-      {slideIdx > 0 && (
+      {safeSlideIdx > 0 && (
         <button
           onClick={e => { e.stopPropagation(); setSlideIdx(i => Math.max(0, i - 1)) }}
           className="absolute bottom-10 left-8 z-40 text-white/40 hover:text-white transition-colors text-xs uppercase tracking-[0.3em] font-bold"
@@ -289,7 +325,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
 
       {/* Bottom hint */}
       <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/30 uppercase tracking-[0.35em] z-40 font-semibold pointer-events-none">
-        {slideIdx < SLIDE_COUNT - 1 ? '▶ Click / Space / → to continue · Press B for bonus' : '✦ End of Awards · Esc to exit'}
+        {safeSlideIdx < totalSlides - 1 ? '▶ Click / Space / → to continue · Press B for bonus' : '✦ End of Awards · Esc to exit'}
       </div>
 
       {/* Judge panel: toggle with B — adjust bonus points live */}
@@ -388,15 +424,7 @@ function rankCompare(a: RankedTeam, b: RankedTeam): number {
   )
 }
 
-// ── Single slide ─────────────────────────────────────────────────────────
-type Tier = 'consolation' | 'bronze' | 'silver' | 'gold'
-function tierForRank(rank: number): Tier {
-  if (rank === 1) return 'gold'
-  if (rank === 2) return 'silver'
-  if (rank === 3) return 'bronze'
-  return 'consolation'
-}
-
+// ── Single slide renderer ─────────────────────────────────────────────────
 const TIER = {
   consolation: {
     preLabel: 'Honorable Mention',
@@ -411,7 +439,7 @@ const TIER = {
     photoSize: 220,
     useGoldSweep: false,
   },
-  bronze: {
+  third: {
     preLabel: 'Second Runner-Up',
     medal: '🥉',
     medalSize: '4rem',
@@ -424,7 +452,7 @@ const TIER = {
     photoSize: 260,
     useGoldSweep: false,
   },
-  silver: {
+  second: {
     preLabel: 'First Runner-Up',
     medal: '🥈',
     medalSize: '5rem',
@@ -437,7 +465,7 @@ const TIER = {
     photoSize: 300,
     useGoldSweep: false,
   },
-  gold: {
+  first: {
     preLabel: 'Grand Champion',
     medal: '🥇',
     medalSize: '6rem',
@@ -452,22 +480,167 @@ const TIER = {
   },
 } as const
 
-function tierTitle(tier: Tier, rank: number): string {
-  if (tier === 'gold') return '🏆 GRAND WINNER'
-  if (tier === 'silver') return '🥈 FIRST RUNNER-UP'
-  if (tier === 'bronze') return '🥉 SECOND RUNNER-UP'
-  return `#${rank}  HONORABLE MENTION`
+function tierTitle(kind: 'consolation' | 'third' | 'second' | 'first', rank: number): string {
+  const suffix = rank > 1 ? `  ·  #${rank}` : ''
+  if (kind === 'first')  return `🏆 GRAND WINNER${suffix}`
+  if (kind === 'second') return `🥈 FIRST RUNNER-UP${suffix}`
+  if (kind === 'third')  return `🥉 SECOND RUNNER-UP${suffix}`
+  return `🎖 HONORABLE MENTION${suffix}`
 }
 
-function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number; ranked: RankedTeam | null }) {
-  const tier = tierForRank(rank)
-  const cfg = TIER[tier]
+function AwardSlideRenderer({
+  slideIdx, descriptor, ranked, config,
+}: {
+  slideIdx: number
+  descriptor: AwardSlideDescriptor
+  ranked: RankedTeam | null
+  config: BingoAwardConfig | null
+}) {
+  if (descriptor.kind === 'intro') return <IntroSlide slideIdx={slideIdx} />
+  if (descriptor.kind === 'holding') return <HoldingSlide slideIdx={slideIdx} config={config} />
+  const prizePoints = config?.slide_points?.[descriptor.id] ?? 0
+  return <PrizeSlide slideIdx={slideIdx} descriptor={descriptor} ranked={ranked} prizePoints={prizePoints} />
+}
+
+// ── Intro slide (animated opener) ─────────────────────────────────────────
+function IntroSlide({ slideIdx }: { slideIdx: number }) {
+  return (
+    <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
+      <div
+        className="absolute top-1/2 left-1/2 pointer-events-none z-0"
+        style={{
+          width: '180vmax',
+          height: '180vmax',
+          background: `conic-gradient(from 0deg, transparent 0deg, #fde04733 18deg, transparent 40deg, transparent 170deg, #fde04722 200deg, transparent 230deg, transparent 360deg)`,
+          animation: 'award-spotlight 20s linear infinite',
+          opacity: 0.9,
+        }}
+      />
+      <Confetti count={140} slideKey={slideIdx} />
+
+      <p
+        className="relative z-10 text-xs sm:text-sm font-bold uppercase tracking-[0.6em] text-amber-200/80"
+        style={{ animation: 'slide-down-fade 0.7s ease-out 0.1s both' }}
+      >
+        Ladies and Gentlemen
+      </p>
+
+      <h1
+        className="relative z-10 mt-4 font-black leading-none animate-gold-title"
+        style={{
+          fontSize: 'clamp(3rem, 11vw, 9rem)',
+          letterSpacing: '0.08em',
+          animation: 'title-slam 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both, gold-sweep 6s linear 0.35s infinite',
+        }}
+      >
+        🏆 AWARD CEREMONY
+      </h1>
+
+      <p
+        className="relative z-10 mt-6 text-white/80 text-xl sm:text-3xl font-light tracking-wider"
+        style={{ animation: 'slide-up-fade 0.7s ease-out 1s both', fontStyle: 'italic' }}
+      >
+        Presenting your champions…
+      </p>
+
+      {/* Sparkles row */}
+      <div
+        className="relative z-10 mt-10 flex gap-5 text-3xl sm:text-5xl"
+        style={{ animation: 'slide-up-fade 0.7s ease-out 1.3s both' }}
+      >
+        <span style={{ animation: 'medal-pulse 2s ease-in-out infinite' }}>✨</span>
+        <span style={{ animation: 'medal-pulse 2s ease-in-out 0.2s infinite' }}>🎉</span>
+        <span style={{ animation: 'medal-pulse 2s ease-in-out 0.4s infinite' }}>🏆</span>
+        <span style={{ animation: 'medal-pulse 2s ease-in-out 0.6s infinite' }}>🎊</span>
+        <span style={{ animation: 'medal-pulse 2s ease-in-out 0.8s infinite' }}>✨</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Holding slide ─────────────────────────────────────────────────────────
+function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwardConfig | null }) {
+  const total = config?.total_points ?? 0
+  const img = config?.image_url ?? null
+  return (
+    <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
+      <div
+        className="absolute top-1/2 left-1/2 pointer-events-none z-0"
+        style={{
+          width: '160vmax',
+          height: '160vmax',
+          background: `conic-gradient(from 0deg, transparent 0deg, #fcd34d22 18deg, transparent 40deg, transparent 170deg, #fcd34d22 200deg, transparent 230deg, transparent 360deg)`,
+          animation: 'award-spotlight 26s linear infinite',
+          opacity: 0.55,
+        }}
+      />
+
+      {img && (
+        <div
+          className="relative z-10 mb-10 rounded-3xl overflow-hidden"
+          style={{
+            width: 'min(60vw, 560px)',
+            aspectRatio: '16/9',
+            boxShadow: '0 0 60px rgba(253,224,71,0.35), 0 20px 60px rgba(0,0,0,0.4)',
+            animation: 'pop-bounce-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both',
+            border: '2px solid rgba(253,224,71,0.35)',
+          }}
+        >
+          <img src={img} alt="Awards" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      <p
+        className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.6em] text-amber-200/80"
+        style={{ animation: 'slide-down-fade 0.55s ease-out 0.4s both' }}
+      >
+        Total Prize Pool
+      </p>
+
+      <h1
+        className="relative z-10 mt-4 font-black leading-none animate-gold-title"
+        style={{
+          fontSize: 'clamp(4rem, 16vw, 12rem)',
+          letterSpacing: '0.04em',
+          animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both, gold-sweep 6s linear 0.55s infinite',
+        }}
+      >
+        {total.toLocaleString()}
+      </h1>
+
+      <p
+        className="relative z-10 mt-2 text-white/70 text-lg sm:text-2xl font-light tracking-widest uppercase"
+        style={{ animation: 'slide-up-fade 0.6s ease-out 1s both' }}
+      >
+        points up for grabs
+      </p>
+
+      <p
+        className="relative z-10 mt-10 text-white/40 text-xs uppercase tracking-[0.4em]"
+        style={{ animation: 'slide-up-fade 0.6s ease-out 1.3s both' }}
+      >
+        ▶ Continue for the winners
+      </p>
+    </div>
+  )
+}
+
+// ── Prize slide (consolation/third/second/first) ──────────────────────────
+function PrizeSlide({
+  slideIdx, descriptor, ranked, prizePoints,
+}: {
+  slideIdx: number
+  descriptor: AwardSlideDescriptor
+  ranked: RankedTeam | null
+  prizePoints: number
+}) {
+  const kind = descriptor.kind as 'consolation' | 'third' | 'second' | 'first'
+  const cfg = TIER[kind]
   const hasTeam = !!ranked
+  const rank = descriptor.rank ?? 1
 
   return (
     <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
-
-      {/* Rotating spotlight conic gradient */}
       <div
         className="absolute top-1/2 left-1/2 pointer-events-none z-0"
         style={{
@@ -478,30 +651,23 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
           opacity: 0.75,
         }}
       />
-
-      {/* Confetti */}
       <Confetti count={cfg.confetti} slideKey={slideIdx} />
 
-      {/* Pre-label (small) */}
       <p
         className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] opacity-70"
-        style={{
-          color: cfg.labelColor,
-          animation: 'slide-down-fade 0.55s ease-out 0.15s both',
-        }}
+        style={{ color: cfg.labelColor, animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}
       >
         {cfg.preLabel}
       </p>
 
-      {/* Big tier title */}
       <h1
         className={`relative z-10 mt-3 mb-8 font-black leading-none ${cfg.useGoldSweep ? 'animate-gold-title' : ''}`}
         style={{
-          fontSize: tier === 'gold'
+          fontSize: kind === 'first'
             ? 'clamp(2.6rem, 9vw, 7rem)'
-            : tier === 'silver'
+            : kind === 'second'
               ? 'clamp(2.4rem, 8vw, 6rem)'
-              : tier === 'bronze'
+              : kind === 'third'
                 ? 'clamp(2.2rem, 7vw, 5.4rem)'
                 : 'clamp(1.6rem, 5vw, 3.4rem)',
           letterSpacing: '0.05em',
@@ -510,12 +676,11 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
           textShadow: cfg.useGoldSweep ? undefined : `0 0 30px ${cfg.labelColor}88`,
         }}
       >
-        {tierTitle(tier, rank)}
+        {tierTitle(kind, rank)}
       </h1>
 
       {hasTeam ? (
         <>
-          {/* Team photo with medal ring */}
           <div
             className="relative z-10"
             style={{ animation: 'pop-bounce-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both' }}
@@ -533,13 +698,12 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
               }}
             >
               <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
-                {ranked.team.photo_url ? (
-                  <img src={ranked.team.photo_url} alt={ranked.team.name} className="w-full h-full object-cover" />
+                {ranked!.team.photo_url ? (
+                  <img src={ranked!.team.photo_url} alt={ranked!.team.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-7xl text-white/40">👥</div>
                 )}
               </div>
-              {/* Medal badge */}
               <div
                 className="absolute -bottom-3 left-1/2 -translate-x-1/2 select-none"
                 style={{
@@ -553,15 +717,14 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
             </div>
           </div>
 
-          {/* Team name */}
           <h2
             className="relative z-10 font-black text-white mt-8 mb-1"
             style={{
-              fontSize: tier === 'gold'
+              fontSize: kind === 'first'
                 ? 'clamp(2rem, 6vw, 5rem)'
-                : tier === 'silver'
+                : kind === 'second'
                   ? 'clamp(1.8rem, 5.5vw, 4.4rem)'
-                  : tier === 'bronze'
+                  : kind === 'third'
                     ? 'clamp(1.6rem, 5vw, 4rem)'
                     : 'clamp(1.4rem, 4vw, 3.2rem)',
               letterSpacing: '0.03em',
@@ -569,20 +732,31 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
               textShadow: `0 4px 34px ${cfg.ringGlow}`,
             }}
           >
-            {ranked.team.name}
+            {ranked!.team.name}
           </h2>
 
-          {/* Stats row */}
           <div
-            className="relative z-10 flex gap-8 mt-3 text-white/85"
+            className="relative z-10 mt-5 flex flex-col items-center"
             style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
           >
-            <Stat label="Total" value={String(ranked.total)} accent={cfg.labelColor} />
-            {ranked.bonusPoints > 0 && (
-              <Stat label="Bonus" value={`+${ranked.bonusPoints}`} accent="#c4b5fd" />
-            )}
-            <Stat label="Bingos" value={`${ranked.bingos}`} accent="#ffffff" />
-            <Stat label="Tasks" value={`${ranked.tasksDone}`} accent="#ffffff" />
+            <p className="text-[10px] uppercase tracking-[0.4em] opacity-60">Prize</p>
+            <p
+              className="font-black leading-none mt-1"
+              style={{
+                fontSize: kind === 'first'
+                  ? 'clamp(2.4rem, 7vw, 5.5rem)'
+                  : kind === 'second'
+                    ? 'clamp(2.2rem, 6.5vw, 5rem)'
+                    : kind === 'third'
+                      ? 'clamp(2rem, 6vw, 4.4rem)'
+                      : 'clamp(1.6rem, 5vw, 3.6rem)',
+                color: cfg.labelColor,
+                textShadow: `0 0 30px ${cfg.ringGlow}`,
+                letterSpacing: '0.02em',
+              }}
+            >
+              {prizePoints.toLocaleString()} <span className="text-white/70 font-light">pts</span>
+            </p>
           </div>
         </>
       ) : (
@@ -593,15 +767,6 @@ function AwardSlide({ slideIdx, rank, ranked }: { slideIdx: number; rank: number
           No team for this position yet.
         </p>
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="flex flex-col items-center">
-      <p className="text-[10px] uppercase tracking-[0.25em] opacity-60">{label}</p>
-      <p className="text-2xl sm:text-3xl font-black" style={{ color: accent }}>{value}</p>
     </div>
   )
 }
