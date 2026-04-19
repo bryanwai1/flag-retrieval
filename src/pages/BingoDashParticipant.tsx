@@ -26,7 +26,7 @@ export function BingoDashParticipant() {
   const { recordScan, toggleComplete } = useBingoScans()
 
   const [task, setTask] = useState<BingoTask | null>(null)
-  const [showSplash, setShowSplash] = useState(true)
+  const [showSplash, setShowSplash] = useState(!isSnakeLadder)
   const [scanRecord, setScanRecord] = useState<{ id: string; completed: boolean } | null>(null)
   const [scanRecorded, setScanRecorded] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
