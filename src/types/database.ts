@@ -99,11 +99,12 @@ export interface BingoTask {
   in_grid: boolean
   category: string
   points: number
-  task_type: 'standard' | 'answer'
+  task_type: 'standard' | 'answer' | 'photo'
   answer_question: string | null
   answer_text: string | null
   completion_warning: string | null
   require_marshal: boolean
+  maps_url: string | null
   created_at: string
 }
 
@@ -113,6 +114,7 @@ export interface BingoSettings {
   timer_end_at: string | null
   active_section_id: string | null
   marshal_password: string
+  game_started: boolean
   created_at: string
 }
 
@@ -161,6 +163,17 @@ export interface BingoMember {
   section_id: string
   name: string
   password: string
+  role: 'member' | 'observer'
+  created_at: string
+}
+
+export interface BingoPhotoSubmission {
+  id: string
+  team_id: string
+  task_id: string
+  scan_id: string | null
+  photo_url: string
+  status: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
 

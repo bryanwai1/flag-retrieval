@@ -21,12 +21,14 @@ export function BingoDashTaskEdit() {
   const [previewPage, setPreviewPage] = useState(0)
   const [activeTab, setActiveTab] = useState<'instructions' | 'answer'>('instructions')
   // Answer tab state
-  const [taskType, setTaskType] = useState<'standard' | 'answer'>('standard')
+  const [taskType, setTaskType] = useState<'standard' | 'answer' | 'photo'>('standard')
   const [answerQuestion, setAnswerQuestion] = useState('')
   const [answerText, setAnswerText] = useState('')
   const [answerSaving, setAnswerSaving] = useState(false)
   const [completionWarning, setCompletionWarning] = useState('')
   const [warningSaving, setWarningSaving] = useState(false)
+  const [mapsUrl, setMapsUrl] = useState('')
+  const [mapsUrlSaving, setMapsUrlSaving] = useState(false)
   const { pages, createPage, updatePage, deletePage, reorderPages } = useBingoTaskPages(taskId)
 
   useEffect(() => {
@@ -35,10 +37,11 @@ export function BingoDashTaskEdit() {
       if (data) {
         setTask(data)
         setTitleValue(data.title)
-        setTaskType(data.task_type ?? 'standard')
+        setTaskType((data.task_type ?? 'standard') as 'standard' | 'answer' | 'photo')
         setAnswerQuestion(data.answer_question ?? '')
         setAnswerText(data.answer_text ?? '')
         setCompletionWarning(data.completion_warning ?? '')
+        setMapsUrl(data.maps_url ?? '')
       }
     })
   }, [taskId])
@@ -323,23 +326,36 @@ export function BingoDashTaskEdit() {
                     taskType === 'standard' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
                   }`}
                 >
-                  Standard (Marshal)
+                  👮 Marshal
+                </button>
+                <button
+                  onClick={async () => {
+                    setTaskType('photo')
+                    if (task) await supabase.from('bingo_tasks').update({ task_type: 'photo', answer_question: null, answer_text: null }).eq('id', task.id)
+                  }}
+                  className={`flex-1 py-2.5 text-sm font-bold transition-colors border-l border-gray-200 ${
+                    taskType === 'photo' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  📸 Photo
                 </button>
                 <button
                   onClick={async () => {
                     setTaskType('answer')
                     if (task) await supabase.from('bingo_tasks').update({ task_type: 'answer' }).eq('id', task.id)
                   }}
-                  className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                  className={`flex-1 py-2.5 text-sm font-bold transition-colors border-l border-gray-200 ${
                     taskType === 'answer' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
                   }`}
                 >
-                  Answer Input
+                  ✏️ Answer
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-1.5">
                 {taskType === 'standard'
-                  ? 'Participants tap "Complete" after marshal approval.'
+                  ? 'Participants complete via marshal password.'
+                  : taskType === 'photo'
+                  ? 'Participants submit a photo — marshal approves in admin.'
                   : 'Participants type the answer — auto-completes when correct.'}
               </p>
             </div>
@@ -425,6 +441,34 @@ export function BingoDashTaskEdit() {
             className="mt-3 px-6 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-bold transition-colors disabled:opacity-50"
           >
             {warningSaving ? 'Saving...' : 'Save Warning'}
+          </button>
+        </div>
+
+        {/* Maps URL */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Google Maps Link</h2>
+          <p className="text-xs text-gray-400 mb-4">If set, participants see an "Open in Maps" button on this task. Paste a Google Maps URL or any navigation link.</p>
+          <input
+            type="url"
+            value={mapsUrl}
+            onChange={e => setMapsUrl(e.target.value)}
+            placeholder="https://maps.google.com/?q=..."
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+          />
+          <button
+            onClick={async () => {
+              if (!task) return
+              setMapsUrlSaving(true)
+              const val = mapsUrl.trim() || null
+              const { error } = await supabase.from('bingo_tasks').update({ maps_url: val }).eq('id', task.id)
+              setMapsUrlSaving(false)
+              if (error) { alert('Failed to save: ' + error.message); return }
+              setTask({ ...task, maps_url: val })
+            }}
+            disabled={mapsUrlSaving}
+            className="mt-3 px-6 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-bold transition-colors disabled:opacity-50"
+          >
+            {mapsUrlSaving ? 'Saving...' : 'Save Maps Link'}
           </button>
         </div>
       </main>

@@ -21,6 +21,7 @@ export function BingoDashParticipant() {
   const snakeTile = snakeTileParam ? parseInt(snakeTileParam, 10) : null
   const backPath = isSnakeLadder ? '/snake-ladder' : '/bingo-dash'
   const { team, loading: teamLoading, isRegistered, registerTeam, leaveTeam } = useBingoDashTeam()
+  const isObserver = !isSnakeLadder && localStorage.getItem('bingo-dash-member-role') === 'observer'
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
   const { photos, loading: photosLoading } = useBingoTaskPhotos(taskId)
   const { recordScan, toggleComplete } = useBingoScans()
@@ -43,6 +44,9 @@ export function BingoDashParticipant() {
   const [marshalPassword, setMarshalPassword] = useState('')
   const [marshalInput, setMarshalInput] = useState('')
   const [marshalError, setMarshalError] = useState('')
+  // Photo submission state
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoSubmitted, setPhotoSubmitted] = useState(false)
   // Answer-input state: one string per answer row
   const [answerInputs, setAnswerInputs] = useState<string[]>([])
   const [carouselIdx, setCarouselIdx] = useState(0)
@@ -149,6 +153,29 @@ export function BingoDashParticipant() {
     setScanRecord(null)
     setShowLeaveConfirm(false)
     setLeaving(false)
+  }
+
+  const handlePhotoUpload = async (file: File) => {
+    if (!team || !taskId || !scanRecord) return
+    if (file.size > 10 * 1024 * 1024) { alert('Photo too large (max 10 MB).'); return }
+    setPhotoUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `bingo-media/photo-submissions/${team.id}-${taskId}-${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('media').upload(path, file, { upsert: false })
+      if (uploadErr) { alert('Upload failed: ' + uploadErr.message); return }
+      const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
+      await supabase.from('bingo_photo_submissions').insert({
+        team_id: team.id,
+        task_id: taskId,
+        scan_id: scanRecord.id,
+        photo_url: urlData.publicUrl,
+        status: 'pending',
+      })
+      setPhotoSubmitted(true)
+    } finally {
+      setPhotoUploading(false)
+    }
   }
 
   // ── Loading ─────────────────────────────────────────────────────────
@@ -328,6 +355,20 @@ export function BingoDashParticipant() {
           </div>
         )}
 
+        {/* Maps button */}
+        {task.maps_url && (
+          <div className="mb-5 animate-slide-up">
+            <a
+              href={task.maps_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-black text-sm text-white border-2 border-white/30 bg-white/10 hover:bg-white/20 active:scale-95 transition-all"
+            >
+              📍 Open in Maps
+            </a>
+          </div>
+        )}
+
         {/* Instruction pointers */}
         {pages.length > 0 ? (
           <>
@@ -346,8 +387,15 @@ export function BingoDashParticipant() {
           </div>
         )}
 
+        {/* Observer notice */}
+        {isObserver && (
+          <div className="mt-8 p-4 rounded-2xl border-2 border-blue-400/40 bg-blue-400/10 text-center">
+            <p className="text-blue-300 font-black text-sm">👁 Observer Mode — viewing only</p>
+          </div>
+        )}
+
         {/* Complete Activity */}
-        <div className="mt-8 animate-slide-up">
+        {!isObserver && <div className="mt-8 animate-slide-up">
           {isSnakeLadder ? (
             snakeResult ? (
               <div
@@ -452,119 +500,8 @@ export function BingoDashParticipant() {
                 Undo completion
               </button>
             </div>
-          ) : task.task_type === 'answer' ? (
-            /* ── Answer-input card (letter boxes) ─────────────── */
-            <div
-              className="rounded-3xl p-5 border-2"
-              style={{
-                borderColor: `${task.hex_code}99`,
-                backgroundColor: `${task.hex_code}18`,
-                boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
-              }}
-            >
-              {task.answer_question && (
-                <p className="text-white font-black text-lg mb-4 text-center leading-snug">
-                  {task.answer_question}
-                </p>
-              )}
-              <div className="flex flex-col gap-5">
-                {answerRows.map((row, rowIdx) => {
-                  const letters = row.replace(/\s/g, '').split('')
-                  const typed = answerInputs[rowIdx] ?? ''
-                  const rowCorrect = normalize(typed) === normalize(row.replace(/\s/g, ''))
-                  if (!letterRefs.current[rowIdx]) letterRefs.current[rowIdx] = []
-                  return (
-                    <div key={rowIdx} className="flex flex-col items-center gap-2">
-                      {answerRows.length > 1 && (
-                        <label className="text-white/50 text-xs font-bold uppercase tracking-wider">
-                          Word {rowIdx + 1}
-                        </label>
-                      )}
-                      <div className="flex gap-1.5 justify-center flex-wrap">
-                        {letters.map((_, charIdx) => {
-                          const typedChar = typed[charIdx] ?? ''
-                          const expectedChar = letters[charIdx]
-                          const charCorrect = typedChar.length > 0 && typedChar.toLowerCase() === expectedChar.toLowerCase()
-                          const charWrong = typedChar.length > 0 && !charCorrect
-                          return (
-                            <input
-                              key={charIdx}
-                              ref={el => { letterRefs.current[rowIdx][charIdx] = el }}
-                              type="text"
-                              inputMode="text"
-                              autoCapitalize="characters"
-                              autoComplete="off"
-                              maxLength={1}
-                              value={typedChar.toUpperCase()}
-                              onChange={e => {
-                                const ch = e.target.value.slice(-1).replace(/[^a-zA-Z0-9]/g, '')
-                                if (!ch) return
-                                setAnswerInputs(prev => {
-                                  const next = [...prev]
-                                  const arr = (next[rowIdx] ?? '').split('')
-                                  while (arr.length <= charIdx) arr.push('')
-                                  arr[charIdx] = ch
-                                  next[rowIdx] = arr.join('')
-                                  return next
-                                })
-                                if (charIdx < letters.length - 1) focusLetter(rowIdx, charIdx + 1)
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Backspace') {
-                                  e.preventDefault()
-                                  const current = typed[charIdx] ?? ''
-                                  if (current) {
-                                    setAnswerInputs(prev => {
-                                      const next = [...prev]
-                                      const arr = (next[rowIdx] ?? '').split('')
-                                      arr[charIdx] = ''
-                                      next[rowIdx] = arr.join('')
-                                      return next
-                                    })
-                                  } else if (charIdx > 0) {
-                                    setAnswerInputs(prev => {
-                                      const next = [...prev]
-                                      const arr = (next[rowIdx] ?? '').split('')
-                                      arr[charIdx - 1] = ''
-                                      next[rowIdx] = arr.join('')
-                                      return next
-                                    })
-                                    focusLetter(rowIdx, charIdx - 1)
-                                  }
-                                } else if (e.key === 'ArrowLeft' && charIdx > 0) {
-                                  focusLetter(rowIdx, charIdx - 1)
-                                } else if (e.key === 'ArrowRight' && charIdx < letters.length - 1) {
-                                  focusLetter(rowIdx, charIdx + 1)
-                                }
-                              }}
-                              onFocus={e => e.target.select()}
-                              className={`w-10 h-12 text-center text-xl font-black rounded-lg border-2 outline-none transition-all ${
-                                rowCorrect
-                                  ? 'border-green-400 bg-green-400/20 text-green-300'
-                                  : charCorrect
-                                  ? 'border-green-400/60 bg-green-400/10 text-green-300'
-                                  : charWrong
-                                  ? 'border-red-400/60 bg-red-400/10 text-red-300'
-                                  : 'border-white/30 bg-black/30 text-white'
-                              }`}
-                              style={{ caretColor: 'transparent' }}
-                            />
-                          )
-                        })}
-                      </div>
-                      {rowCorrect && (
-                        <span className="text-green-400 text-xs font-bold mt-0.5">✓ Correct!</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-              {!answerMatches && (
-                <p className="text-white/40 text-xs text-center mt-4">Fill in the letters above</p>
-              )}
-            </div>
           ) : (
-            /* ── Standard card ─────────────────────────────────── */
+            /* ── Per-type completion card ──────────────────────── */
             <div
               className="rounded-3xl p-5 border-2 animate-pulse-border"
               style={{
@@ -573,62 +510,201 @@ export function BingoDashParticipant() {
                 boxShadow: `0 0 24px ${task.hex_code}44, inset 0 0 24px ${task.hex_code}11`,
               }}
             >
-              {task.require_marshal && (
-                <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
-                  <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                    <span className="text-2xl">👮</span>
-                    <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
-                  </div>
-                  <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
-                    {task.completion_warning || 'Enter the Marshal password to complete this challenge.'}
-                  </p>
-                  <span className="text-2xl flex-shrink-0">🛑</span>
-                </div>
-              )}
-
-              {task.require_marshal && (
-                <div className="mb-4">
-                  <input
-                    type="password"
-                    value={marshalInput}
-                    onChange={e => { setMarshalInput(e.target.value); setMarshalError('') }}
-                    placeholder="Marshal password..."
-                    className="w-full px-4 py-3 rounded-2xl border-2 text-center text-lg font-bold focus:outline-none transition-colors bg-white/10 text-white placeholder-white/30"
-                    style={{ borderColor: marshalError ? '#ef4444' : marshalInput ? task.hex_code : 'rgba(255,255,255,0.2)' }}
-                  />
-                  {marshalError && (
-                    <p className="text-red-400 text-xs font-bold text-center mt-2">{marshalError}</p>
+              {/* ── Standard: Marshal password + Complete button ── */}
+              {task.task_type === 'standard' && (
+                <>
+                  {task.require_marshal && (
+                    <>
+                      <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-yellow-400/20 border border-yellow-400/50 animate-attention">
+                        <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                          <span className="text-2xl">👮</span>
+                          <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
+                        </div>
+                        <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
+                          {task.completion_warning || 'Enter the Marshal password to complete this challenge.'}
+                        </p>
+                        <span className="text-2xl flex-shrink-0">🛑</span>
+                      </div>
+                      <div className="mb-4">
+                        <input
+                          type="password"
+                          value={marshalInput}
+                          onChange={e => { setMarshalInput(e.target.value); setMarshalError('') }}
+                          placeholder="Marshal password..."
+                          className="w-full px-4 py-3 rounded-2xl border-2 text-center text-lg font-bold focus:outline-none transition-colors bg-white/10 text-white placeholder-white/30"
+                          style={{ borderColor: marshalError ? '#ef4444' : marshalInput ? task.hex_code : 'rgba(255,255,255,0.2)' }}
+                        />
+                        {marshalError && (
+                          <p className="text-red-400 text-xs font-bold text-center mt-2">{marshalError}</p>
+                        )}
+                      </div>
+                    </>
                   )}
-                </div>
+                  <button
+                    onClick={async () => {
+                      if (!scanRecord) return
+                      if (task.require_marshal && marshalInput.trim() !== marshalPassword) {
+                        setMarshalError('Wrong marshal password.')
+                        return
+                      }
+                      setCompleting(true)
+                      try {
+                        await toggleComplete(scanRecord.id, true)
+                        setScanRecord({ ...scanRecord, completed: true })
+                      } finally { setCompleting(false) }
+                    }}
+                    disabled={completing || !scanRecord}
+                    className="w-full py-4 rounded-2xl text-white text-xl font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
+                    style={{
+                      backgroundColor: task.hex_code,
+                      boxShadow: `0 6px 0 ${task.hex_code}88, 0 8px 20px ${task.hex_code}44`,
+                    }}
+                  >
+                    {completing ? 'Completing...' : 'Complete Challenge ✅'}
+                  </button>
+                </>
               )}
 
-              <button
-                onClick={async () => {
-                  if (!scanRecord) return
-                  if (task.require_marshal) {
-                    if (marshalInput.trim() !== marshalPassword) {
-                      setMarshalError('Wrong marshal password.')
-                      return
-                    }
-                  }
-                  setCompleting(true)
-                  try {
-                    await toggleComplete(scanRecord.id, true)
-                    setScanRecord({ ...scanRecord, completed: true })
-                  } finally { setCompleting(false) }
-                }}
-                disabled={completing || !scanRecord}
-                className="w-full py-4 rounded-2xl text-white text-xl font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
-                style={{
-                  backgroundColor: task.hex_code,
-                  boxShadow: `0 6px 0 ${task.hex_code}88, 0 8px 20px ${task.hex_code}44`,
-                }}
-              >
-                {completing ? 'Completing...' : 'Complete Challenge ✅'}
-              </button>
+              {/* ── Photo: Submit image for marshal approval ── */}
+              {task.task_type === 'photo' && (
+                <>
+                  <p className="text-white font-black text-lg text-center mb-4">📸 Submit Your Photo</p>
+                  <p className="text-white/50 text-sm text-center mb-5">A marshal will review and approve your submission.</p>
+                  {photoSubmitted ? (
+                    <div className="p-4 rounded-2xl bg-green-400/15 border border-green-400/40 text-center">
+                      <div className="text-3xl mb-2">⏳</div>
+                      <p className="text-green-300 font-black">Photo submitted!</p>
+                      <p className="text-green-300/60 text-sm mt-1">Waiting for marshal review</p>
+                    </div>
+                  ) : (
+                    <label className={`flex flex-col items-center justify-center gap-3 w-full py-6 rounded-2xl border-2 border-dashed border-white/30 text-white/60 font-bold text-sm cursor-pointer hover:border-white/50 hover:text-white/80 hover:bg-white/5 transition-all ${photoUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <span className="text-4xl">{photoUploading ? '⏳' : '📷'}</span>
+                      <span>{photoUploading ? 'Uploading...' : 'Tap to take or upload a photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        disabled={photoUploading || !scanRecord}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          e.target.value = ''
+                          if (f) handlePhotoUpload(f)
+                        }}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
+
+              {/* ── Answer: Letter-box input ── */}
+              {task.task_type === 'answer' && (
+                <>
+                  {task.answer_question && (
+                    <p className="text-white font-black text-lg mb-4 text-center leading-snug">
+                      {task.answer_question}
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-5">
+                    {answerRows.map((row, rowIdx) => {
+                      const letters = row.replace(/\s/g, '').split('')
+                      const typed = answerInputs[rowIdx] ?? ''
+                      const rowCorrect = normalize(typed) === normalize(row.replace(/\s/g, ''))
+                      if (!letterRefs.current[rowIdx]) letterRefs.current[rowIdx] = []
+                      return (
+                        <div key={rowIdx} className="flex flex-col items-center gap-2">
+                          {answerRows.length > 1 && (
+                            <label className="text-white/50 text-xs font-bold uppercase tracking-wider">
+                              Word {rowIdx + 1}
+                            </label>
+                          )}
+                          <div className="flex gap-1.5 justify-center flex-wrap">
+                            {letters.map((_, charIdx) => {
+                              const typedChar = typed[charIdx] ?? ''
+                              const expectedChar = letters[charIdx]
+                              const charCorrect = typedChar.length > 0 && typedChar.toLowerCase() === expectedChar.toLowerCase()
+                              const charWrong = typedChar.length > 0 && !charCorrect
+                              return (
+                                <input
+                                  key={charIdx}
+                                  ref={el => { letterRefs.current[rowIdx][charIdx] = el }}
+                                  type="text"
+                                  inputMode="text"
+                                  autoCapitalize="characters"
+                                  autoComplete="off"
+                                  maxLength={1}
+                                  value={typedChar.toUpperCase()}
+                                  onChange={e => {
+                                    const ch = e.target.value.slice(-1).replace(/[^a-zA-Z0-9]/g, '')
+                                    if (!ch) return
+                                    setAnswerInputs(prev => {
+                                      const next = [...prev]
+                                      const arr = (next[rowIdx] ?? '').split('')
+                                      while (arr.length <= charIdx) arr.push('')
+                                      arr[charIdx] = ch
+                                      next[rowIdx] = arr.join('')
+                                      return next
+                                    })
+                                    if (charIdx < letters.length - 1) focusLetter(rowIdx, charIdx + 1)
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Backspace') {
+                                      e.preventDefault()
+                                      const current = typed[charIdx] ?? ''
+                                      if (current) {
+                                        setAnswerInputs(prev => {
+                                          const next = [...prev]
+                                          const arr = (next[rowIdx] ?? '').split('')
+                                          arr[charIdx] = ''
+                                          next[rowIdx] = arr.join('')
+                                          return next
+                                        })
+                                      } else if (charIdx > 0) {
+                                        setAnswerInputs(prev => {
+                                          const next = [...prev]
+                                          const arr = (next[rowIdx] ?? '').split('')
+                                          arr[charIdx - 1] = ''
+                                          next[rowIdx] = arr.join('')
+                                          return next
+                                        })
+                                        focusLetter(rowIdx, charIdx - 1)
+                                      }
+                                    } else if (e.key === 'ArrowLeft' && charIdx > 0) {
+                                      focusLetter(rowIdx, charIdx - 1)
+                                    } else if (e.key === 'ArrowRight' && charIdx < letters.length - 1) {
+                                      focusLetter(rowIdx, charIdx + 1)
+                                    }
+                                  }}
+                                  onFocus={e => e.target.select()}
+                                  className={`w-10 h-12 text-center text-xl font-black rounded-lg border-2 outline-none transition-all ${
+                                    rowCorrect
+                                      ? 'border-green-400 bg-green-400/20 text-green-300'
+                                      : charCorrect
+                                      ? 'border-green-400/60 bg-green-400/10 text-green-300'
+                                      : charWrong
+                                      ? 'border-red-400/60 bg-red-400/10 text-red-300'
+                                      : 'border-white/30 bg-black/30 text-white'
+                                  }`}
+                                  style={{ caretColor: 'transparent' }}
+                                />
+                              )
+                            })}
+                          </div>
+                          {rowCorrect && (
+                            <span className="text-green-400 text-xs font-bold mt-0.5">✓ Correct!</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {!answerMatches && (
+                    <p className="text-white/40 text-xs text-center mt-4">Fill in the letters above to complete</p>
+                  )}
+                </>
+              )}
             </div>
           )}
-        </div>
+        </div>}
         {/* Return to board */}
         <div className="mt-6 animate-slide-up">
           <button
