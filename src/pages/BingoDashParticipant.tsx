@@ -481,6 +481,13 @@ export function BingoDashParticipant() {
                 <div className="text-4xl mb-2">🎉</div>
                 <p className="text-2xl font-black mb-1 text-white">Challenge Complete!</p>
                 <p className="text-white/60 text-sm font-medium">Great job, {team?.name}!</p>
+                <button
+                  onClick={() => navigate(backPath)}
+                  className="mt-5 w-full py-3 rounded-2xl text-white font-black uppercase tracking-wider transition-all active:scale-95"
+                  style={{ backgroundColor: task.hex_code, boxShadow: `0 4px 0 ${task.hex_code}88` }}
+                >
+                  ← Back to Board
+                </button>
               </div>
               <button
                 onClick={async () => {
@@ -702,18 +709,17 @@ export function BingoDashParticipant() {
                   )}
                 </>
               )}
+
+              {/* Back to board — shown in every card type */}
+              <button
+                onClick={() => navigate(backPath)}
+                className="mt-5 w-full py-3 rounded-2xl text-white/70 font-bold text-sm uppercase tracking-wider border border-white/20 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+              >
+                ← Back to Board
+              </button>
             </div>
           )}
         </div>}
-        {/* Return to board */}
-        <div className="mt-6 animate-slide-up">
-          <button
-            onClick={() => navigate(backPath)}
-            className="w-full py-3.5 rounded-2xl text-white/70 font-bold text-sm uppercase tracking-wider border border-white/20 hover:bg-white/10 hover:text-white transition-all active:scale-95"
-          >
-            ← Return to Board
-          </button>
-        </div>
       </main>
     </div>
   )
