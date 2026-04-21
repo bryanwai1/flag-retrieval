@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 
 const PRESET_COLORS = [
@@ -383,7 +383,7 @@ export function BingoDashAdmin() {
   const [formHex, setFormHex] = useState('#3B82F6')
   const [formCategory, setFormCategory] = useState('')
   const [formPoints, setFormPoints] = useState(0)
-  const [formTaskType, setFormTaskType] = useState<'standard' | 'answer'>('standard')
+  const [formTaskType, setFormTaskType] = useState<'standard' | 'answer' | 'photo'>('standard')
   const [formAnswerQuestion, setFormAnswerQuestion] = useState('')
   const [formAnswerText, setFormAnswerText] = useState('')
   const [formSaving, setFormSaving] = useState(false)
@@ -409,7 +409,7 @@ export function BingoDashAdmin() {
   const [tileCategory, setTileCategory] = useState('')
   const [tilePoints, setTilePoints] = useState(0)
   const [tileSectionId, setTileSectionId] = useState<string>('')
-  const [tileTaskType, setTileTaskType] = useState<'standard' | 'answer'>('standard')
+  const [tileTaskType, setTileTaskType] = useState<'standard' | 'answer' | 'photo'>('standard')
   const [tileAnswerQuestion, setTileAnswerQuestion] = useState('')
   const [tileAnswerText, setTileAnswerText] = useState('')
   const [tileSaving, setTileSaving] = useState(false)
@@ -442,7 +442,9 @@ export function BingoDashAdmin() {
   // Team grid viewer modal
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
   const [members, setMembers] = useState<BingoMember[]>([])
+  const [photoSubmissions, setPhotoSubmissions] = useState<BingoPhotoSubmission[]>([])
   const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupPassword, setNewGroupPassword] = useState('')
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState<string | null>(null)
 
   // Library: compartment filter
@@ -580,7 +582,7 @@ export function BingoDashAdmin() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
-    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes] = await Promise.all([
+    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes, subsRes] = await Promise.all([
       supabase.from('bingo_tasks').select('*').order('sort_order'),
       supabase.from('bingo_teams').select('*').order('created_at'),
       supabase.from('bingo_scans').select('*'),
@@ -588,6 +590,7 @@ export function BingoDashAdmin() {
       supabase.from('bingo_categories').select('*').order('sort_order'),
       supabase.from('bingo_challenge_sections').select('*').order('sort_order'),
       supabase.from('bingo_members').select('*').order('created_at'),
+      supabase.from('bingo_photo_submissions').select('*').order('created_at', { ascending: false }),
     ])
     if (tasksRes.data) setTasks(tasksRes.data)
     if (teamsRes.data) setTeams(teamsRes.data)
@@ -599,6 +602,7 @@ export function BingoDashAdmin() {
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (challengeSectionsRes.data) setChallengeSections(challengeSectionsRes.data)
     if (membersRes.data) setMembers(membersRes.data)
+    if (subsRes.data) setPhotoSubmissions(subsRes.data)
     setLoading(false)
   }, [])
 
@@ -1101,6 +1105,25 @@ export function BingoDashAdmin() {
     if (error) { alert('Failed to remove member'); await fetchAll() }
   }
 
+  const moveMember = async (memberId: string, newTeamId: string) => {
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, team_id: newTeamId } : m))
+    await supabase.from('bingo_members').update({ team_id: newTeamId }).eq('id', memberId)
+  }
+
+  const approvePhotoSubmission = async (sub: BingoPhotoSubmission) => {
+    setPhotoSubmissions(prev => prev.map(s => s.id === sub.id ? { ...s, status: 'approved' } : s))
+    await supabase.from('bingo_photo_submissions').update({ status: 'approved' }).eq('id', sub.id)
+    if (sub.scan_id) {
+      await supabase.from('bingo_scans').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', sub.scan_id)
+      setScans(prev => prev.map(s => s.id === sub.scan_id ? { ...s, completed: true } : s))
+    }
+  }
+
+  const rejectPhotoSubmission = async (subId: string) => {
+    setPhotoSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: 'rejected' } : s))
+    await supabase.from('bingo_photo_submissions').update({ status: 'rejected' }).eq('id', subId)
+  }
+
   const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
     await supabase.from('bingo_teams').update(updates).eq('id', id)
@@ -1140,19 +1163,36 @@ export function BingoDashAdmin() {
 
   const createGroup = async (sectionId: string) => {
     const name = newGroupName.trim()
+    const pwd = newGroupPassword.replace(/\D/g, '').slice(0, 4)
     if (!name) return
+    if (!/^\d{4}$/.test(pwd)) { alert('Password must be exactly 4 digits.'); return }
     if (teams.some(t => t.section_id === sectionId && t.name.toLowerCase() === name.toLowerCase())) {
       alert(`Group "${name}" already exists in this compartment.`)
       return
     }
     const { data, error } = await supabase
       .from('bingo_teams')
-      .insert({ name, password: '', section_id: sectionId })
+      .insert({ name, password: pwd, section_id: sectionId })
       .select()
       .single()
     if (error || !data) { alert('Failed to create group'); return }
     setTeams(prev => [...prev, data])
     setNewGroupName('')
+    setNewGroupPassword('')
+  }
+
+  const bulkCreateGroups = async (sectionId: string, count: number) => {
+    const existing = teams.filter(t => t.section_id === sectionId)
+    const rows = Array.from({ length: count }, (_, i) => {
+      const num = existing.length + i + 1
+      const name = `Group ${num}`
+      const password = String(1000 + Math.floor(Math.random() * 9000)).padStart(4, '0')
+      return { name, password, section_id: sectionId }
+    }).filter(r => !teams.some(t => t.section_id === sectionId && t.name.toLowerCase() === r.name.toLowerCase()))
+    if (rows.length === 0) { alert('All group names already exist.'); return }
+    const { data, error } = await supabase.from('bingo_teams').insert(rows).select()
+    if (error || !data) { alert('Failed to bulk create groups'); return }
+    setTeams(prev => [...prev, ...data])
   }
 
   const copyLink = (taskId: string) => {
@@ -1310,6 +1350,37 @@ export function BingoDashAdmin() {
         </div>
 
         {activeTab === 'board' && <>
+
+        {/* ── Game Lock ────────────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Game Access</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            Groups can join and log in before the event. Enable this when you are ready for participants to play.
+          </p>
+          <div className={`flex items-center justify-between gap-4 rounded-2xl px-6 py-5 ${settings?.game_started ? 'bg-green-50 border border-green-200' : 'bg-gray-100 border border-gray-200'}`}>
+            <div>
+              <p className={`text-lg font-black ${settings?.game_started ? 'text-green-700' : 'text-gray-600'}`}>
+                {settings?.game_started ? '● Game is LIVE' : '■ Game is Locked'}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {settings?.game_started
+                  ? 'Participants can access the board and complete challenges.'
+                  : 'Participants see a waiting screen — they cannot access the board yet.'}
+              </p>
+            </div>
+            <button
+              onClick={() => settings && updateSettings({ game_started: !settings.game_started })}
+              disabled={!settings}
+              className={`px-6 py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40 flex-shrink-0 ${
+                settings?.game_started
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+            >
+              {settings?.game_started ? 'Lock Game' : 'Start Game'}
+            </button>
+          </div>
+        </section>
 
         {/* ── Timer ────────────────────────────────────────────────────────── */}
         <section>
@@ -2239,6 +2310,55 @@ export function BingoDashAdmin() {
         {/* ── Teams tab ────────────────────────────────────────────────────── */}
         {activeTab === 'teams' && (
         <section>
+          {/* ── Photo Submission Queue ─────────────────────────────────────── */}
+          {(() => {
+            const pending = photoSubmissions.filter(s => s.status === 'pending')
+            if (pending.length === 0) return null
+            return (
+              <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-3">
+                  📸 Photo Submissions — {pending.length} Pending
+                </h3>
+                <div className="flex flex-col gap-3">
+                  {pending.map(sub => {
+                    const subTeam = teams.find(t => t.id === sub.team_id)
+                    const subTask = tasks.find(t => t.id === sub.task_id)
+                    return (
+                      <div key={sub.id} className="flex items-start gap-3 bg-white rounded-lg p-3 border border-amber-100">
+                        <a href={sub.photo_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={sub.photo_url}
+                            alt="submission"
+                            className="w-20 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0 hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-gray-800 truncate">{subTeam?.name ?? 'Unknown team'}</p>
+                          <p className="text-xs text-gray-500 truncate">{subTask?.title ?? 'Unknown task'}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{new Date(sub.created_at).toLocaleString()}</p>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => approvePhotoSubmission(sub)}
+                              className="px-3 py-1 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => rejectPhotoSubmission(sub.id)}
+                              className="px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Teams grouped by compartment (section) */}
           {sections.map(section => {
             const sectionTeams = teams.filter(t => t.section_id === section.id)
@@ -2256,21 +2376,41 @@ export function BingoDashAdmin() {
                 </div>
 
                 {/* Create group form */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-2 mb-4 flex-wrap">
                   <input
                     type="text"
                     value={newGroupName}
                     onChange={e => setNewGroupName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') createGroup(section.id) }}
-                    placeholder="New group name..."
-                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-violet-400"
+                    placeholder="Group name..."
+                    className="flex-1 min-w-[140px] px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-violet-400"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={newGroupPassword}
+                    onChange={e => setNewGroupPassword(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    onKeyDown={e => { if (e.key === 'Enter') createGroup(section.id) }}
+                    placeholder="4-digit password"
+                    className="w-36 px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono tracking-widest text-center focus:outline-none focus:border-violet-400"
                   />
                   <button
                     onClick={() => createGroup(section.id)}
-                    disabled={!newGroupName.trim()}
+                    disabled={!newGroupName.trim() || newGroupPassword.length !== 4}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 disabled:opacity-40 transition-colors"
                   >
                     + Create Group
+                  </button>
+                  <button
+                    onClick={() => {
+                      const n = parseInt(prompt('How many groups to bulk create?', '16') ?? '', 10)
+                      if (Number.isFinite(n) && n > 0) bulkCreateGroups(section.id, n)
+                    }}
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                  >
+                    Bulk Create
                   </button>
                 </div>
                 {sectionTeams.length > 0 && (<div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -2373,7 +2513,7 @@ export function BingoDashAdmin() {
                                 className={`w-20 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-mono tracking-widest text-center bg-transparent ${
                                   team.password ? 'text-gray-800' : 'text-gray-300'
                                 }`}
-                                title={team.password ? 'Team password (set by team leader)' : 'Not set yet — first joiner becomes team leader'}
+                                title={team.password ? 'Team password (set by admin)' : 'Not set yet — set a 4-digit password for this group'}
                               />
                             </td>
                             <td className="px-4 py-3 min-w-[200px]">
@@ -2393,6 +2533,24 @@ export function BingoDashAdmin() {
                                             className="inline-flex items-center gap-1 bg-gray-100 rounded-full pl-2 pr-1 py-0.5 text-[11px] text-gray-700"
                                           >
                                             {m.name}
+                                            <span className={`text-[9px] font-black uppercase px-1 rounded-full ${
+                                              m.role === 'observer'
+                                                ? 'bg-blue-100 text-blue-600'
+                                                : 'bg-violet-100 text-violet-600'
+                                            }`}>
+                                              {m.role === 'observer' ? 'Observer' : 'Member'}
+                                            </span>
+                                            <select
+                                              value=""
+                                              onChange={e => { if (e.target.value) moveMember(m.id, e.target.value) }}
+                                              className="text-[9px] bg-transparent text-gray-400 hover:text-gray-600 cursor-pointer outline-none border-none"
+                                              title={`Move ${m.name} to another team`}
+                                            >
+                                              <option value="">Move…</option>
+                                              {sectionTeams.filter(t => t.id !== team.id).map(t => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                              ))}
+                                            </select>
                                             <button
                                               type="button"
                                               onClick={() => removeMember(m.id, m.name, team.name)}
