@@ -26,10 +26,22 @@ const MEMBER_ID_KEY = (sectionSlug: string) => `bingo-join-member-${sectionSlug}
 const MEMBER_DATA_KEY = (sectionSlug: string) => `bingo-join-member-data-${sectionSlug}`
 const TEAM_ID_KEY = (sectionSlug: string) => `bingo-join-team-${sectionSlug}`
 const TEAM_DATA_KEY = (sectionSlug: string) => `bingo-join-data-${sectionSlug}`
+const MEMBER_ROLE_KEY = (sectionSlug: string) => `bingo-join-role-${sectionSlug}`
+const DEVICE_NAME_KEY = 'bingo-device-name'
+
+function getOrCreateDeviceName(): string {
+  const stored = localStorage.getItem(DEVICE_NAME_KEY)
+  if (stored) return stored
+  const id = Math.random().toString(36).slice(2, 7).toUpperCase()
+  const name = `Player-${id}`
+  localStorage.setItem(DEVICE_NAME_KEY, name)
+  return name
+}
 
 // Shared with useBingoDashTeam so the task page recognizes the user without re-registering.
 const GLOBAL_TEAM_ID_KEY = 'bingo-dash-team-id'
 const GLOBAL_TEAM_DATA_KEY = 'bingo-dash-team-data'
+const GLOBAL_MEMBER_ROLE_KEY = 'bingo-dash-member-role'
 
 type TileStatus = 'locked' | 'scanned' | 'completed'
 
@@ -44,40 +56,32 @@ function JoinScreen({
   sectionName: string
   groups: BingoTeam[]
   memberCounts: Record<string, number>
-  onJoinGroup: (memberName: string, password: string, teamId: string) => Promise<void>
+  onJoinGroup: (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => Promise<void>
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [name, setName] = useState('')
+  const [step, setStep] = useState<1 | 2>(1)
   const [password, setPassword] = useState('')
   const [search, setSearch] = useState('')
   const [selectedTeam, setSelectedTeam] = useState<BingoTeam | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: name only — always advance to group picker so everyone picks from the same list
-  const handleNext = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    setError('')
-    setStep(2)
-  }
-
-  // Step 2: pick a group → advance to password step
+  // Step 1: pick a group → advance to password step
   const handlePickGroup = (team: BingoTeam) => {
     setSelectedTeam(team)
     setPassword('')
     setError('')
-    setStep(3)
+    setStep(2)
   }
 
-  // Step 3: submit password
+  // Step 2: submit password
   const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedTeam || password.length !== 4) return
     setSubmitting(true)
     setError('')
     try {
-      await onJoinGroup(name.trim(), password, selectedTeam.id)
+      const deviceName = getOrCreateDeviceName()
+      await onJoinGroup(deviceName, password, selectedTeam.id, 'member')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join group')
       setSubmitting(false)
@@ -87,8 +91,6 @@ function JoinScreen({
   const filteredGroups = groups.filter(g =>
     g.name.toLowerCase().includes(search.toLowerCase())
   )
-
-  const selectedIsLeaderSetup = !!selectedTeam && !selectedTeam.password
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4 py-8">
@@ -107,59 +109,7 @@ function JoinScreen({
           style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
         >
           <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
-          <p className="text-gray-400 text-center text-sm mb-6">Enter your name to begin</p>
-
-          <form onSubmit={handleNext} className="flex flex-col gap-3">
-            <input
-              type="text"
-              value={name}
-              onChange={e => { setName(e.target.value); setError('') }}
-              placeholder="Your name..."
-              className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-              style={{ borderColor: name ? '#a855f7' : '#e5e7eb' }}
-              autoFocus
-              maxLength={40}
-              disabled={submitting}
-            />
-
-            {error && (
-              <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <span>🚫</span>
-                <p className="text-red-600 font-bold text-sm">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={!name.trim() || submitting}
-              className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
-              style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
-            >
-              {submitting ? 'Checking...' : 'Next →'}
-            </button>
-          </form>
-
-          <p className="text-center text-xs text-gray-300 mt-5">
-            Use the same name to re-join your group.
-          </p>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div
-          className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
-          style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
-        >
-          <button
-            onClick={() => { setStep(1); setError('') }}
-            className="text-sm text-purple-500 font-bold mb-4 hover:text-purple-700 transition-colors"
-          >
-            &larr; Back
-          </button>
-          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Pick Your Group</h2>
-          <p className="text-gray-400 text-center text-sm mb-4">
-            Hi <span className="text-purple-500 font-bold">{name}</span>! Choose which group to join.
-          </p>
+          <p className="text-gray-400 text-center text-sm mb-5">Search and select your group</p>
 
           <input
             type="text"
@@ -171,7 +121,7 @@ function JoinScreen({
             autoFocus
           />
 
-          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
             {filteredGroups.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-6">
                 {search ? 'No groups match your search.' : 'No groups available yet.'}
@@ -180,14 +130,15 @@ function JoinScreen({
               filteredGroups.map(group => {
                 const count = memberCounts[group.id] ?? 0
                 const isFull = count >= MAX_TEAM_MEMBERS
-                const hasLeader = !!group.password
+                const notReady = !group.password
+                const disabled = isFull || notReady
                 return (
                   <button
                     key={group.id}
-                    onClick={() => !isFull && handlePickGroup(group)}
-                    disabled={isFull}
+                    onClick={() => !disabled && handlePickGroup(group)}
+                    disabled={disabled}
                     className={`w-full px-5 py-4 rounded-2xl border-2 text-left font-bold text-lg transition-all duration-150 ${
-                      isFull
+                      disabled
                         ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
                         : 'border-gray-200 text-gray-800 hover:border-purple-400 hover:bg-purple-50 active:scale-[0.98]'
                     }`}
@@ -198,11 +149,11 @@ function JoinScreen({
                         {count} / {MAX_TEAM_MEMBERS}
                       </span>
                     </div>
-                    {!hasLeader && !isFull && (
-                      <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Be the team leader · set password</span>
-                    )}
                     {isFull && (
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Full</span>
+                    )}
+                    {notReady && !isFull && (
+                      <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">Not set up yet</span>
                     )}
                   </button>
                 )
@@ -212,14 +163,14 @@ function JoinScreen({
         </div>
       )}
 
-      {step === 3 && selectedTeam && (
+      {step === 2 && selectedTeam && (
         <div
           className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
           style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
         >
           <button
             onClick={() => {
-              setStep(2)
+              setStep(1)
               setPassword('')
               setError('')
             }}
@@ -228,15 +179,13 @@ function JoinScreen({
             &larr; Back
           </button>
           <h2 className="text-2xl font-black text-gray-900 text-center mb-1">
-            {selectedIsLeaderSetup ? 'Set Team Password' : 'Enter Team Password'}
+            Enter Password
           </h2>
           <p className="text-gray-400 text-center text-sm mb-1">
             Group: <span className="text-purple-500 font-bold">{selectedTeam.name}</span>
           </p>
           <p className="text-gray-400 text-center text-xs mb-5">
-            {selectedIsLeaderSetup
-              ? "You're the team leader. Pick a 4-digit password — your teammates will use it to join."
-              : 'Ask your team leader for the 4-digit code.'}
+            Enter the 4-digit password given to your group.
           </p>
 
           <form onSubmit={handleSubmitPassword} className="flex flex-col gap-3">
@@ -270,9 +219,13 @@ function JoinScreen({
               className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
               style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
             >
-              {submitting ? 'Joining...' : selectedIsLeaderSetup ? 'Set & Join 🏴' : 'Join Group →'}
+              {submitting ? 'Joining...' : 'Join Group →'}
             </button>
           </form>
+
+          <p className="text-center text-xs text-gray-400 mt-5 flex items-center justify-center gap-1.5">
+            <span>📱</span> This device will be remembered for the game.
+          </p>
         </div>
       )}
     </div>
@@ -425,6 +378,7 @@ function BoardScreen({
   team,
   sectionName,
   sectionSlug: _sectionSlug,
+  memberRole,
   gridTasks,
   scans,
   settings,
@@ -433,6 +387,7 @@ function BoardScreen({
   team: { id: string; name: string }
   sectionName: string
   sectionSlug: string
+  memberRole: 'member' | 'observer'
   gridTasks: BingoTask[]
   scans: BingoScan[]
   settings: BingoSettings | null
@@ -519,6 +474,9 @@ function BoardScreen({
               <span className="text-green-400 text-xs font-bold">{completedCount}/{gridTasks.length} completed</span>
               {lettersEarned && (
                 <span className="text-purple-300 text-xs font-black tracking-widest">{lettersEarned}!</span>
+              )}
+              {memberRole === 'observer' && (
+                <span className="text-blue-300 text-[10px] font-black uppercase tracking-wider bg-blue-900/40 px-1.5 py-0.5 rounded">👁 Observer</span>
               )}
             </div>
           </div>
@@ -611,6 +569,36 @@ function BoardScreen({
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white" />Done</span>
         </div>
       )}
+
+      <div className="relative z-10 px-4 pb-8">
+        <div className="max-w-md mx-auto">
+          <div className="rounded-2xl overflow-hidden border border-red-800/40 bg-red-950/30">
+            <div className="px-4 py-3 flex items-center gap-2 border-b border-red-800/30">
+              <span className="text-base">🆘</span>
+              <span className="text-red-400 text-xs font-black uppercase tracking-widest">Emergency Contacts</span>
+            </div>
+            <div className="divide-y divide-red-900/30">
+              {[
+                { name: 'Bryan Ng', phone: '012-661 1043', role: 'Facilitator' },
+                { name: 'Susan Yap', phone: '012-370 3732', role: 'InStep' },
+                { name: 'Ariel Lai', phone: '016-939 1957', role: 'HSBC' },
+              ].map(c => (
+                <a
+                  key={c.phone}
+                  href={`tel:${c.phone.replace(/[-\s]/g, '')}`}
+                  className="flex items-center justify-between px-4 py-3 gap-3 hover:bg-red-900/20 transition-colors"
+                >
+                  <div>
+                    <div className="text-white text-sm font-bold leading-tight">{c.name}</div>
+                    <div className="text-red-400/70 text-[11px] font-semibold">{c.role}</div>
+                  </div>
+                  <div className="text-red-300 text-sm font-black tracking-wide">{c.phone}</div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -621,6 +609,7 @@ export function BingoDashJoin() {
   const { sectionSlug } = useParams<{ sectionSlug: string }>()
   const [section, setSection] = useState<BingoSection | null>(null)
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null)
+  const [memberRole, setMemberRole] = useState<'member' | 'observer'>('member')
   const [groups, setGroups] = useState<BingoTeam[]>([])
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
@@ -644,13 +633,16 @@ export function BingoDashJoin() {
         const cachedMemberId = localStorage.getItem(MEMBER_ID_KEY(sectionSlug))
         const cachedTeamId = localStorage.getItem(TEAM_ID_KEY(sectionSlug))
         const cachedTeamData = localStorage.getItem(TEAM_DATA_KEY(sectionSlug))
+        const cachedRole = (localStorage.getItem(MEMBER_ROLE_KEY(sectionSlug)) ?? 'member') as 'member' | 'observer'
         if (cachedMemberId && cachedTeamId && cachedTeamData) {
           try {
             const parsed = JSON.parse(cachedTeamData)
             setTeam(parsed)
+            setMemberRole(cachedRole)
             setPageState('board')
             localStorage.setItem(GLOBAL_TEAM_ID_KEY, cachedTeamId)
             localStorage.setItem(GLOBAL_TEAM_DATA_KEY, cachedTeamData)
+            localStorage.setItem(GLOBAL_MEMBER_ROLE_KEY, cachedRole)
             // Validate team still exists in background
             supabase.from('bingo_teams').select('*').eq('id', cachedTeamId).single().then(({ data: t }) => {
               if (t) {
@@ -679,11 +671,12 @@ export function BingoDashJoin() {
           .order('name')
           .then(({ data: g }) => { if (g) setGroups(g) })
 
-        // Load member counts per team (for the full/available indicator)
+        // Load member counts per team — only 'member' role counts toward the cap
         supabase
           .from('bingo_members')
           .select('team_id')
           .eq('section_id', data.id)
+          .eq('role', 'member')
           .then(({ data: m }) => {
             if (!m) return
             const counts: Record<string, number> = {}
@@ -738,7 +731,7 @@ export function BingoDashJoin() {
   }, [])
 
   // Join a group: create or find the member record, then enter the board
-  const joinGroup = async (memberName: string, password: string, teamId: string) => {
+  const joinGroup = async (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => {
     if (!section || !sectionSlug) throw new Error('Section not found')
     if (!/^\d{4}$/.test(password)) throw new Error('Password must be 4 digits.')
 
@@ -747,13 +740,10 @@ export function BingoDashJoin() {
       .from('bingo_teams').select('*').eq('id', teamId).single()
     if (teamErr || !teamData) throw new Error('Group not found')
 
-    // Team password: leader sets it the first time; everyone else verifies.
+    // Password must be set by admin in advance.
     let liveTeam: BingoTeam = teamData
     if (!teamData.password) {
-      const { data: updated, error: pErr } = await supabase
-        .from('bingo_teams').update({ password }).eq('id', teamId).select().single()
-      if (pErr || !updated) throw new Error('Could not set team password.')
-      liveTeam = updated
+      throw new Error('This group has not been set up yet. Ask your facilitator.')
     } else if (teamData.password !== password) {
       throw new Error('Wrong team password.')
     }
@@ -766,13 +756,14 @@ export function BingoDashJoin() {
       .ilike('name', memberName)
       .maybeSingle()
 
-    // Enforce 4-member cap (don't block a returning member on their own team)
+    // Enforce 4-member cap only for non-observer joiners (don't block a returning member on their own team)
     const isReturningSameTeam = existing?.team_id === teamId
-    if (!isReturningSameTeam) {
+    if (role === 'member' && !isReturningSameTeam) {
       const { count } = await supabase
         .from('bingo_members')
         .select('id', { count: 'exact', head: true })
         .eq('team_id', teamId)
+        .eq('role', 'member')
       if ((count ?? 0) >= MAX_TEAM_MEMBERS) {
         throw new Error(`This team is full (${MAX_TEAM_MEMBERS} / ${MAX_TEAM_MEMBERS}).`)
       }
@@ -780,14 +771,15 @@ export function BingoDashJoin() {
 
     let member: BingoMember
     if (existing) {
-      if (existing.team_id !== teamId || existing.password !== password) {
-        await supabase.from('bingo_members').update({ team_id: teamId, password }).eq('id', existing.id)
+      const needsUpdate = existing.team_id !== teamId || existing.password !== password || existing.role !== role
+      if (needsUpdate) {
+        await supabase.from('bingo_members').update({ team_id: teamId, password, role }).eq('id', existing.id)
       }
-      member = { ...existing, team_id: teamId, password }
+      member = { ...existing, team_id: teamId, password, role }
     } else {
       const { data: created, error } = await supabase
         .from('bingo_members')
-        .insert({ name: memberName, password, team_id: teamId, section_id: section.id })
+        .insert({ name: memberName, password, team_id: teamId, section_id: section.id, role })
         .select()
         .single()
       if (error) throw error
@@ -801,8 +793,13 @@ export function BingoDashJoin() {
     localStorage.setItem(TEAM_DATA_KEY(sectionSlug), liveTeamJson)
     localStorage.setItem(GLOBAL_TEAM_ID_KEY, liveTeam.id)
     localStorage.setItem(GLOBAL_TEAM_DATA_KEY, liveTeamJson)
+    localStorage.setItem(MEMBER_ROLE_KEY(sectionSlug), role)
+    localStorage.setItem(GLOBAL_MEMBER_ROLE_KEY, role)
+    setMemberRole(role)
     setGroups(prev => prev.map(g => g.id === liveTeam.id ? liveTeam : g))
-    setMemberCounts(prev => ({ ...prev, [liveTeam.id]: (prev[liveTeam.id] ?? 0) + (existing ? 0 : 1) }))
+    if (role === 'member') {
+      setMemberCounts(prev => ({ ...prev, [liveTeam.id]: (prev[liveTeam.id] ?? 0) + (existing ? 0 : 1) }))
+    }
     setTeam(liveTeam)
     setPageState('board')
   }
@@ -813,9 +810,11 @@ export function BingoDashJoin() {
       localStorage.removeItem(MEMBER_DATA_KEY(sectionSlug))
       localStorage.removeItem(TEAM_ID_KEY(sectionSlug))
       localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
+      localStorage.removeItem(MEMBER_ROLE_KEY(sectionSlug))
     }
     localStorage.removeItem(GLOBAL_TEAM_ID_KEY)
     localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
+    localStorage.removeItem(GLOBAL_MEMBER_ROLE_KEY)
     setTeam(null)
     setPageState('join')
   }
@@ -849,11 +848,38 @@ export function BingoDashJoin() {
   }
 
   if (pageState === 'board' && team && section) {
+    if (!settings?.game_started) {
+      return (
+        <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+          <ParticleBackground />
+          <div className="relative z-10 text-center animate-slide-up">
+            <div className="text-6xl mb-5">⏳</div>
+            <h1 className="text-4xl font-black text-white tracking-tight mb-2">Game Not Started Yet</h1>
+            <p className="text-purple-400 font-bold text-base mb-1">{section.name}</p>
+            <p className="text-gray-400 text-sm mb-8">
+              You're in <span className="text-white font-bold">{team.name}</span>. Hang tight — the game will begin soon!
+            </p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-600 text-xs mt-2">Waiting for facilitator to start the game...</p>
+            </div>
+            <button
+              onClick={leaveTeam}
+              className="mt-10 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              Switch Team
+            </button>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <BoardScreen
         team={team}
         sectionName={section.name}
         sectionSlug={sectionSlug!}
+        memberRole={memberRole}
         gridTasks={gridTasks}
         scans={scans}
         settings={settings}
