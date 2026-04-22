@@ -454,9 +454,31 @@ body.mobile .slide-logo svg{width:36px;}
 /* Mobile: click hint */
 body.mobile .click-hint{bottom:auto;top:12px;font-size:11px;}
 
-/* Hide QR and view toggle on mobile */
+/* Hide QR on mobile (view toggle stays visible so users can switch) */
 body.mobile .qr-btn{display:none;}
-body.mobile .view-toggle{display:none;}
+
+/* ── ROLE / LOCK UI ── */
+#lock-btn{background:rgba(219,0,17,.15);border:1px solid rgba(219,0,17,.45);color:#fca5a5;}
+#lock-btn.unlocked{background:rgba(0,196,140,.15);border-color:rgba(0,196,140,.5);color:#6ee7b7;}
+#lock-btn:hover{filter:brightness(1.2);}
+body.role-follower #lock-btn{display:none;}
+body.role-follower .qr-btn{display:none;}  /* followers don't need to share the QR */
+
+#follow-banner{
+  position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:5000;
+  display:none;align-items:center;gap:6px;padding:6px 14px;border-radius:50px;
+  background:rgba(219,0,17,.22);border:1px solid rgba(219,0,17,.55);color:#fecaca;
+  font-size:11px;font-weight:800;letter-spacing:1px;backdrop-filter:blur(10px);
+  pointer-events:none;white-space:nowrap;
+}
+#follow-banner.unlocked{background:rgba(0,196,140,.22);border-color:rgba(0,196,140,.55);color:#a7f3d0;}
+body.role-follower #follow-banner{display:flex;}
+
+/* Follower when locked: disable nav affordances */
+body.role-follower.is-locked .btn-prev,
+body.role-follower.is-locked .btn-next{opacity:.35;pointer-events:none;}
+body.role-follower.is-locked #top-nav .tab-btn{pointer-events:none;opacity:.55;}
+body.role-follower.is-locked #slide-area{cursor:default;}
 </style>
 </head>
 <body>
@@ -1108,6 +1130,7 @@ body.mobile .view-toggle{display:none;}
 </div>
 
 <div class="click-hint" id="click-hint">&#128161; CLICK ANYWHERE TO ADVANCE</div>
+<div id="follow-banner">&#128274; Mirroring presenter</div>
 <div id="save-toast" style="position:fixed;bottom:80px;right:20px;z-index:999;
   background:rgba(0,196,140,.9);color:#fff;padding:8px 18px;border-radius:50px;
   font-size:12px;font-weight:800;letter-spacing:1px;pointer-events:none;
@@ -1120,6 +1143,7 @@ body.mobile .view-toggle{display:none;}
     <a href="/" class="btn btn-prev" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;">&#127968; Hub</a>
     <button class="btn btn-prev" onclick="prevStep()">&#8592; Prev</button>
     <button class="btn btn-next" onclick="nextStep()">Next &#8594;</button>
+    <button class="qr-btn" id="lock-btn" onclick="toggleLock()" title="Lock/unlock participant navigation">&#128274; Locked</button>
     <button class="qr-btn" onclick="toggleQR()" title="Share mobile link">&#128241; QR</button>
     <div class="view-toggle" id="view-toggle">
       <button class="vt-btn active" data-view="desktop" onclick="setView('desktop')">&#128187; Desktop</button>
@@ -1154,6 +1178,49 @@ slides.forEach(s=>s.insertAdjacentHTML('afterbegin',LOGO_SVG));
 const total=slides.length;
 let cur=0,step=0;
 let hintGone=false;
+
+// ── ROLE & LOCK ──
+// Participants scan the QR which carries ?mobile=1 → follower role.
+// The presenter opens the bare URL → admin role and drives the sync.
+const IS_FOLLOWER = new URLSearchParams(window.location.search).get('mobile')==='1';
+const IS_ADMIN = !IS_FOLLOWER;
+let locked = true; // synced via Supabase; default locked so late joiners mirror
+document.body.classList.add(IS_ADMIN?'role-admin':'role-follower');
+document.body.classList.add('is-locked');
+
+function canNavigate(){ return IS_ADMIN || !locked; }
+
+function updateLockUI(){
+  document.body.classList.toggle('is-locked', locked);
+  const btn=document.getElementById('lock-btn');
+  if(btn){
+    btn.innerHTML = locked ? '&#128274; Locked' : '&#128275; Unlocked';
+    btn.classList.toggle('unlocked', !locked);
+    btn.title = locked ? 'Participants mirror you — click to let them free-scroll' : 'Participants scroll on their own — click to lock them back to you';
+  }
+  const banner=document.getElementById('follow-banner');
+  if(banner){
+    banner.innerHTML = locked ? '&#128274; Mirroring presenter' : '&#128275; Free scroll &mdash; scroll on your own';
+    banner.classList.toggle('unlocked', !locked);
+  }
+}
+
+function toggleLock(){
+  if(!IS_ADMIN) return;
+  locked = !locked;
+  updateLockUI();
+  if(window.__briefingLockSync) window.__briefingLockSync.push(locked);
+}
+
+// Called by the Supabase script when remote lock changes
+window.__briefingSetLock = (val) => {
+  const newLocked = (val==='1' || val===1 || val===true);
+  if(newLocked===locked){ updateLockUI(); return; }
+  locked = newLocked;
+  updateLockUI();
+  // When lock re-engages, followers snap back to presenter's current slide
+  if(IS_FOLLOWER && locked && window.__briefingPullPos) window.__briefingPullPos();
+};
 
 function hideHint(){if(!hintGone){hintGone=true;const h=document.getElementById('click-hint');if(h)h.style.opacity='0';}}
 
@@ -1308,6 +1375,7 @@ function updateUI(idx,st){
 }
 
 function nextStep(){
+  if(!canNavigate()) return;
   hideHint();
   const max=getMax(cur);
   if(step<max){step++;showSlide(cur,step);}
@@ -1315,22 +1383,27 @@ function nextStep(){
   pushSync();
 }
 function prevStep(){
+  if(!canNavigate()) return;
   hideHint();
   if(step>0){step--;showSlide(cur,step);}
   else if(cur>0){cur--;step=getMax(cur);showSlide(cur,step);}
   pushSync();
 }
 function jumpToSection(s){
+  if(!canNavigate()) return;
   hideHint();
   for(let i=0;i<slides.length;i++){if(parseInt(slides[i].dataset.section)===s){cur=i;step=0;showSlide(cur,0);pushSync();return;}}
 }
 
 // ── REALTIME SYNC HOOKS ──
-// Push helper — no-op until module script installs window.__briefingSync
-function pushSync(){ if(window.__briefingSync) window.__briefingSync.push(cur,step); }
+// Only the admin pushes position; followers never write.
+function pushSync(){ if(IS_ADMIN && window.__briefingSync) window.__briefingSync.push(cur,step); }
 // Exposed to module script so it can pull remote state and apply it locally
 window.__briefingGetState = () => ({ cur, step });
 window.__briefingApplyRemote = (c, s) => {
+  // Admin is the source of truth; followers only mirror while locked.
+  if(IS_ADMIN) return;
+  if(!locked) return;
   if(c===cur && s===step) return;
   cur=c; step=s;
   showSlide(cur,step);
@@ -1424,8 +1497,12 @@ function removeContact(btn){
 }
 
 // ── MOBILE DETECTION & VIEW TOGGLE ──
+// Public URL used when viewing locally so QR codes work across networks.
+const PUBLIC_BRIEFING_URL='https://flag-retrieval.vercel.app/briefing.html';
 function getMobileUrl(){
-  const u=new URL(window.location.href);
+  const host=window.location.hostname;
+  const isLocal=host==='localhost'||host==='127.0.0.1'||host===''||host.endsWith('.local');
+  const u=isLocal?new URL(PUBLIC_BRIEFING_URL):new URL(window.location.href);
   u.searchParams.set('mobile','1');
   return u.toString();
 }
@@ -1513,7 +1590,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL  = 'https://hqzvootetvvxcqzdhbjd.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxenZvb3RldHZ2eGNxemRoYmpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMDEzNTksImV4cCI6MjA5MTU3NzM1OX0.L6rTy3TAyGZOIcbmBdk2jbLPo9UHmzKHoYkuXxvPFbw';
-const SYNC_KEY = 'briefing-leader-pos';
+const POS_KEY = 'briefing-leader-pos';
+const LOCK_KEY = 'briefing-leader-locked';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -1539,18 +1617,36 @@ window.__briefingSync = {
     lastVal = v;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(async () => {
-      try { await sb.from('settings').upsert({ key: SYNC_KEY, value: v }); }
+      try { await sb.from('settings').upsert({ key: POS_KEY, value: v }); }
       catch(e){ console.warn('[briefing sync] push failed', e); }
     }, 80);
   }
 };
 
-// Initial pull — apply remote if it exists, else seed from current local state
+window.__briefingLockSync = {
+  async push(locked){
+    try { await sb.from('settings').upsert({ key: LOCK_KEY, value: locked ? '1' : '0' }); }
+    catch(e){ console.warn('[briefing lock] push failed', e); }
+  }
+};
+
+// Used by the main script to snap followers back to the presenter when re-locked
+window.__briefingPullPos = async () => {
+  try {
+    const { data } = await sb.from('settings').select('value').eq('key', POS_KEY).maybeSingle();
+    if(data && data.value) applyRemote(data.value);
+  } catch(e){ console.warn('[briefing sync] pull failed', e); }
+};
+
+// Initial pull — lock state first, then position
 (async () => {
   try {
-    const { data } = await sb.from('settings').select('value').eq('key', SYNC_KEY).maybeSingle();
-    if(data && data.value){
-      applyRemote(data.value);
+    const { data: rows } = await sb.from('settings').select('key,value').in('key', [POS_KEY, LOCK_KEY]);
+    const lockRow = rows && rows.find(r => r.key === LOCK_KEY);
+    const posRow  = rows && rows.find(r => r.key === POS_KEY);
+    if(lockRow && window.__briefingSetLock) window.__briefingSetLock(lockRow.value);
+    if(posRow && posRow.value){
+      applyRemote(posRow.value);
     } else if(window.__briefingGetState){
       const { cur, step } = window.__briefingGetState();
       window.__briefingSync.push(cur, step);
@@ -1558,11 +1654,18 @@ window.__briefingSync = {
   } catch(e){ console.warn('[briefing sync] initial pull failed', e); }
 })();
 
-// Subscribe to remote changes
-sb.channel('briefing-leader-sync')
+// Subscribe to position + lock changes
+sb.channel('briefing-leader-pos-ch')
   .on('postgres_changes',
-    { event: '*', schema: 'public', table: 'settings', filter: `key=eq.${SYNC_KEY}` },
+    { event: '*', schema: 'public', table: 'settings', filter: `key=eq.${POS_KEY}` },
     (payload) => { applyRemote(payload.new && payload.new.value); }
+  )
+  .subscribe();
+
+sb.channel('briefing-leader-lock-ch')
+  .on('postgres_changes',
+    { event: '*', schema: 'public', table: 'settings', filter: `key=eq.${LOCK_KEY}` },
+    (payload) => { if(window.__briefingSetLock) window.__briefingSetLock(payload.new && payload.new.value); }
   )
   .subscribe();
 </script>
