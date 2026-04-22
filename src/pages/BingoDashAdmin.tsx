@@ -2488,23 +2488,21 @@ export function BingoDashAdmin() {
                     Bulk Create
                   </button>
                 </div>
-                {sectionTeams.length > 0 && (<div className="bg-gray-900 rounded-xl border border-white/10 overflow-x-auto">
+                {sectionTeams.length > 0 && (<div className="rounded-xl border border-white/10 overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Photo</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs min-w-[180px]">Group</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs min-w-[110px]">Password</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Members</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Compartment</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Progress</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Bingos</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs" title="Bonus points from other games — added to total for award ranking">Bonus</th>
-                        <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Grid</th>
-                        <th className="text-right px-4 py-3 font-bold text-gray-500 uppercase tracking-wide text-xs">Actions</th>
+                      <tr className="border-b border-white/10 bg-white/5">
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-14">Photo</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px]">Group</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-20">PWD</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-28">Members</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px]">Board</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-36">Progress</th>
+                        <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-16" title="Bonus points from other games">Bonus</th>
+                        <th className="text-right px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-28">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-white/5">
                       {sectionTeams.map(team => {
                         const teamScans = scans.filter(s => s.team_id === team.id)
                         const sectionGridTasks = sectionTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
@@ -2517,19 +2515,22 @@ export function BingoDashAdmin() {
                         const pct = sectionGridTasks.length > 0 ? Math.round((completedCount / sectionGridTasks.length) * 100) : 0
                         const teamSlots = buildBingoSlots(sectionGridTasks)
                         const teamBingoLines = completedBingoLines(teamSlots, completedIds).length
+                        const teamMembers = members.filter(m => m.team_id === team.id)
+                        const isFull = teamMembers.length >= 4
                         return (
-                          <tr key={team.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3">
+                          <tr key={team.id} className="hover:bg-white/5 transition-colors group">
+                            {/* Photo */}
+                            <td className="px-3 py-2.5">
                               <div className="relative group/photo">
                                 <label
-                                  className={`block w-12 h-12 rounded-full overflow-hidden border-2 ${team.photo_url ? 'border-violet-200' : 'border-dashed border-gray-300'} bg-gray-50 cursor-pointer hover:border-violet-400 transition-colors ${uploadingTeamPhoto === team.id ? 'opacity-60' : ''}`}
+                                  className={`block w-9 h-9 rounded-full overflow-hidden border-2 ${team.photo_url ? 'border-violet-500/60' : 'border-dashed border-white/20'} bg-white/5 cursor-pointer hover:border-violet-400 transition-colors ${uploadingTeamPhoto === team.id ? 'opacity-60' : ''}`}
                                   title={team.photo_url ? 'Click to replace photo' : 'Click to upload photo'}
                                 >
                                   {team.photo_url ? (
                                     <img src={team.photo_url} alt={`${team.name} photo`} className="w-full h-full object-cover" />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-xl">
-                                      {uploadingTeamPhoto === team.id ? '\u2026' : '+'}
+                                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-base">
+                                      {uploadingTeamPhoto === team.id ? '…' : '+'}
                                     </div>
                                   )}
                                   <input
@@ -2548,7 +2549,7 @@ export function BingoDashAdmin() {
                                   <button
                                     type="button"
                                     onClick={() => removeTeamPhoto(team.id)}
-                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity shadow"
+                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity shadow"
                                     title="Remove photo"
                                   >
                                     &times;
@@ -2556,7 +2557,8 @@ export function BingoDashAdmin() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-3">
+                            {/* Group name */}
+                            <td className="px-3 py-2.5">
                               <input
                                 type="text"
                                 defaultValue={team.name}
@@ -2567,10 +2569,11 @@ export function BingoDashAdmin() {
                                   else e.target.value = team.name
                                 }}
                                 onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                className="w-full px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-medium text-gray-800 bg-transparent"
+                                className="w-full px-2 py-1 rounded border border-transparent hover:border-white/20 focus:border-violet-500 focus:outline-none font-medium text-white bg-transparent text-sm"
                               />
                             </td>
-                            <td className="px-4 py-3">
+                            {/* Password */}
+                            <td className="px-3 py-2.5">
                               <input
                                 type="text"
                                 inputMode="numeric"
@@ -2585,90 +2588,78 @@ export function BingoDashAdmin() {
                                   e.target.value = v
                                 }}
                                 onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                className={`w-20 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-mono tracking-widest text-center bg-transparent ${
-                                  team.password ? 'text-gray-800' : 'text-gray-300'
+                                className={`w-16 px-2 py-1 rounded border border-transparent hover:border-white/20 focus:border-violet-500 focus:outline-none font-mono tracking-widest text-center bg-transparent text-sm ${
+                                  team.password ? 'text-gray-300' : 'text-gray-600'
                                 }`}
-                                title={team.password ? 'Team password (set by admin)' : 'Not set yet — set a 4-digit password for this group'}
+                                title={team.password ? 'Team password' : 'Not set — enter a 4-digit password'}
                               />
                             </td>
-                            <td className="px-4 py-3 min-w-[200px]">
-                              {(() => {
-                                const teamMembers = members.filter(m => m.team_id === team.id)
-                                const isFull = teamMembers.length >= 4
-                                return (
-                                  <div>
-                                    <span className={`text-sm font-bold ${isFull ? 'text-red-500' : 'text-gray-700'}`}>
-                                      {teamMembers.length} / 4
-                                    </span>
-                                    {teamMembers.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {teamMembers.map(m => (
-                                          <span
-                                            key={m.id}
-                                            className="inline-flex items-center gap-1 bg-gray-100 rounded-full pl-2 pr-1 py-0.5 text-[11px] text-gray-700"
-                                          >
-                                            {m.name}
-                                            <span className={`text-[9px] font-black uppercase px-1 rounded-full ${
-                                              m.role === 'observer'
-                                                ? 'bg-blue-100 text-blue-600'
-                                                : 'bg-violet-100 text-violet-600'
-                                            }`}>
-                                              {m.role === 'observer' ? 'Observer' : 'Member'}
-                                            </span>
-                                            <select
-                                              value=""
-                                              onChange={e => { if (e.target.value) moveMember(m.id, e.target.value) }}
-                                              className="text-[9px] bg-transparent text-gray-400 hover:text-gray-600 cursor-pointer outline-none border-none"
-                                              title={`Move ${m.name} to another team`}
-                                            >
-                                              <option value="">Move…</option>
-                                              {sectionTeams.filter(t => t.id !== team.id).map(t => (
-                                                <option key={t.id} value={t.id}>{t.name}</option>
-                                              ))}
-                                            </select>
-                                            <button
-                                              type="button"
-                                              onClick={() => removeMember(m.id, m.name, team.name)}
-                                              className="w-4 h-4 rounded-full bg-gray-300 hover:bg-red-500 hover:text-white text-gray-600 text-[10px] font-bold leading-none flex items-center justify-center transition-colors"
-                                              title={`Remove ${m.name}`}
-                                            >
-                                              &times;
-                                            </button>
-                                          </span>
-                                        ))}
+                            {/* Members */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`text-sm font-bold ${isFull ? 'text-red-400' : 'text-gray-300'}`}>
+                                  {teamMembers.length} / 4
+                                </span>
+                                {teamMembers.length > 0 && (
+                                  <div className="flex flex-col gap-0.5">
+                                    {teamMembers.map(m => (
+                                      <div key={m.id} className="flex items-center gap-1 group/m">
+                                        <span className="text-[11px] text-gray-400 truncate max-w-[72px]">{m.name}</span>
+                                        <select
+                                          value=""
+                                          onChange={e => { if (e.target.value) moveMember(m.id, e.target.value) }}
+                                          className="text-[9px] bg-transparent text-gray-600 hover:text-gray-400 cursor-pointer outline-none border-none opacity-0 group-hover/m:opacity-100 transition-opacity"
+                                          title={`Move ${m.name}`}
+                                        >
+                                          <option value="">Move…</option>
+                                          {sectionTeams.filter(t => t.id !== team.id).map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeMember(m.id, m.name, team.name)}
+                                          className="w-3.5 h-3.5 rounded-full bg-white/10 hover:bg-red-500 hover:text-white text-gray-500 text-[9px] font-bold leading-none flex items-center justify-center transition-colors opacity-0 group-hover/m:opacity-100"
+                                          title={`Remove ${m.name}`}
+                                        >
+                                          &times;
+                                        </button>
                                       </div>
-                                    )}
+                                    ))}
                                   </div>
-                                )
-                              })()}
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-3">
+                            {/* Board/Compartment */}
+                            <td className="px-3 py-2.5">
                               <select
                                 value={team.section_id}
                                 onChange={e => moveTeamToSection(team.id, e.target.value)}
-                                className="px-2 py-1 rounded border border-gray-200 text-xs bg-white"
+                                className="px-2 py-1 rounded border border-white/15 text-xs bg-gray-800 text-gray-300 focus:outline-none focus:border-violet-500"
                               >
                                 {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                               </select>
                             </td>
-                            <td className="px-4 py-3 min-w-[140px]">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            {/* Progress + Bingos */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                                   <div className="h-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
                                 </div>
-                                <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                                <span className="text-[11px] text-gray-500 font-mono whitespace-nowrap">
                                   {completedCount}/{sectionGridTasks.length}
                                 </span>
                               </div>
-                              {pointsEarned > 0 && (
-                                <p className="text-[10px] text-gray-400 font-bold mt-0.5">{pointsEarned} pts</p>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-black text-amber-500">{teamBingoLines}</span>
+                                <span className="text-[11px] text-gray-600">bingos</span>
+                                {pointsEarned > 0 && (
+                                  <span className="text-[11px] text-gray-600 font-bold">{pointsEarned}pts</span>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="text-sm font-black text-amber-600">{teamBingoLines}</span>
-                              <span className="text-xs text-gray-400 ml-1">/ 12</span>
-                            </td>
-                            <td className="px-4 py-3">
+                            {/* Bonus */}
+                            <td className="px-3 py-2.5">
                               <input
                                 type="number"
                                 step="1"
@@ -2682,28 +2673,28 @@ export function BingoDashAdmin() {
                                   e.target.value = String(v)
                                 }}
                                 onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                className="w-20 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none font-mono text-center text-gray-800 bg-transparent"
-                                title="Extra points from other games — factored into award ranking"
+                                className="w-14 px-2 py-1 rounded border border-transparent hover:border-white/20 focus:border-violet-500 focus:outline-none font-mono text-center text-gray-300 bg-transparent text-sm"
+                                title="Extra points from other games"
                               />
                             </td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => setViewingTeam(team)}
-                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-violet-700 border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors"
-                              >
-                                View Grid
-                              </button>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <button onClick={() => deleteTeam(team.id, team.name)}
-                                className="text-xs text-gray-400 hover:text-red-500 transition-colors">Delete</button>
+                            {/* Actions */}
+                            <td className="px-3 py-2.5 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setViewingTeam(team)}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-violet-400 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 transition-colors whitespace-nowrap"
+                                >
+                                  Grid
+                                </button>
+                                <button onClick={() => deleteTeam(team.id, team.name)}
+                                  className="text-[11px] text-gray-600 hover:text-red-400 transition-colors">Del</button>
+                              </div>
                             </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                  <p className="text-xs text-gray-300 px-4 py-2">Tap <span className="font-bold text-violet-500">View Grid</span> to see a group's 5×5 board.</p>
                 </div>)}
               </div>
             )
