@@ -41,48 +41,25 @@ export function useBingoDashTeam() {
   }, [])
 
   /**
-   * Register with team name + password.
-   * Looks up an existing team by name + password (case-insensitive name match).
-   * Creates a new team if none found.
+   * Join an existing team (created by admin) by teamId + password.
+   * Admin creates teams in advance; participants pick from the list and enter the password.
    */
-  const registerTeam = async (teamName: string, password: string): Promise<BingoTeam> => {
-    const trimmedName = teamName.trim()
-    const trimmedPwd  = password.trim()
-    if (!trimmedName) throw new Error('Team name cannot be empty')
+  const joinTeamById = async (teamId: string, password: string): Promise<BingoTeam> => {
+    const trimmedPwd = password.trim()
 
-    // Resolve the section this registration belongs to from global settings.
-    const { data: settings } = await supabase
-      .from('bingo_settings').select('active_section_id').eq('id', 'main').single()
-    const sectionId = settings?.active_section_id
-    if (!sectionId) throw new Error('No active section — ask the admin to pick one.')
-
-    // Try to find existing team by name within the active section.
-    const { data: existing } = await supabase
+    const { data: found, error } = await supabase
       .from('bingo_teams')
       .select('*')
-      .eq('section_id', sectionId)
-      .ilike('name', trimmedName)
-      .maybeSingle()
+      .eq('id', teamId)
+      .single()
+    if (error || !found) throw new Error('Group not found.')
+    if (!found.password) throw new Error('This group has not been set up yet. Ask your facilitator.')
+    if (found.password !== trimmedPwd) throw new Error('Wrong password for this group.')
 
-    let result: BingoTeam
-    if (existing) {
-      // Team exists — verify password
-      if (existing.password !== trimmedPwd) throw new Error('Wrong password for this team name.')
-      result = existing
-    } else {
-      const { data: created, error } = await supabase
-        .from('bingo_teams')
-        .insert({ name: trimmedName, password: trimmedPwd, section_id: sectionId })
-        .select()
-        .single()
-      if (error) throw error
-      result = created
-    }
-
-    localStorage.setItem(TEAM_ID_KEY, result.id)
-    localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(result))
-    setTeam(result)
-    return result
+    localStorage.setItem(TEAM_ID_KEY, found.id)
+    localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(found))
+    setTeam(found)
+    return found
   }
 
   const leaveTeam = () => {
@@ -95,7 +72,7 @@ export function useBingoDashTeam() {
     team,
     loading,
     isRegistered: !!team,
-    registerTeam,
+    joinTeamById,
     leaveTeam,
   }
 }

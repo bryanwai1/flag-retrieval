@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { ParticleBackground } from '../components/ParticleBackground'
-import type { BingoTask, BingoScan, BingoSettings } from '../types/database'
+import type { BingoTask, BingoScan, BingoSettings, BingoTeam } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
@@ -35,29 +35,57 @@ const BINGO_LINES = [
 
 const BINGO_WORD = 'BINGO'
 
-// ── Join Screen ───────────────────────────────────────────────────────────────
+// ── Join Screen (search group → password) ─────────────────────────────────────
 
-function JoinScreen({ onRegister }: { onRegister: (name: string, password: string) => Promise<void> }) {
-  const [name, setName] = useState('')
+function JoinScreen({ onJoin }: { onJoin: (teamId: string, password: string) => Promise<void> }) {
+  const [step, setStep] = useState<1 | 2>(1)
+  const [groups, setGroups] = useState<BingoTeam[]>([])
+  const [groupsLoading, setGroupsLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selectedTeam, setSelectedTeam] = useState<BingoTeam | null>(null)
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    (async () => {
+      const { data: settings } = await supabase
+        .from('bingo_settings').select('active_section_id').eq('id', 'main').single()
+      const sectionId = settings?.active_section_id
+      if (!sectionId) { setGroupsLoading(false); return }
+      const { data: teams } = await supabase
+        .from('bingo_teams').select('*').eq('section_id', sectionId).order('name')
+      if (teams) setGroups(teams)
+      setGroupsLoading(false)
+    })()
+  }, [])
+
+  const handlePickGroup = (team: BingoTeam) => {
+    setSelectedTeam(team)
+    setPassword('')
+    setError('')
+    setStep(2)
+  }
+
+  const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!selectedTeam || password.length !== 4) return
     setSubmitting(true)
     setError('')
     try {
-      await onRegister(name.trim(), password.trim())
+      await onJoin(selectedTeam.id, password)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join')
+      setError(err instanceof Error ? err.message : 'Failed to join group')
       setSubmitting(false)
     }
   }
 
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4 py-8">
       <ParticleBackground />
 
       <div className="relative z-10 text-center mb-10 animate-slide-up">
@@ -66,58 +94,118 @@ function JoinScreen({ onRegister }: { onRegister: (name: string, password: strin
         <p className="text-gray-400 mt-3 text-lg">Complete challenges · Scan tiles · Win</p>
       </div>
 
-      <div
-        className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
-        style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
-      >
-        <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
-        <p className="text-gray-400 text-center text-sm mb-6">Enter your team name and password</p>
+      {step === 1 && (
+        <div
+          className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
+          style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
+        >
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
+          <p className="text-gray-400 text-center text-sm mb-5">Search and select your group</p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
             type="text"
-            value={name}
-            onChange={e => { setName(e.target.value); setError('') }}
-            placeholder="Team name..."
-            className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-            style={{ borderColor: name ? '#a855f7' : '#e5e7eb' }}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search groups..."
+            className="w-full px-4 py-3 rounded-2xl border-2 text-base font-medium focus:outline-none transition-colors text-center mb-3"
+            style={{ borderColor: search ? '#a855f7' : '#e5e7eb' }}
             autoFocus
-            maxLength={40}
-            disabled={submitting}
           />
 
-          <input
-            type="password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError('') }}
-            placeholder="Password..."
-            className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-            style={{ borderColor: password ? '#a855f7' : '#e5e7eb' }}
-            maxLength={40}
-            disabled={submitting}
-          />
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+            {groupsLoading ? (
+              <p className="text-gray-400 text-sm text-center py-6">Loading groups...</p>
+            ) : filteredGroups.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-6">
+                {search ? 'No groups match your search.' : 'No groups available yet. Ask your facilitator.'}
+              </p>
+            ) : (
+              filteredGroups.map(group => {
+                const notReady = !group.password
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => !notReady && handlePickGroup(group)}
+                    disabled={notReady}
+                    className={`w-full px-5 py-4 rounded-2xl border-2 text-left font-bold text-lg transition-all duration-150 ${
+                      notReady
+                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-200 text-gray-800 hover:border-purple-400 hover:bg-purple-50 active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{group.name}</span>
+                    </div>
+                    {notReady && (
+                      <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">Not set up yet</span>
+                    )}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
 
-          {error && (
-            <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-              <span>🚫</span>
-              <p className="text-red-600 font-bold text-sm">{error}</p>
-            </div>
-          )}
-
+      {step === 2 && selectedTeam && (
+        <div
+          className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
+          style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
+        >
           <button
-            type="submit"
-            disabled={!name.trim() || submitting}
-            className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
-            style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+            onClick={() => { setStep(1); setPassword(''); setError('') }}
+            className="text-sm text-purple-500 font-bold mb-4 hover:text-purple-700 transition-colors"
           >
-            {submitting ? 'Joining...' : 'Join Game →'}
+            &larr; Back
           </button>
-        </form>
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Enter Password</h2>
+          <p className="text-gray-400 text-center text-sm mb-1">
+            Group: <span className="text-purple-500 font-bold">{selectedTeam.name}</span>
+          </p>
+          <p className="text-gray-400 text-center text-xs mb-5">
+            Enter the 4-digit password given to your group.
+          </p>
 
-        <p className="text-center text-xs text-gray-300 mt-5">
-          Use the same name + password to re-join your team.
-        </p>
-      </div>
+          <form onSubmit={handleSubmitPassword} className="flex flex-col gap-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={password}
+              onChange={e => {
+                setPassword(e.target.value.replace(/\D/g, '').slice(0, 4))
+                setError('')
+              }}
+              placeholder="• • • •"
+              className="w-full px-5 py-4 rounded-2xl border-2 text-4xl font-black focus:outline-none transition-colors text-center tracking-[0.6em]"
+              style={{ borderColor: password.length === 4 ? '#a855f7' : '#e5e7eb' }}
+              autoFocus
+              maxLength={4}
+              disabled={submitting}
+            />
+
+            {error && (
+              <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <span>🚫</span>
+                <p className="text-red-600 font-bold text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={password.length !== 4 || submitting}
+              className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
+              style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+            >
+              {submitting ? 'Joining...' : 'Join Group →'}
+            </button>
+          </form>
+
+          <p className="text-center text-xs text-gray-400 mt-5 flex items-center justify-center gap-1.5">
+            <span>📱</span> This device will be remembered for the game.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -519,7 +607,7 @@ function BoardScreen({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export function BingoDashHome() {
-  const { team, loading: teamLoading, isRegistered, registerTeam, leaveTeam } = useBingoDashTeam()
+  const { team, loading: teamLoading, isRegistered, joinTeamById, leaveTeam } = useBingoDashTeam()
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [settings, setSettings] = useState<BingoSettings | null>(null)
@@ -595,7 +683,7 @@ export function BingoDashHome() {
   }
 
   if (!isRegistered) {
-    return <JoinScreen onRegister={async (name, pwd) => { await registerTeam(name, pwd) }} />
+    return <JoinScreen onJoin={async (teamId, pwd) => { await joinTeamById(teamId, pwd) }} />
   }
 
   return (

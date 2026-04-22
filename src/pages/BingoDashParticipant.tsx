@@ -5,7 +5,6 @@ import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useBingoScans } from '../hooks/useBingoScans'
-import { BingoDashRegistration } from '../components/BingoDashRegistration'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { ParticleBackground } from '../components/ParticleBackground'
@@ -20,7 +19,7 @@ export function BingoDashParticipant() {
   const snakeTileParam = searchParams.get('tile')
   const snakeTile = snakeTileParam ? parseInt(snakeTileParam, 10) : null
   const backPath = isSnakeLadder ? '/snake-ladder' : '/bingo-dash'
-  const { team, loading: teamLoading, isRegistered, registerTeam, leaveTeam } = useBingoDashTeam()
+  const { team, loading: teamLoading, isRegistered, leaveTeam } = useBingoDashTeam()
   const isObserver = !isSnakeLadder && localStorage.getItem('bingo-dash-member-role') === 'observer'
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
   const { photos, loading: photosLoading } = useBingoTaskPhotos(taskId)
@@ -188,13 +187,26 @@ export function BingoDashParticipant() {
   }
 
   // ── Registration (Bingo Dash only — Snake & Ladder picks a team on completion) ─
+  // Admin creates teams in advance; participants must join from /bingo-dash (search + password).
   if (!isSnakeLadder && !isRegistered) {
     return (
-      <BingoDashRegistration
-        onRegister={(name, pwd) => registerTeam(name, pwd)}
-        hexCode={task.hex_code}
-        taskTitle={task.title}
-      />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-center px-6">
+        <ParticleBackground />
+        <div className="relative z-10 max-w-sm">
+          <div className="text-5xl mb-4">🎯</div>
+          <h2 className="text-white text-2xl font-black mb-2">Join your group first</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            You need to pick your group before you can complete this task.
+          </p>
+          <button
+            onClick={() => navigate('/bingo-dash')}
+            className="px-6 py-3 rounded-2xl text-white font-black text-base"
+            style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+          >
+            Go to Join Page →
+          </button>
+        </div>
+      </div>
     )
   }
 
