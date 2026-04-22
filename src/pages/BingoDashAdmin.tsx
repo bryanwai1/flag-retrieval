@@ -1966,7 +1966,7 @@ export function BingoDashAdmin() {
                               <span className="text-xs text-gray-400">pts for all:</span>
                               <input type="number" min={0} defaultValue={group.tasks[0]?.points ?? 0}
                                 key={section.id + group.key + '-pts'}
-                                className="w-14 px-1.5 py-0.5 text-xs border border-gray-200 rounded text-center font-bold focus:outline-none focus:ring-1 focus:ring-violet-400"
+                                className="w-14 px-1.5 py-0.5 text-xs border border-white/20 bg-gray-800 text-white rounded text-center font-bold focus:outline-none focus:ring-1 focus:ring-violet-500"
                                 onBlur={e => setBulkCategoryPoints(group.key, Math.max(0, parseInt(e.target.value) || 0))}
                                 onKeyDown={e => { if (e.key === 'Enter') setBulkCategoryPoints(group.key, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0)) }}
                                 title={`Set points for all ${group.label} tasks`} />
