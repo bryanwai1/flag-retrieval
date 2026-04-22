@@ -69,6 +69,7 @@ export interface BingoSection {
   name: string
   slug: string
   sort_order: number
+  game_started: boolean
   created_at: string
 }
 

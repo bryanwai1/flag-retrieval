@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import type { BingoTask, BingoScan, BingoSection, BingoSettings, BingoTeam, BingoMember } from '../types/database'
@@ -52,11 +52,13 @@ function JoinScreen({
   groups,
   memberCounts,
   onJoinGroup,
+  isObserver = false,
 }: {
   sectionName: string
   groups: BingoTeam[]
   memberCounts: Record<string, number>
   onJoinGroup: (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => Promise<void>
+  isObserver?: boolean
 }) {
   const [step, setStep] = useState<1 | 2>(1)
   const [password, setPassword] = useState('')
@@ -65,15 +67,28 @@ function JoinScreen({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: pick a group → advance to password step
-  const handlePickGroup = (team: BingoTeam) => {
+  // Step 1: pick a group
+  const handlePickGroup = async (team: BingoTeam) => {
+    if (isObserver) {
+      // Observers skip the password step and join directly
+      setSubmitting(true)
+      setError('')
+      try {
+        const deviceName = getOrCreateDeviceName()
+        await onJoinGroup(deviceName, '', team.id, 'observer')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to join group')
+        setSubmitting(false)
+      }
+      return
+    }
     setSelectedTeam(team)
     setPassword('')
     setError('')
     setStep(2)
   }
 
-  // Step 2: submit password
+  // Step 2: submit password (members only)
   const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedTeam || password.length !== 4) return
@@ -97,10 +112,13 @@ function JoinScreen({
       <ParticleBackground />
 
       <div className="relative z-10 text-center mb-10 animate-slide-up">
-        <div className="text-6xl mb-4">🎯</div>
+        <div className="text-6xl mb-4">{isObserver ? '👁' : '🎯'}</div>
         <h1 className="text-5xl font-black text-white tracking-tight">BINGO DASH</h1>
         <p className="text-purple-400 mt-2 text-base font-bold">{sectionName}</p>
-        <p className="text-gray-400 mt-1 text-sm">Complete challenges &middot; Scan tiles &middot; Win</p>
+        {isObserver
+          ? <p className="text-blue-400 mt-1 text-sm font-semibold">Observer mode &middot; View only</p>
+          : <p className="text-gray-400 mt-1 text-sm">Complete challenges &middot; Scan tiles &middot; Win</p>
+        }
       </div>
 
       {step === 1 && (
@@ -108,8 +126,25 @@ function JoinScreen({
           className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
           style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
         >
-          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
-          <p className="text-gray-400 text-center text-sm mb-5">Search and select your group</p>
+          {isObserver && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-5">
+              <span className="text-base">👁</span>
+              <p className="text-blue-700 text-xs font-bold">You're joining as an Observer — view only, no submissions.</p>
+            </div>
+          )}
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">
+            {isObserver ? 'Select Group to Watch' : 'Join Game'}
+          </h2>
+          <p className="text-gray-400 text-center text-sm mb-5">
+            {isObserver ? 'Pick the group you want to observe' : 'Search and select your group'}
+          </p>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-3">
+              <span>🚫</span>
+              <p className="text-red-600 font-bold text-sm">{error}</p>
+            </div>
+          )}
 
           <input
             type="text"
@@ -119,6 +154,7 @@ function JoinScreen({
             className="w-full px-4 py-3 rounded-2xl border-2 text-base font-medium focus:outline-none transition-colors text-center mb-3"
             style={{ borderColor: search ? '#a855f7' : '#e5e7eb' }}
             autoFocus
+            disabled={submitting}
           />
 
           <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
@@ -129,9 +165,9 @@ function JoinScreen({
             ) : (
               filteredGroups.map(group => {
                 const count = memberCounts[group.id] ?? 0
-                const isFull = count >= MAX_TEAM_MEMBERS
-                const notReady = !group.password
-                const disabled = isFull || notReady
+                const isFull = !isObserver && count >= MAX_TEAM_MEMBERS
+                const notReady = !isObserver && !group.password
+                const disabled = isFull || notReady || submitting
                 return (
                   <button
                     key={group.id}
@@ -140,14 +176,18 @@ function JoinScreen({
                     className={`w-full px-5 py-4 rounded-2xl border-2 text-left font-bold text-lg transition-all duration-150 ${
                       disabled
                         ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                        : 'border-gray-200 text-gray-800 hover:border-purple-400 hover:bg-purple-50 active:scale-[0.98]'
+                        : isObserver
+                          ? 'border-gray-200 text-gray-800 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98]'
+                          : 'border-gray-200 text-gray-800 hover:border-purple-400 hover:bg-purple-50 active:scale-[0.98]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{group.name}</span>
-                      <span className={`text-xs font-mono ${isFull ? 'text-red-400' : 'text-gray-400'}`}>
-                        {count} / {MAX_TEAM_MEMBERS}
-                      </span>
+                      {!isObserver && (
+                        <span className={`text-xs font-mono ${isFull ? 'text-red-400' : 'text-gray-400'}`}>
+                          {count} / {MAX_TEAM_MEMBERS}
+                        </span>
+                      )}
                     </div>
                     {isFull && (
                       <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Full</span>
@@ -160,6 +200,9 @@ function JoinScreen({
               })
             )}
           </div>
+          {submitting && (
+            <p className="text-center text-sm text-gray-400 mt-4 font-medium">Joining as observer...</p>
+          )}
         </div>
       )}
 
@@ -607,6 +650,8 @@ function BoardScreen({
 
 export function BingoDashJoin() {
   const { sectionSlug } = useParams<{ sectionSlug: string }>()
+  const [searchParams] = useSearchParams()
+  const isObserver = searchParams.get('mode') === 'observer'
   const [section, setSection] = useState<BingoSection | null>(null)
   const [team, setTeam] = useState<{ id: string; name: string } | null>(null)
   const [memberRole, setMemberRole] = useState<'member' | 'observer'>('member')
@@ -730,22 +775,40 @@ export function BingoDashJoin() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  // Live section game_started updates
+  useEffect(() => {
+    if (!section) return
+    const channel = supabase
+      .channel(`bingo-join-section-${section.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `id=eq.${section.id}` }, ({ new: updated }) => {
+        setSection(prev => prev ? { ...prev, ...updated } as typeof prev : prev)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [section?.id])
+
   // Join a group: create or find the member record, then enter the board
   const joinGroup = async (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => {
     if (!section || !sectionSlug) throw new Error('Section not found')
-    if (!/^\d{4}$/.test(password)) throw new Error('Password must be 4 digits.')
+
+    // Observers bypass password checks
+    if (role !== 'observer') {
+      if (!/^\d{4}$/.test(password)) throw new Error('Password must be 4 digits.')
+    }
 
     // Re-fetch team for the latest password state (first-joiner race-safety).
     const { data: teamData, error: teamErr } = await supabase
       .from('bingo_teams').select('*').eq('id', teamId).single()
     if (teamErr || !teamData) throw new Error('Group not found')
 
-    // Password must be set by admin in advance.
     let liveTeam: BingoTeam = teamData
-    if (!teamData.password) {
-      throw new Error('This group has not been set up yet. Ask your facilitator.')
-    } else if (teamData.password !== password) {
-      throw new Error('Wrong team password.')
+    if (role !== 'observer') {
+      // Password must be set by admin in advance.
+      if (!teamData.password) {
+        throw new Error('This group has not been set up yet. Ask your facilitator.')
+      } else if (teamData.password !== password) {
+        throw new Error('Wrong team password.')
+      }
     }
 
     // Look up existing member for this section
@@ -844,11 +907,11 @@ export function BingoDashJoin() {
   }
 
   if (pageState === 'join' && section) {
-    return <JoinScreen sectionName={section.name} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} />
+    return <JoinScreen sectionName={section.name} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} isObserver={isObserver} />
   }
 
   if (pageState === 'board' && team && section) {
-    if (!settings?.game_started) {
+    if (!section.game_started) {
       return (
         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
           <ParticleBackground />

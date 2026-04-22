@@ -244,26 +244,26 @@ function CategoryGroupBlock({
       {/* Category header */}
       <div className="flex items-center gap-3 mb-3">
         <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.label}</h3>
-        <span className="text-xs text-gray-300 font-medium">{group.tasks.length}</span>
-        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-500 font-medium">{group.tasks.length}</span>
+        <div className="flex-1 h-px bg-white/10" />
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="text-xs text-gray-400">color for all:</span>
+          <span className="text-xs text-gray-500">color for all:</span>
           <input
             type="color"
             defaultValue={group.tasks[0]?.hex_code ?? '#3B82F6'}
             key={group.key + '-color'}
-            className="w-7 h-7 rounded cursor-pointer border border-gray-200"
+            className="w-7 h-7 rounded cursor-pointer border border-white/20"
             onChange={e => setBulkCategoryColor(group.key, e.target.value)}
             title={`Set color for all ${group.label} tasks`}
           />
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="text-xs text-gray-400">pts for all:</span>
+          <span className="text-xs text-gray-500">pts for all:</span>
           <input
             type="number" min={0}
             defaultValue={group.tasks[0]?.points ?? 0}
             key={group.key + '-pts'}
-            className="w-14 px-1.5 py-0.5 text-xs border border-gray-200 rounded text-center font-bold focus:outline-none focus:ring-1 focus:ring-violet-400"
+            className="w-14 px-1.5 py-0.5 text-xs border border-white/20 bg-gray-800 text-white rounded text-center font-bold focus:outline-none focus:ring-1 focus:ring-violet-500"
             onBlur={e => setBulkCategoryPoints(group.key, Math.max(0, parseInt(e.target.value) || 0))}
             onKeyDown={e => {
               if (e.key === 'Enter') setBulkCategoryPoints(group.key, Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))
@@ -308,7 +308,7 @@ function CategoryGroupBlock({
                   {scans.filter(s => s.task_id === task.id).length} scanned
                 </p>
                 {(task.points ?? 0) > 0 && (
-                  <span className="bg-black/30 text-white/80 text-[10px] font-black rounded px-1.5 py-0.5">
+                  <span className="bg-black/50 text-white text-[10px] font-black rounded px-1.5 py-0.5 shadow shadow-black/30 ring-1 ring-white/20">
                     {task.points} pts
                   </span>
                 )}
@@ -362,6 +362,8 @@ export function BingoDashAdmin() {
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null)
   const [showSectionManager, setShowSectionManager] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
+  const [showInlineBoardCreate, setShowInlineBoardCreate] = useState(false)
+  const [inlineBoardName, setInlineBoardName] = useState('')
   // Category management
   const [showCategoryManager, setShowCategoryManager] = useState<string | null>(null) // section id or null
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -376,6 +378,7 @@ export function BingoDashAdmin() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showJoinLink, setShowJoinLink] = useState(false)
   const [joinLinkCopied, setJoinLinkCopied] = useState(false)
+  const [joinLinkTab, setJoinLinkTab] = useState<'player' | 'observer'>('player')
 
   // Add challenge form
   const [formTitle, setFormTitle] = useState('')
@@ -609,8 +612,8 @@ export function BingoDashAdmin() {
   // ── Section CRUD ──────────────────────────────────────────────────────────
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  const createSection = async () => {
-    const name = newSectionName.trim()
+  const createSection = async (overrideName?: string) => {
+    const name = (overrideName ?? newSectionName).trim()
     if (!name) return
     const baseSlug = slugify(name) || `section-${Date.now()}`
     let slug = baseSlug
@@ -623,7 +626,8 @@ export function BingoDashAdmin() {
     if (error || !data) { alert('Failed to create section'); return }
     setSections(prev => [...prev, data])
     setCurrentSectionId(data.id)
-    setNewSectionName('')
+    if (overrideName) setInlineBoardName('')
+    else setNewSectionName('')
   }
 
   const renameSection = async (id: string, name: string) => {
@@ -758,6 +762,11 @@ export function BingoDashAdmin() {
     await supabase.from('bingo_settings').update({ active_section_id: id }).eq('id', 'main')
   }
 
+  const toggleSectionGameStarted = async (sectionId: string, started: boolean) => {
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: started } : s))
+    await supabase.from('bingo_sections').update({ game_started: started }).eq('id', sectionId)
+  }
+
   const fetchSettings = useCallback(async () => {
     const { data } = await supabase.from('bingo_settings').select('*').eq('id', 'main').single()
     if (data) setSettings(data)
@@ -773,6 +782,17 @@ export function BingoDashAdmin() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [fetchSettings])
+
+  // Real-time section game_started sync
+  useEffect(() => {
+    const channel = supabase
+      .channel('bingo-sections-admin')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections' }, ({ new: updated }) => {
+        setSections(prev => prev.map(s => s.id === updated.id ? { ...s, ...updated } as typeof s : s))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   // Countdown tick
   useEffect(() => {
@@ -1251,76 +1271,123 @@ export function BingoDashAdmin() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50" onDragEnd={onDragEnd}>
+    <div className="min-h-screen bg-gray-950" onDragEnd={onDragEnd}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-30 border-b border-white/10" style={{ background: 'linear-gradient(135deg, #1a1130 0%, #0f0c1a 60%, #111827 100%)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600 transition-colors">←</button>
-            <h1 className="text-2xl font-bold text-gray-900">Bingo Dash — Admin</h1>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Section switcher */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Section</label>
-              <select
-                value={currentSectionId ?? ''}
-                onChange={e => setCurrentSectionId(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm font-medium bg-white"
-              >
-                {sections.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}{settings?.active_section_id === s.id ? ' • LIVE' : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => currentSectionId && setActiveSection(currentSectionId)}
-                disabled={!currentSectionId || settings?.active_section_id === currentSectionId}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-green-700 border border-green-300 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Make this the section players see"
-              >
-                Set live
-              </button>
-              <button
-                onClick={() => setShowSectionManager(true)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-600 border border-gray-300 hover:bg-gray-50"
-              >
-                Manage
-              </button>
+            <button onClick={() => navigate('/')} className="text-gray-600 hover:text-gray-300 transition-colors">←</button>
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">Bingo Dash <span className="text-violet-400">Admin</span></h1>
+              <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold hidden sm:block">Control Hub</p>
             </div>
-            <span className="text-sm text-gray-400 hidden sm:block">
-              {scopedTasks.length} challenges · {scopedTeams.length} teams
-            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden sm:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 mr-1">
+              <span className="text-xs font-black text-violet-400">{scopedTasks.length}</span>
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">challenges</span>
+              <span className="w-px h-3 bg-white/10" />
+              <span className="text-xs font-black text-emerald-400">{scopedTeams.length}</span>
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">teams</span>
+            </div>
             <button
-              onClick={() => { setShowJoinLink(true); setJoinLinkCopied(false) }}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 border border-emerald-200 hover:bg-emerald-50 transition-colors"
+              onClick={() => { setShowJoinLink(true); setJoinLinkCopied(false); setJoinLinkTab('player') }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-400 border border-emerald-800 hover:bg-emerald-950/60 transition-colors"
             >
               Join Link / QR
             </button>
             <a href="/bingo-dash" target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-violet-600 border border-violet-200 hover:bg-violet-50 transition-colors">
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-violet-400 border border-violet-800 hover:bg-violet-950/60 transition-colors">
               Player View ↗
             </a>
             <a href="/bingo-dash/projector" target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-600 border border-amber-200 hover:bg-amber-50 transition-colors">
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-400 border border-amber-800 hover:bg-amber-950/60 transition-colors">
               Scoreboard ↗
             </a>
             <a href="/bingo-dash/colmar-intro" target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors">
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-rose-400 border border-rose-800 hover:bg-rose-950/60 transition-colors">
               Intro Slide ↗
             </a>
             <button
               onClick={() => setActiveTab('teams')}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 border border-gray-700 hover:bg-white/5 transition-colors"
             >
               View Teams
             </button>
             <button
               onClick={() => { setShowImport(true); setImportText(''); setImportPreview(null); setImportError('') }}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 text-sm font-bold transition-colors shadow-lg shadow-violet-900/40"
             >
               Import
+            </button>
+          </div>
+        </div>
+
+        {/* ── Board tab bar ─────────────────────────────────────────────────── */}
+        <div className="max-w-6xl mx-auto px-6 py-2.5 flex items-center gap-1.5 overflow-x-auto border-t border-white/5">
+          <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mr-2 flex-shrink-0">Boards</span>
+          {sections.map(s => {
+            const isActive = currentSectionId === s.id
+            const isLive = settings?.active_section_id === s.id || s.game_started
+            return (
+              <button
+                key={s.id}
+                onClick={() => setCurrentSectionId(s.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex-shrink-0 ${
+                  isActive
+                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/50'
+                    : 'text-gray-400 hover:text-white hover:bg-white/10 border border-white/10'
+                }`}
+              >
+                {s.name}
+                {isLive && (
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-green-300' : 'bg-green-500'}`} />
+                )}
+              </button>
+            )
+          })}
+          {showInlineBoardCreate ? (
+            <input
+              autoFocus
+              value={inlineBoardName}
+              onChange={e => setInlineBoardName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { createSection(inlineBoardName); setShowInlineBoardCreate(false) }
+                if (e.key === 'Escape') { setShowInlineBoardCreate(false); setInlineBoardName('') }
+              }}
+              onBlur={() => { if (!inlineBoardName.trim()) setShowInlineBoardCreate(false) }}
+              placeholder="Board name…"
+              className="px-2.5 py-1.5 text-sm border border-violet-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 w-40 flex-shrink-0 bg-gray-900 text-white placeholder-gray-600"
+            />
+          ) : (
+            <button
+              onClick={() => setShowInlineBoardCreate(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors flex-shrink-0 border border-dashed border-white/10"
+            >
+              + New Board
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {currentSectionId && settings?.active_section_id === currentSectionId ? (
+              <span className="text-xs font-bold text-green-400 flex items-center gap-1.5 px-2.5 py-1.5 bg-green-950/50 border border-green-800 rounded-lg">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" /> Live
+              </span>
+            ) : (
+              <button
+                onClick={() => currentSectionId && setActiveSection(currentSectionId)}
+                disabled={!currentSectionId}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-green-400 border border-green-800 hover:bg-green-950/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Make this board the one players see at /bingo-dash"
+              >
+                Set live
+              </button>
+            )}
+            <button
+              onClick={() => setShowSectionManager(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-600 hover:text-gray-300 hover:bg-white/5 transition-colors"
+              title="Rename or delete boards"
+            >
+              Manage
             </button>
           </div>
         </div>
@@ -1329,7 +1396,7 @@ export function BingoDashAdmin() {
       <main className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-10">
 
         {/* ── Tab navigation ───────────────────────────────────────────────── */}
-        <div className="flex gap-0 border-b border-gray-200 -mt-4">
+        <div className="flex gap-0 border-b border-white/10 -mt-4">
           {([
             { key: 'board', label: 'Board' },
             { key: 'library', label: 'Card Library' },
@@ -1340,8 +1407,8 @@ export function BingoDashAdmin() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-5 py-3 text-sm font-bold border-b-2 -mb-px transition-colors ${
                 activeTab === tab.key
-                  ? 'border-violet-600 text-violet-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-violet-500 text-violet-400'
+                  : 'border-transparent text-gray-600 hover:text-gray-300 hover:border-gray-600'
               }`}
             >
               {tab.label}
@@ -1351,40 +1418,46 @@ export function BingoDashAdmin() {
 
         {activeTab === 'board' && <>
 
-        {/* ── Game Lock ────────────────────────────────────────────────────── */}
+        {/* ── Game Access (per-section) ─────────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Game Access</h2>
-          <p className="text-xs text-gray-400 mb-3">
-            Groups can join and log in before the event. Enable this when you are ready for participants to play.
+          <h2 className="text-xl font-bold text-white mb-2">Game Access</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Control which games are live. Each section is independent — you can run multiple games simultaneously.
           </p>
-          <div className={`flex items-center justify-between gap-4 rounded-2xl px-6 py-5 ${settings?.game_started ? 'bg-green-50 border border-green-200' : 'bg-gray-100 border border-gray-200'}`}>
-            <div>
-              <p className={`text-lg font-black ${settings?.game_started ? 'text-green-700' : 'text-gray-600'}`}>
-                {settings?.game_started ? '● Game is LIVE' : '■ Game is Locked'}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {settings?.game_started
-                  ? 'Participants can access the board and complete challenges.'
-                  : 'Participants see a waiting screen — they cannot access the board yet.'}
-              </p>
-            </div>
-            <button
-              onClick={() => settings && updateSettings({ game_started: !settings.game_started })}
-              disabled={!settings}
-              className={`px-6 py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40 flex-shrink-0 ${
-                settings?.game_started
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-green-500 text-white hover:bg-green-600'
-              }`}
-            >
-              {settings?.game_started ? 'Lock Game' : 'Start Game'}
-            </button>
-          </div>
+          {(() => {
+            const currentSection = sections.find(s => s.id === currentSectionId)
+            const isStarted = currentSection?.game_started ?? false
+            return (
+              <div className={`flex items-center justify-between gap-4 rounded-2xl px-6 py-5 ${isStarted ? 'bg-green-950/40 border border-green-800' : 'bg-gray-800/60 border border-white/10'}`}>
+                <div>
+                  <p className={`text-lg font-black ${isStarted ? 'text-green-400' : 'text-gray-300'}`}>
+                    {isStarted ? '● Game is LIVE' : '■ Game is Locked'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {isStarted
+                      ? `Participants in "${currentSection?.name}" can access the board and complete challenges.`
+                      : `Participants in "${currentSection?.name}" see a waiting screen.`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => currentSectionId && toggleSectionGameStarted(currentSectionId, !isStarted)}
+                  disabled={!currentSectionId}
+                  className={`px-6 py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40 flex-shrink-0 ${
+                    isStarted
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                >
+                  {isStarted ? 'Lock Game' : 'Start Game'}
+                </button>
+              </div>
+            )
+          })()}
         </section>
 
         {/* ── Timer ────────────────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Timer</h2>
+          <h2 className="text-xl font-bold text-white mb-4">Timer</h2>
           <div className="bg-gray-900 rounded-2xl p-6">
             <div className="text-center mb-5">
               <div
@@ -1455,15 +1528,15 @@ export function BingoDashAdmin() {
 
         {/* ── Marshal Password ──────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Marshal Password</h2>
-          <p className="text-xs text-gray-400 mb-3">Participants must enter this password to complete challenges that have "Require Marshal" enabled.</p>
+          <h2 className="text-xl font-bold text-white mb-2">Marshal Password</h2>
+          <p className="text-xs text-gray-500 mb-3">Participants must enter this password to complete challenges that have "Require Marshal" enabled.</p>
           <div className="flex gap-2 items-center">
             <input
               type="text"
               value={settings?.marshal_password ?? ''}
               onChange={e => setSettings(prev => prev ? { ...prev, marshal_password: e.target.value } : prev)}
               placeholder="Marshal password..."
-              className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-mono font-bold focus:outline-none focus:border-violet-400"
+              className="flex-1 px-4 py-2.5 rounded-lg border border-white/15 bg-gray-900 text-white placeholder-gray-600 text-sm font-mono font-bold focus:outline-none focus:border-violet-500"
             />
             <button
               onClick={() => {
@@ -1481,11 +1554,11 @@ export function BingoDashAdmin() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-white">
                 Board Editor
-                <span className="ml-2 text-sm font-normal text-gray-400">({gridTasks.length}/25)</span>
+                <span className="ml-2 text-sm font-normal text-gray-500">({gridTasks.length}/25)</span>
               </h2>
-              <p className="text-sm text-gray-400 mt-0.5">
+              <p className="text-sm text-gray-500 mt-0.5">
                 Drag tiles to reorder · Drag from list to place · Hover to move ◀▶ or remove ✕
               </p>
             </div>
@@ -1560,7 +1633,7 @@ export function BingoDashAdmin() {
 
             {/* Card library — pick any card from any section, filter & search */}
             <div className="flex-1 min-w-0 w-full lg:w-auto">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Add to Grid
                 {gridTasks.length >= 25 && <span className="ml-2 text-red-400 normal-case font-normal">Grid full</span>}
               </p>
@@ -1569,7 +1642,7 @@ export function BingoDashAdmin() {
                 <select
                   value={addListSectionFilter}
                   onChange={e => setAddListSectionFilter(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium bg-white flex-shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg border border-white/15 text-xs font-medium bg-gray-900 text-white flex-shrink-0"
                   title="Filter by section"
                 >
                   <option value="current">This section</option>
@@ -1583,7 +1656,7 @@ export function BingoDashAdmin() {
                   value={addListSearch}
                   onChange={e => setAddListSearch(e.target.value)}
                   placeholder="Search cards by title, category, color…"
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-violet-400 min-w-0"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-white/15 bg-gray-900 text-white placeholder-gray-600 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 min-w-0"
                 />
               </div>
               {/* Category chips */}
@@ -1591,7 +1664,7 @@ export function BingoDashAdmin() {
                 <div className="flex gap-1.5 flex-wrap mb-2">
                   <button
                     onClick={() => setOffGridCategoryFilter('all')}
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${offGridCategoryFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${offGridCategoryFilter === 'all' ? 'bg-violet-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/15 hover:text-white'}`}
                   >
                     All
                   </button>
@@ -1599,7 +1672,7 @@ export function BingoDashAdmin() {
                     <button
                       key={cat}
                       onClick={() => setOffGridCategoryFilter(cat)}
-                      className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${offGridCategoryFilter === cat ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${offGridCategoryFilter === cat ? 'bg-violet-600 text-white' : 'bg-white/10 text-gray-400 hover:bg-white/15 hover:text-white'}`}
                     >
                       {cat}
                     </button>
@@ -1607,11 +1680,11 @@ export function BingoDashAdmin() {
                 </div>
               )}
               {addListTasks.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-400">
+                <div className="bg-gray-900 rounded-xl border border-white/10 px-4 py-8 text-center text-sm text-gray-500">
                   No cards match these filters.
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                <div className="bg-gray-900 rounded-xl border border-white/10 divide-y divide-white/5 max-h-96 overflow-y-auto">
                   {addListTasks.map(task => {
                     const isSameSection = task.section_id === currentSectionId
                     const sectionName = sections.find(s => s.id === task.section_id)?.name ?? ''
@@ -1621,29 +1694,29 @@ export function BingoDashAdmin() {
                         draggable={isSameSection}
                         onDragStart={isSameSection ? (e => onListDragStart(e, task.id)) : undefined}
                         onDragEnd={isSameSection ? onDragEnd : undefined}
-                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors select-none ${
+                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors select-none ${
                           isSameSection ? 'cursor-grab active:cursor-grabbing' : ''
                         } ${dragState?.id === task.id ? 'opacity-40' : ''}`}
                       >
                         <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: task.hex_code }} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-400 truncate">
+                          <p className="text-sm font-medium text-white truncate">{task.title}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 truncate">
                             {task.category && <span>{task.category}</span>}
                             {!isSameSection && (
-                              <span className="text-[10px] font-bold bg-amber-50 text-amber-700 rounded px-1.5 py-0.5">
+                              <span className="text-[10px] font-bold bg-amber-900/40 text-amber-400 border border-amber-800 rounded px-1.5 py-0.5">
                                 {sectionName} · copy
                               </span>
                             )}
                             {isSameSection && task.in_grid && (
-                              <span className="text-[10px] font-bold bg-gray-100 text-gray-500 rounded px-1.5 py-0.5">on grid</span>
+                              <span className="text-[10px] font-bold bg-white/10 text-gray-400 rounded px-1.5 py-0.5">on grid</span>
                             )}
                           </div>
                         </div>
                         <button
                           onClick={() => addCardFromLibrary(task)}
                           disabled={gridTasks.length >= 25 || (isSameSection && task.in_grid)}
-                          className="px-3 py-1 bg-violet-50 text-violet-700 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-40 transition-colors flex-shrink-0"
+                          className="px-3 py-1 bg-violet-900/50 text-violet-400 border border-violet-700 rounded-lg text-xs font-bold hover:bg-violet-800/50 disabled:opacity-40 transition-colors flex-shrink-0"
                         >
                           + Add
                         </button>
@@ -1662,7 +1735,7 @@ export function BingoDashAdmin() {
         {activeTab === 'library' && (
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Card Library</h2>
+            <h2 className="text-xl font-bold text-white">Card Library</h2>
             <button onClick={() => setShowForm(!showForm)}
               className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium transition-colors">
               + Add Challenge
@@ -1792,19 +1865,19 @@ export function BingoDashAdmin() {
                   {/* Compartment header */}
                   <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-black text-gray-800 uppercase tracking-wider">{section.name}</h2>
+                      <h2 className="text-base font-black text-white uppercase tracking-wider">{section.name}</h2>
                       {settings?.active_section_id === section.id && (
-                        <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>
+                        <span className="text-[10px] font-black text-green-400 bg-green-950/60 border border-green-800 px-1.5 py-0.5 rounded uppercase">Live</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-400 font-medium">{totalTasks} cards</span>
-                    <div className="flex-1 h-px bg-gray-300" />
+                    <span className="text-xs text-gray-500 font-medium">{totalTasks} cards</span>
+                    <div className="flex-1 h-px bg-white/10" />
                     <button
                       onClick={() => setShowCategoryManager(showCategoryManager === section.id ? null : section.id)}
                       className={`text-xs font-bold transition-colors flex-shrink-0 px-2 py-0.5 rounded ${
                         showCategoryManager === section.id
-                          ? 'bg-violet-100 text-violet-700'
-                          : 'text-gray-500 hover:text-violet-600'
+                          ? 'bg-violet-900/50 text-violet-400'
+                          : 'text-gray-500 hover:text-violet-400'
                       }`}
                     >
                       Categories ({categories.filter(c => c.section_id === section.id).length})
@@ -1989,7 +2062,7 @@ export function BingoDashAdmin() {
         {/* ── Challenges gallery (Board tab, scoped to current section) ──────── */}
         {activeTab === 'board' && <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Challenges</h2>
+            <h2 className="text-xl font-bold text-white">Challenges</h2>
             <button onClick={() => setShowForm(!showForm)}
               className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium transition-colors">
               + Add Challenge
@@ -2006,21 +2079,21 @@ export function BingoDashAdmin() {
                   <button
                     onClick={() => setShowChallengeSectionManager(v => !v)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                      showChallengeSectionManager ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      showChallengeSectionManager ? 'bg-violet-900/50 text-violet-300 border border-violet-700' : 'bg-white/10 text-gray-400 hover:bg-white/15 hover:text-white'
                     }`}
                   >
                     ▤ Sections ({currentCS.length})
                   </button>
                   {currentCS.map(cs => (
-                    <span key={cs.id} className="px-2.5 py-1 bg-violet-50 border border-violet-200 text-violet-700 rounded-lg text-xs font-bold">
+                    <span key={cs.id} className="px-2.5 py-1 bg-violet-900/40 border border-violet-700 text-violet-400 rounded-lg text-xs font-bold">
                       {cs.name}
                     </span>
                   ))}
                 </div>
 
                 {showChallengeSectionManager && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
-                    <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Manage Sections</p>
+                  <div className="bg-gray-800/60 border border-white/10 rounded-xl p-4 mb-4">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Manage Sections</p>
 
                     {/* Existing sections */}
                     <div className="flex flex-col gap-2 mb-3">
@@ -2118,18 +2191,18 @@ export function BingoDashAdmin() {
           {allCategories.length > 0 && (
             <div className="flex gap-2 flex-wrap mb-5">
               <button onClick={() => setCategoryFilter('all')}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${categoryFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${categoryFilter === 'all' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/60 ring-1 ring-violet-400/40' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'}`}>
                 All ({scopedTasks.length})
               </button>
               {allCategories.map(cat => (
                 <button key={cat} onClick={() => setCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${categoryFilter === cat ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${categoryFilter === cat ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/60 ring-1 ring-violet-400/40' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'}`}>
                   {cat} ({scopedTasks.filter(t => t.category === cat).length})
                 </button>
               ))}
               {scopedTasks.some(t => !t.category) && (
                 <button onClick={() => setCategoryFilter('__none__')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${categoryFilter === '__none__' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${categoryFilter === '__none__' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/60 ring-1 ring-violet-400/40' : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'}`}>
                   Uncategorized ({scopedTasks.filter(t => !t.category).length})
                 </button>
               )}
@@ -2264,13 +2337,13 @@ export function BingoDashAdmin() {
                     {/* Challenge section header — only shown when sections exist */}
                     {hasSections && (
                       <div className="flex items-center gap-3 mb-4">
-                        <h2 className="text-sm font-black text-gray-700 uppercase tracking-wider">
+                        <h2 className="text-sm font-black text-gray-300 uppercase tracking-wider">
                           {cs?.name ?? 'Uncategorized'}
                         </h2>
-                        <span className="text-xs text-gray-400 font-medium">
+                        <span className="text-xs text-gray-500 font-medium">
                           {groups.reduce((n, g) => n + g.tasks.length, 0)} challenges
                         </span>
-                        <div className="flex-1 h-px bg-gray-300" />
+                        <div className="flex-1 h-px bg-white/10" />
                       </div>
                     )}
                     {/* Categories within this challenge section */}
@@ -2359,20 +2432,22 @@ export function BingoDashAdmin() {
             )
           })()}
 
-          {/* Teams grouped by compartment (section) */}
-          {sections.map(section => {
-            const sectionTeams = teams.filter(t => t.section_id === section.id)
-            const sectionTasks = tasks.filter(t => t.section_id === section.id)
+          {/* Teams for the current board */}
+          {(() => {
+            const section = sections.find(s => s.id === currentSectionId)
+            if (!section) return null
+            const sectionTeams = scopedTeams
+            const sectionTasks = scopedTasks
             return (
               <div key={section.id} className="mb-10">
-                {/* Compartment header */}
+                {/* Board header */}
                 <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-base font-black text-gray-800 uppercase tracking-wider">{section.name}</h2>
+                  <h2 className="text-base font-black text-white uppercase tracking-wider">{section.name}</h2>
                   {settings?.active_section_id === section.id && (
-                    <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>
+                    <span className="text-[10px] font-black text-green-400 bg-green-950/60 border border-green-800 px-1.5 py-0.5 rounded uppercase">Live</span>
                   )}
-                  <span className="text-xs text-gray-400 font-medium">{sectionTeams.length} group{sectionTeams.length !== 1 ? 's' : ''}</span>
-                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-gray-500 font-medium">{sectionTeams.length} group{sectionTeams.length !== 1 ? 's' : ''}</span>
+                  <div className="flex-1 h-px bg-white/10" />
                 </div>
 
                 {/* Create group form */}
@@ -2383,7 +2458,7 @@ export function BingoDashAdmin() {
                     onChange={e => setNewGroupName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') createGroup(section.id) }}
                     placeholder="Group name..."
-                    className="flex-1 min-w-[140px] px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-violet-400"
+                    className="flex-1 min-w-[140px] px-3 py-2 rounded-lg border border-white/15 bg-gray-900 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-violet-500"
                   />
                   <input
                     type="text"
@@ -2394,12 +2469,12 @@ export function BingoDashAdmin() {
                     onChange={e => setNewGroupPassword(e.target.value.replace(/\D/g, '').slice(0, 4))}
                     onKeyDown={e => { if (e.key === 'Enter') createGroup(section.id) }}
                     placeholder="4-digit password"
-                    className="w-36 px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono tracking-widest text-center focus:outline-none focus:border-violet-400"
+                    className="w-36 px-3 py-2 rounded-lg border border-white/15 bg-gray-900 text-white placeholder-gray-600 text-sm font-mono tracking-widest text-center focus:outline-none focus:border-violet-500"
                   />
                   <button
                     onClick={() => createGroup(section.id)}
                     disabled={!newGroupName.trim() || newGroupPassword.length !== 4}
-                    className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 disabled:opacity-40 transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-40 transition-colors shadow-lg shadow-violet-900/30"
                   >
                     + Create Group
                   </button>
@@ -2408,12 +2483,12 @@ export function BingoDashAdmin() {
                       const n = parseInt(prompt('How many groups to bulk create?', '16') ?? '', 10)
                       if (Number.isFinite(n) && n > 0) bulkCreateGroups(section.id, n)
                     }}
-                    className="px-4 py-2 rounded-lg text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-gray-300 bg-white/10 hover:bg-white/15 transition-colors"
                   >
                     Bulk Create
                   </button>
                 </div>
-                {sectionTeams.length > 0 && (<div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                {sectionTeams.length > 0 && (<div className="bg-gray-900 rounded-xl border border-white/10 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50">
@@ -2632,8 +2707,8 @@ export function BingoDashAdmin() {
                 </div>)}
               </div>
             )
-          })}
-          {teams.length === 0 && (
+          })()}
+          {scopedTeams.length === 0 && (
             <p className="text-gray-400 text-sm">No groups yet. Create groups above for participants to join.</p>
           )}
         </section>
@@ -2924,7 +2999,7 @@ export function BingoDashAdmin() {
                   placeholder="New section name (e.g. Klang Hunt)"
                   className="flex-1 px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
                 />
-                <button onClick={createSection} disabled={!newSectionName.trim()}
+                <button onClick={() => createSection()} disabled={!newSectionName.trim()}
                   className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-bold hover:bg-violet-700 disabled:opacity-40">
                   Add
                 </button>
@@ -2933,26 +3008,39 @@ export function BingoDashAdmin() {
                 {sections.map(s => {
                   const taskCount = tasks.filter(t => t.section_id === s.id).length
                   const teamCount = teams.filter(t => t.section_id === s.id).length
-                  const isLive = settings?.active_section_id === s.id
                   return (
-                    <div key={s.id} className="flex items-center gap-2 p-3">
-                      <input
-                        type="text"
-                        defaultValue={s.name}
-                        key={`${s.id}-${s.name}`}
-                        onBlur={e => { if (e.target.value.trim() !== s.name) renameSection(s.id, e.target.value) }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                        }}
-                        className="flex-1 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none text-sm font-medium"
-                      />
-                      {isLive && <span className="text-[10px] font-black text-green-700 bg-green-100 px-1.5 py-0.5 rounded uppercase">Live</span>}
-                      <span className="text-xs text-gray-400">{taskCount} cards · {teamCount} teams</span>
-                      <button onClick={() => deleteSection(s.id)}
-                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 disabled:opacity-40"
-                        disabled={sections.length <= 1}>
-                        Delete
-                      </button>
+                    <div key={s.id} className={`p-3 ${s.game_started ? 'bg-green-50' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          defaultValue={s.name}
+                          key={`${s.id}-${s.name}`}
+                          onBlur={e => { if (e.target.value.trim() !== s.name) renameSection(s.id, e.target.value) }}
+                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                          className="flex-1 px-2 py-1 rounded border border-transparent hover:border-gray-200 focus:border-violet-400 focus:outline-none text-sm font-medium bg-transparent"
+                        />
+                        <span className="text-xs text-gray-400 flex-shrink-0">{taskCount} cards · {teamCount} teams</span>
+                        <button onClick={() => deleteSection(s.id)}
+                          className="text-xs text-red-400 hover:text-red-600 px-1.5 py-1 flex-shrink-0 disabled:opacity-30"
+                          disabled={sections.length <= 1}>
+                          Delete
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => toggleSectionGameStarted(s.id, !s.game_started)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                            s.game_started
+                              ? 'bg-green-500 text-white hover:bg-red-500'
+                              : 'bg-gray-200 text-gray-600 hover:bg-green-500 hover:text-white'
+                          }`}
+                        >
+                          <span>{s.game_started ? '● LIVE' : '■ Locked'}</span>
+                        </button>
+                        <span className="text-[11px] text-gray-400">
+                          {s.game_started ? 'Players can access the board' : 'Players see waiting screen'}
+                        </span>
+                      </div>
                     </div>
                   )
                 })}
@@ -3063,19 +3151,21 @@ export function BingoDashAdmin() {
       {/* ── Join Link / QR Modal ───────────────────────────────────────────── */}
       {showJoinLink && (() => {
         const currentSection = sections.find(s => s.id === currentSectionId)
-        const joinUrl = currentSection
+        const baseUrl = currentSection
           ? `${window.location.origin}/bingo-dash/play/${currentSection.slug}`
           : ''
+        const playerUrl = baseUrl
+        const observerUrl = baseUrl ? `${baseUrl}?mode=observer` : ''
 
-        const handleCopy = () => {
-          navigator.clipboard.writeText(joinUrl).then(() => {
+        const handleCopy = (url: string) => {
+          navigator.clipboard.writeText(url).then(() => {
             setJoinLinkCopied(true)
             setTimeout(() => setJoinLinkCopied(false), 2000)
           })
         }
 
-        const handleDownloadQR = () => {
-          const svg = document.getElementById('join-qr-svg')
+        const downloadQR = (svgId: string, filename: string) => {
+          const svg = document.getElementById(svgId)
           if (!svg) return
           const svgData = new XMLSerializer().serializeToString(svg)
           const canvas = document.createElement('canvas')
@@ -3090,7 +3180,7 @@ export function BingoDashAdmin() {
               ctx.drawImage(img, 0, 0, 1024, 1024)
             }
             const a = document.createElement('a')
-            a.download = `bingo-dash-join-${currentSection?.slug ?? 'qr'}.png`
+            a.download = filename
             a.href = canvas.toDataURL('image/png')
             a.click()
           }
@@ -3104,9 +3194,9 @@ export function BingoDashAdmin() {
               onClick={e => e.stopPropagation()}>
               <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Player Join Link</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Join Links</h3>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Share this link or QR code for <span className="font-bold text-gray-600">{currentSection?.name ?? 'this section'}</span>
+                    For <span className="font-bold text-gray-600">{currentSection?.name ?? 'this section'}</span>
                   </p>
                 </div>
                 <button onClick={() => setShowJoinLink(false)}
@@ -3118,34 +3208,79 @@ export function BingoDashAdmin() {
                   <p className="text-sm">No section selected.</p>
                 </div>
               ) : (
-                <div className="p-6 flex flex-col items-center gap-5">
-                  {/* QR Code */}
-                  <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
-                    <QRCodeSVG id="join-qr-svg" value={joinUrl} size={280} level="H" />
-                  </div>
-
-                  {/* URL + Copy */}
-                  <div className="w-full flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-xs font-mono text-gray-600 break-all select-all border border-gray-200">
-                      {joinUrl}
-                    </div>
-                    <button onClick={handleCopy}
-                      className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
-                        joinLinkCopied
-                          ? 'bg-green-100 text-green-700 border border-green-300'
-                          : 'bg-gray-900 text-white hover:bg-gray-700'
-                      }`}>
-                      {joinLinkCopied ? 'Copied!' : 'Copy'}
+                <div className="p-6 flex flex-col gap-5">
+                  {/* Tabs */}
+                  <div className="flex rounded-xl overflow-hidden border border-gray-200">
+                    <button
+                      onClick={() => setJoinLinkTab('player')}
+                      className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                        joinLinkTab === 'player' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      🎯 Players
+                    </button>
+                    <button
+                      onClick={() => setJoinLinkTab('observer')}
+                      className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
+                        joinLinkTab === 'observer' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      👁 Observers
                     </button>
                   </div>
 
-                  {/* Download */}
-                  <button onClick={handleDownloadQR}
-                    className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors hover:scale-[1.02] active:scale-95">
-                    Download QR as PNG
-                  </button>
+                  {/* Player tab */}
+                  {joinLinkTab === 'player' && (
+                    <div className="flex flex-col items-center gap-5">
+                      <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                        <QRCodeSVG id="join-qr-svg" value={playerUrl} size={260} level="H" />
+                      </div>
+                      <div className="w-full flex items-center gap-2">
+                        <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-xs font-mono text-gray-600 break-all select-all border border-gray-200">
+                          {playerUrl}
+                        </div>
+                        <button onClick={() => handleCopy(playerUrl)}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                            joinLinkCopied ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-gray-900 text-white hover:bg-gray-700'
+                          }`}>
+                          {joinLinkCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <button onClick={() => downloadQR('join-qr-svg', `bingo-dash-join-${currentSection.slug}.png`)}
+                        className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors hover:scale-[1.02] active:scale-95">
+                        Download QR as PNG
+                      </button>
+                    </div>
+                  )}
 
-                  {/* Section switcher hint */}
+                  {/* Observer tab */}
+                  {joinLinkTab === 'observer' && (
+                    <div className="flex flex-col items-center gap-5">
+                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 w-full">
+                        <span>👁</span>
+                        <p className="text-blue-700 text-xs font-bold">Observers can browse and click everything — but cannot submit answers or complete tasks.</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                        <QRCodeSVG id="join-qr-svg-observer" value={observerUrl} size={260} level="H" />
+                      </div>
+                      <div className="w-full flex items-center gap-2">
+                        <div className="flex-1 px-3 py-2.5 bg-blue-50 rounded-lg text-xs font-mono text-blue-700 break-all select-all border border-blue-200">
+                          {observerUrl}
+                        </div>
+                        <button onClick={() => handleCopy(observerUrl)}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                            joinLinkCopied ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}>
+                          {joinLinkCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <button onClick={() => downloadQR('join-qr-svg-observer', `bingo-dash-observer-${currentSection.slug}.png`)}
+                        className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-colors hover:scale-[1.02] active:scale-95">
+                        Download Observer QR as PNG
+                      </button>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-gray-300 text-center">
                     Switch sections in the header to get a different join link.
                   </p>
