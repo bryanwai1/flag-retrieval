@@ -103,9 +103,9 @@ function JoinScreen({
     }
   }
 
-  const filteredGroups = groups.filter(g =>
-    g.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredGroups = groups
+    .filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4 py-8">
