@@ -53,11 +53,12 @@ export function ProjectorView() {
     if (timerRef.current) clearInterval(timerRef.current)
   }
 
-  const hasPoints = tasks.some(t => t.points > 0)
-  const totalPoints = tasks.reduce((sum, t) => sum + (t.points || 0), 0)
+  const liveTasks = tasks.filter(t => t.is_live)
+  const hasPoints = liveTasks.some(t => t.points > 0)
+  const totalPoints = liveTasks.reduce((sum, t) => sum + (t.points || 0), 0)
   const sortedTasks: Task[] = hasPoints
-    ? [...tasks].sort((a, b) => b.points - a.points)
-    : tasks
+    ? [...liveTasks].sort((a, b) => b.points - a.points)
+    : liveTasks
 
   if (tasksLoading || lbLoading || teamsLoading) {
     return (

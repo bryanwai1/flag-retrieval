@@ -4,11 +4,14 @@ import { supabase } from '../lib/supabase'
 import { useCurrentTeam } from '../hooks/useCurrentTeam'
 import { useTaskPages } from '../hooks/useTaskPages'
 import { useTaskPhotos } from '../hooks/useTaskPhotos'
+import { useTaskLinks } from '../hooks/useTaskLinks'
 import { useTeamScans } from '../hooks/useTeamScans'
+import { useSetting } from '../hooks/useSettings'
 import { TeamRegistration } from '../components/TeamRegistration'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { PhotoGalleryView } from '../components/PhotoGalleryView'
+import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { ParticleBackground } from '../components/ParticleBackground'
 import type { Task } from '../types/database'
 
@@ -17,7 +20,11 @@ export function ParticipantView() {
   const { team, memberName, loading: teamLoading, isRegistered, createTribe, joinTribe, searchTribes, leaveTribe } = useCurrentTeam()
   const { pages, loading: pagesLoading } = useTaskPages(taskId)
   const { photos, loading: photosLoading } = useTaskPhotos(taskId)
+  const { links } = useTaskLinks(taskId)
   const { recordScan, toggleComplete } = useTeamScans()
+  const [marshalPassword] = useSetting('marshal_password', '1234')
+  const [marshalInput, setMarshalInput] = useState('')
+  const [marshalError, setMarshalError] = useState('')
   const [task, setTask] = useState<Task | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const [scanRecorded, setScanRecorded] = useState(false)
@@ -47,18 +54,30 @@ export function ParticipantView() {
   }, [taskId])
 
   useEffect(() => {
-    if (team && taskId && !scanRecorded) {
+    if (team && taskId && !scanRecorded && task?.is_live) {
       recordScan(team.id, taskId).then((scan) => {
         setScanRecorded(true)
         if (scan) setScanRecord({ id: scan.id, completed: scan.completed })
       })
     }
-  }, [team, taskId, scanRecorded, recordScan])
+  }, [team, taskId, scanRecorded, recordScan, task])
 
   if (teamLoading || !task) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!task.is_live) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="max-w-sm text-center">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-2xl font-black text-gray-800 mb-2">Card Not Available</h1>
+          <p className="text-sm text-gray-500">This card isn't live right now. Please check back later or ask a facilitator.</p>
+        </div>
       </div>
     )
   }
@@ -177,7 +196,7 @@ export function ParticipantView() {
       </header>
 
       <main className="max-w-lg mx-auto px-6 py-8 relative z-10">
-        {pages.length === 0 && photos.length === 0 ? (
+        {pages.length === 0 && photos.length === 0 && links.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             No instructions available for this task yet.
           </div>
@@ -203,6 +222,13 @@ export function ParticipantView() {
                   photos={photos}
                   hexCode={task.hex_code}
                 />
+              </div>
+            )}
+
+            {/* External link buttons */}
+            {links.length > 0 && (
+              <div className={pages.length > 0 || photos.length > 0 ? 'mt-8' : ''}>
+                <TaskLinkButtons links={links} hexCode={task.hex_code} />
               </div>
             )}
 
@@ -253,17 +279,45 @@ export function ParticipantView() {
                       <span className="text-xs text-yellow-300 font-black uppercase tracking-tight leading-none">Marshal</span>
                     </div>
                     <p className="text-yellow-200 text-sm font-black uppercase tracking-wide leading-snug">
-                      Only tap Complete <span className="text-yellow-300 underline underline-offset-2">after</span> receiving your Completion Card from the Marshal!
+                      Enter the Marshal password to complete this challenge.
                     </p>
                     <span className="text-2xl flex-shrink-0">🛑</span>
                   </div>
+
+                  {/* Marshal 4-digit password input */}
+                  <div className="mb-4">
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={marshalInput}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 4)
+                        setMarshalInput(digits)
+                        setMarshalError('')
+                      }}
+                      placeholder="• • • •"
+                      className="w-full px-4 py-3 rounded-2xl border-2 text-center text-2xl font-black tracking-[0.6em] focus:outline-none transition-colors bg-white/10 text-white placeholder-white/30"
+                      style={{ borderColor: marshalError ? '#ef4444' : marshalInput ? task.hex_code : 'rgba(255,255,255,0.2)' }}
+                    />
+                    {marshalError && (
+                      <p className="text-red-400 text-xs font-bold text-center mt-2">{marshalError}</p>
+                    )}
+                  </div>
+
                   <button
                     onClick={async () => {
                       if (!scanRecord) return
+                      if (marshalInput.trim() !== marshalPassword) {
+                        setMarshalError('Wrong marshal password.')
+                        return
+                      }
                       setCompleting(true)
                       try {
                         await toggleComplete(scanRecord.id, true)
                         setScanRecord({ ...scanRecord, completed: true })
+                        setMarshalInput('')
                       } finally { setCompleting(false) }
                     }}
                     disabled={completing || !scanRecord}

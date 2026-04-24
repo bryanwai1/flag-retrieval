@@ -41,6 +41,16 @@ export function useTeamScans() {
     if (error) throw error
   }
 
+  const resetTeamScans = async (teamId: string) => {
+    const { error } = await supabase.from('team_scans').delete().eq('team_id', teamId)
+    if (error) throw error
+  }
+
+  const resetAllScans = async () => {
+    const { error } = await supabase.from('team_scans').delete().neq('team_id', '00000000-0000-0000-0000-000000000000')
+    if (error) throw error
+  }
+
   const recordScan = async (teamId: string, taskId: string) => {
     const { data: existing } = await supabase
       .from('team_scans')
@@ -58,5 +68,5 @@ export function useTeamScans() {
     return data
   }
 
-  return { scans, loading, toggleComplete, recordScan, refetch: fetchScans }
+  return { scans, loading, toggleComplete, recordScan, resetTeamScans, resetAllScans, refetch: fetchScans }
 }

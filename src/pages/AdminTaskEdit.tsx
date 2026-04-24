@@ -8,6 +8,9 @@ import { PageForm } from '../components/PageForm'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { AdminPhotoUpload } from '../components/AdminPhotoUpload'
+import { TaskLinksEditor } from '../components/TaskLinksEditor'
+import { TaskLinkButtons } from '../components/TaskLinkButtons'
+import { useTaskLinks } from '../hooks/useTaskLinks'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { PhotoGalleryView } from '../components/PhotoGalleryView'
 import type { Task, TaskPage } from '../types/database'
@@ -24,6 +27,7 @@ export function AdminTaskEdit() {
   const [previewPage, setPreviewPage] = useState(0)
   const { pages, createPage, updatePage, deletePage, reorderPages } = useTaskPages(taskId)
   const { photos } = useTaskPhotos(taskId)
+  const { links } = useTaskLinks(taskId)
 
   useEffect(() => {
     if (!taskId) return
@@ -120,7 +124,7 @@ export function AdminTaskEdit() {
         </header>
 
         <main className="max-w-lg mx-auto px-6 py-8 relative z-10">
-          {pages.length === 0 && photos.length === 0 ? (
+          {pages.length === 0 && photos.length === 0 && links.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               No instructions available for this task yet.
             </div>
@@ -142,6 +146,12 @@ export function AdminTaskEdit() {
               {photos.length > 0 && (
                 <div className={pages.length > 0 ? 'mt-8' : ''}>
                   <PhotoGalleryView photos={photos} hexCode={task.hex_code} />
+                </div>
+              )}
+
+              {links.length > 0 && (
+                <div className={pages.length > 0 || photos.length > 0 ? 'mt-8' : ''}>
+                  <TaskLinkButtons links={links} hexCode={task.hex_code} />
                 </div>
               )}
 
@@ -231,6 +241,9 @@ export function AdminTaskEdit() {
         <div className="mb-6">
           <AdminPhotoUpload taskId={task.id} />
         </div>
+
+        {/* Task Links */}
+        <TaskLinksEditor taskId={task.id} hexCode={task.hex_code} />
 
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Instruction Pages ({pages.length})</h2>

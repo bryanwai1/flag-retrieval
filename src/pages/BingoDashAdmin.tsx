@@ -440,7 +440,9 @@ export function BingoDashAdmin() {
   const [slotPickerFilter, setSlotPickerFilter] = useState('all')
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'board' | 'library' | 'teams'>('board')
+  const [activeTab, setActiveTab] = useState<'board' | 'library' | 'teams' | 'submissions'>('board')
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
+  const [submissionBoardFilter, setSubmissionBoardFilter] = useState<'current' | 'all'>('all')
 
   // Team grid viewer modal
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
@@ -1397,23 +1399,32 @@ export function BingoDashAdmin() {
 
         {/* ── Tab navigation ───────────────────────────────────────────────── */}
         <div className="flex gap-0 border-b border-white/10 -mt-4">
-          {([
-            { key: 'board', label: 'Board' },
-            { key: 'library', label: 'Card Library' },
-            { key: 'teams', label: `Teams${teams.length > 0 ? ` (${teams.length})` : ''}` },
-          ] as const).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-5 py-3 text-sm font-bold border-b-2 -mb-px transition-colors ${
-                activeTab === tab.key
-                  ? 'border-violet-500 text-violet-400'
-                  : 'border-transparent text-gray-600 hover:text-gray-300 hover:border-gray-600'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {(() => {
+            const pendingCount = photoSubmissions.filter(s => s.status === 'pending').length
+            return ([
+              { key: 'board', label: 'Board' },
+              { key: 'library', label: 'Card Library' },
+              { key: 'teams', label: `Teams${teams.length > 0 ? ` (${teams.length})` : ''}` },
+              { key: 'submissions', label: 'Submissions', badge: pendingCount },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-5 py-3 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                  activeTab === tab.key
+                    ? 'border-violet-500 text-violet-400'
+                    : 'border-transparent text-gray-600 hover:text-gray-300 hover:border-gray-600'
+                }`}
+              >
+                {tab.label}
+                {'badge' in tab && tab.badge > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-black text-[10px] font-black">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))
+          })()}
         </div>
 
         {activeTab === 'board' && <>
@@ -2383,55 +2394,6 @@ export function BingoDashAdmin() {
         {/* ── Teams tab ────────────────────────────────────────────────────── */}
         {activeTab === 'teams' && (
         <section>
-          {/* ── Photo Submission Queue ─────────────────────────────────────── */}
-          {(() => {
-            const pending = photoSubmissions.filter(s => s.status === 'pending')
-            if (pending.length === 0) return null
-            return (
-              <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <h3 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-3">
-                  📸 Photo Submissions — {pending.length} Pending
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {pending.map(sub => {
-                    const subTeam = teams.find(t => t.id === sub.team_id)
-                    const subTask = tasks.find(t => t.id === sub.task_id)
-                    return (
-                      <div key={sub.id} className="flex items-start gap-3 bg-white rounded-lg p-3 border border-amber-100">
-                        <a href={sub.photo_url} target="_blank" rel="noopener noreferrer">
-                          <img
-                            src={sub.photo_url}
-                            alt="submission"
-                            className="w-20 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0 hover:opacity-90 transition-opacity"
-                          />
-                        </a>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-gray-800 truncate">{subTeam?.name ?? 'Unknown team'}</p>
-                          <p className="text-xs text-gray-500 truncate">{subTask?.title ?? 'Unknown task'}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{new Date(sub.created_at).toLocaleString()}</p>
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => approvePhotoSubmission(sub)}
-                              className="px-3 py-1 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors"
-                            >
-                              ✓ Approve
-                            </button>
-                            <button
-                              onClick={() => rejectPhotoSubmission(sub.id)}
-                              className="px-3 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                            >
-                              ✗ Reject
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
-
           {/* Teams for the current board */}
           {(() => {
             const section = sections.find(s => s.id === currentSectionId)
@@ -2702,6 +2664,133 @@ export function BingoDashAdmin() {
           {scopedTeams.length === 0 && (
             <p className="text-gray-400 text-sm">No groups yet. Create groups above for participants to join.</p>
           )}
+        </section>
+        )}
+
+        {/* ── Submissions tab ──────────────────────────────────────────────── */}
+        {activeTab === 'submissions' && (
+        <section>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white mb-1">Photo Submissions</h2>
+            <p className="text-xs text-gray-500">Review images submitted by groups for photo challenges.</p>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-4 mb-5">
+            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
+              {(['pending', 'approved', 'rejected', 'all'] as const).map(s => {
+                const count = s === 'all'
+                  ? photoSubmissions.length
+                  : photoSubmissions.filter(x => x.status === s).length
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setSubmissionStatusFilter(s)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                      submissionStatusFilter === s
+                        ? 'bg-violet-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {s} <span className="opacity-60">({count})</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
+              <button
+                onClick={() => setSubmissionBoardFilter('all')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  submissionBoardFilter === 'all' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                All boards
+              </button>
+              <button
+                onClick={() => setSubmissionBoardFilter('current')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  submissionBoardFilter === 'current' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Current board only
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          {(() => {
+            const filtered = photoSubmissions.filter(sub => {
+              if (submissionStatusFilter !== 'all' && sub.status !== submissionStatusFilter) return false
+              if (submissionBoardFilter === 'current') {
+                const subTeam = teams.find(t => t.id === sub.team_id)
+                if (!subTeam || subTeam.section_id !== currentSectionId) return false
+              }
+              return true
+            })
+            if (filtered.length === 0) {
+              return (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-8 text-center">
+                  <p className="text-gray-400 text-sm">No {submissionStatusFilter === 'all' ? '' : submissionStatusFilter} submissions{submissionBoardFilter === 'current' ? ' for this board' : ''}.</p>
+                </div>
+              )
+            }
+            return (
+              <div className="flex flex-col gap-3">
+                {filtered.map(sub => {
+                  const subTeam = teams.find(t => t.id === sub.team_id)
+                  const subTask = tasks.find(t => t.id === sub.task_id)
+                  const subSection = sections.find(s => s.id === subTeam?.section_id)
+                  const statusStyles = {
+                    pending: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                    approved: 'bg-green-500/20 text-green-300 border-green-500/30',
+                    rejected: 'bg-red-500/20 text-red-300 border-red-500/30',
+                  }[sub.status]
+                  return (
+                    <div key={sub.id} className="flex items-start gap-4 bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/[0.07] transition-colors">
+                      <a href={sub.photo_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                        <img
+                          src={sub.photo_url}
+                          alt="submission"
+                          className="w-28 h-28 object-cover rounded-lg border border-white/10 hover:opacity-90 transition-opacity"
+                        />
+                      </a>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="font-bold text-sm text-white truncate">{subTeam?.name ?? 'Unknown team'}</p>
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${statusStyles}`}>
+                            {sub.status}
+                          </span>
+                          {subSection && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-gray-300">
+                              {subSection.name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 truncate mb-1">{subTask?.title ?? 'Unknown task'}</p>
+                        <p className="text-[10px] text-gray-500">{new Date(sub.created_at).toLocaleString()}</p>
+                        {sub.status === 'pending' && (
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => approvePhotoSubmission(sub)}
+                              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => rejectPhotoSubmission(sub.id)}
+                              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                            >
+                              ✗ Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </section>
         )}
 

@@ -9,13 +9,14 @@ export function ProjectorDisplay() {
   const { tasks, loading } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
+  const liveTasks = tasks.filter(t => t.is_live)
   // Check if any task has points — if so, sort by points desc (hardest left)
-  const hasPoints = tasks.some(t => t.points > 0)
+  const hasPoints = liveTasks.some(t => t.points > 0)
   const sortedTasks = hasPoints
-    ? [...tasks].sort((a, b) => b.points - a.points)
-    : tasks
+    ? [...liveTasks].sort((a, b) => b.points - a.points)
+    : liveTasks
 
-  const maxPoints = Math.max(...tasks.map(t => t.points), 1)
+  const maxPoints = Math.max(...liveTasks.map(t => t.points), 1)
 
   if (loading) {
     return (
@@ -63,7 +64,7 @@ export function ProjectorDisplay() {
         </p>
       </div>
 
-      {tasks.length === 0 ? (
+      {liveTasks.length === 0 ? (
         <p className="text-gray-500 text-xl relative z-10">No tasks yet. Add tasks from the admin panel.</p>
       ) : (
         <div className="relative z-10 w-full max-w-[1600px]">

@@ -30,7 +30,7 @@ export function useTasks() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchTasks])
 
-  const createTask = async (task: Omit<Task, 'id' | 'created_at'>) => {
+  const createTask = async (task: Omit<Task, 'id' | 'created_at' | 'is_live'> & { is_live?: boolean }) => {
     const { data, error } = await supabase.from('tasks').insert(task).select().single()
     if (error) throw error
     return data

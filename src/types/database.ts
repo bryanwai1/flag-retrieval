@@ -5,6 +5,7 @@ export interface Task {
   title: string
   sort_order: number
   points: number
+  is_live: boolean
   created_at: string
 }
 
@@ -43,6 +44,15 @@ export interface TaskPhoto {
   position_x: number
   position_y: number
   caption: string | null
+  created_at: string
+}
+
+export interface TaskLink {
+  id: string
+  task_id: string
+  label: string
+  url: string
+  sort_order: number
   created_at: string
 }
 
