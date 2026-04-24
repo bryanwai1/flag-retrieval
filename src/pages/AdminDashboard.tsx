@@ -15,7 +15,7 @@ import type { Task } from '../types/database'
 
 export function AdminDashboard() {
   const navigate = useNavigate()
-  const { tasks, createTask, updateTask, deleteTask, refetch } = useTasks()
+  const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks()
   const { teams, renameTeam, deleteTeam } = useTeams()
   const { members, renameMember, removeMember, moveMember } = useTeamMembers()
   const { scans, toggleComplete, resetTeamScans, resetAllScans } = useTeamScans()
@@ -38,6 +38,19 @@ export function AdminDashboard() {
   const [copiedFaciLink, setCopiedFaciLink] = useState(false)
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [dropZone, setDropZone] = useState<'live' | 'library' | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+
+  async function onDuplicate(taskId: string) {
+    if (duplicatingId) return
+    setDuplicatingId(taskId)
+    try {
+      await duplicateTask(taskId)
+    } catch (err) {
+      alert(`Duplicate failed: ${(err as Error).message}`)
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
 
   function onCardDragStart(e: React.DragEvent, taskId: string) {
     e.dataTransfer.setData('text/plain', taskId)
@@ -403,6 +416,14 @@ export function AdminDashboard() {
                     className="px-3 py-1 bg-white/20 rounded-lg text-sm hover:bg-white/30 transition-colors"
                   >
                     {copiedTaskId === task.id ? '✓' : 'Link'}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDuplicate(task.id) }}
+                    disabled={duplicatingId === task.id}
+                    className="px-3 py-1 bg-white/20 rounded-lg text-sm hover:bg-white/30 transition-colors disabled:opacity-50"
+                    title="Create a copy of this card with all its pages, photos and links"
+                  >
+                    {duplicatingId === task.id ? '…' : '⎘ Duplicate'}
                   </button>
                   <button
                     onClick={(e) => {

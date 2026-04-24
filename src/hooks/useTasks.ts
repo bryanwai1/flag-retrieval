@@ -46,5 +46,58 @@ export function useTasks() {
     if (error) throw error
   }
 
-  return { tasks, loading, createTask, updateTask, deleteTask, refetch: fetchTasks }
+  const duplicateTask = async (sourceId: string): Promise<Task> => {
+    const { data: src, error: srcErr } = await supabase
+      .from('tasks').select('*').eq('id', sourceId).single()
+    if (srcErr || !src) throw srcErr ?? new Error('Source task not found')
+
+    const maxOrder = tasks.reduce((m, t) => Math.max(m, t.sort_order), 0)
+    const { data: newTask, error: insErr } = await supabase
+      .from('tasks')
+      .insert({
+        color: src.color,
+        hex_code: src.hex_code,
+        title: `${src.title} (Copy)`,
+        sort_order: maxOrder + 1,
+        points: src.points,
+        is_live: false,
+      })
+      .select()
+      .single()
+    if (insErr || !newTask) throw insErr ?? new Error('Failed to create duplicate')
+
+    const { data: pages } = await supabase
+      .from('task_pages').select('*').eq('task_id', sourceId).order('page_order', { ascending: true })
+    if (pages && pages.length) {
+      const rows = pages.map(({ id: _id, created_at: _c, ...rest }: Record<string, unknown>) => ({
+        ...rest,
+        task_id: newTask.id,
+      }))
+      await supabase.from('task_pages').insert(rows)
+    }
+
+    const { data: photos } = await supabase
+      .from('task_photos').select('*').eq('task_id', sourceId).order('photo_order', { ascending: true })
+    if (photos && photos.length) {
+      const rows = photos.map(({ id: _id, created_at: _c, ...rest }: Record<string, unknown>) => ({
+        ...rest,
+        task_id: newTask.id,
+      }))
+      await supabase.from('task_photos').insert(rows)
+    }
+
+    const { data: links } = await supabase
+      .from('task_links').select('*').eq('task_id', sourceId).order('sort_order', { ascending: true })
+    if (links && links.length) {
+      const rows = links.map(({ id: _id, created_at: _c, ...rest }: Record<string, unknown>) => ({
+        ...rest,
+        task_id: newTask.id,
+      }))
+      await supabase.from('task_links').insert(rows)
+    }
+
+    return newTask
+  }
+
+  return { tasks, loading, createTask, updateTask, deleteTask, duplicateTask, refetch: fetchTasks }
 }
