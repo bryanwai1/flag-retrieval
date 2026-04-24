@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { TaskPage } from '../types/database'
+import { T } from './T'
 
 interface InstructionPageProps {
   page: TaskPage
@@ -101,7 +102,7 @@ export function InstructionPage({ page, hexCode }: InstructionPageProps) {
                   </div>
                   {/* Text + button */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-gray-800 text-lg leading-snug font-bold">{text}</p>
+                    <p className="text-gray-800 text-lg leading-snug font-bold"><T>{text}</T></p>
                     {example && (
                       <button
                         onClick={() => setOpenExample(openExample === index ? null : index)}
@@ -115,7 +116,7 @@ export function InstructionPage({ page, hexCode }: InstructionPageProps) {
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                           <circle cx="12" cy="12" r="3" />
                         </svg>
-                        {openExample === index ? 'Hide Example' : 'See Example'}
+                        <T>{openExample === index ? 'Hide Example' : 'See Example'}</T>
                       </button>
                     )}
                   </div>

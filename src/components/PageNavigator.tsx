@@ -1,3 +1,5 @@
+import { T } from './T'
+
 interface PageNavigatorProps {
   current: number
   total: number
@@ -14,7 +16,7 @@ export function PageNavigator({ current, total, onPrev, onNext, hexCode }: PageN
         disabled={current === 0}
         className="px-6 py-3 rounded-2xl font-bold transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed bg-gray-200 text-gray-700 hover:bg-gray-300 hover:scale-105 active:scale-95"
       >
-        Back
+        <T>Back</T>
       </button>
       <div className="flex gap-2">
         {Array.from({ length: total }).map((_, i) => (
@@ -34,7 +36,7 @@ export function PageNavigator({ current, total, onPrev, onNext, hexCode }: PageN
         className="px-6 py-3 rounded-2xl font-bold text-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
         style={{ backgroundColor: hexCode }}
       >
-        Next
+        <T>Next</T>
       </button>
     </div>
   )

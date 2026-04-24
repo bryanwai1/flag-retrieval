@@ -1,4 +1,5 @@
 import type { TaskLink } from '../types/database'
+import { T } from './T'
 
 interface Props {
   links: TaskLink[]
@@ -11,7 +12,7 @@ export function TaskLinkButtons({ links, hexCode }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs font-black uppercase tracking-[0.15em] text-white/60">
-        🔗 Links for this task
+        🔗 <T>Links for this task</T>
       </p>
       <div className="flex flex-col gap-2.5">
         {links.map((link) => (
@@ -43,9 +44,9 @@ export function TaskLinkButtons({ links, hexCode }: Props) {
                   🔗
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-gray-900 font-black text-base leading-tight truncate">{link.label}</span>
+                  <span className="text-gray-900 font-black text-base leading-tight truncate"><T>{link.label}</T></span>
                   <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: hexCode }}>
-                    Click here to open link ↗
+                    <T>Click here to open link ↗</T>
                   </span>
                 </div>
               </div>

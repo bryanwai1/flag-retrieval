@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import type { TaskPhoto } from '../types/database'
+import { T, useT } from './T'
 
 interface PhotoGalleryViewProps {
   photos: TaskPhoto[]
@@ -57,13 +58,18 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
   const isCurrentFound = found.has(current)
   const isCelebrating = celebrating === current
 
+  const doneLabel = useT('done')
+  const alreadyDoneLabel = useT('✓ Already Done')
+  const celebrateLabel = useT('Done! 🎯')
+  const defaultDoneLabel = useT('📍 Done!')
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-black text-white text-lg">Photo Clues</h2>
+        <h2 className="font-black text-white text-lg"><T>Photo Clues</T></h2>
         <span className="text-sm font-bold text-white/50">
-          {found.size} / {total} done
+          {found.size} / {total} {doneLabel}
         </span>
       </div>
 
@@ -99,7 +105,7 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
         {isCelebrating && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 animate-pulse">
             <div className="text-6xl animate-bounce-in">🎯</div>
-            <p className="text-white font-black text-2xl mt-2 animate-slide-up">Done!</p>
+            <p className="text-white font-black text-2xl mt-2 animate-slide-up"><T>Done!</T></p>
           </div>
         )}
 
@@ -113,7 +119,7 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
             className="absolute top-3 right-3 px-3 py-1 rounded-full text-white text-xs font-black"
             style={{ backgroundColor: hexCode }}
           >
-            ✓ Done
+            ✓ <T>Done</T>
           </div>
         )}
 
@@ -134,7 +140,7 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
       {/* Caption */}
       {photo.caption && (
         <p className="text-center text-white/80 text-sm font-medium px-2 -mt-1">
-          {photo.caption}
+          <T>{photo.caption}</T>
         </p>
       )}
 
@@ -165,7 +171,7 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
           boxShadow: isCurrentFound ? 'none' : `0 6px 0 ${hexCode}88, 0 8px 20px ${hexCode}44`,
         }}
       >
-        {isCurrentFound ? '✓ Already Done' : isCelebrating ? 'Done! 🎯' : '📍 Done!'}
+        {isCurrentFound ? alreadyDoneLabel : isCelebrating ? celebrateLabel : defaultDoneLabel}
       </button>
 
       {isCurrentFound && !isCelebrating && (
@@ -173,13 +179,13 @@ export function PhotoGalleryView({ photos, hexCode }: PhotoGalleryViewProps) {
           onClick={handleUndo}
           className="w-full py-2 rounded-xl text-sm font-bold text-white/50 hover:text-red-400 transition-colors"
         >
-          Undo Done
+          <T>Undo Done</T>
         </button>
       )}
 
       {total > 1 && (
         <p className="text-center text-xs text-white/40 font-medium">
-          Swipe left / right to browse photos
+          <T>Swipe left / right to browse photos</T>
         </p>
       )}
     </div>

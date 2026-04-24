@@ -36,6 +36,36 @@ export function AdminDashboard() {
   const [marshalSaved, setMarshalSaved] = useState(false)
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null)
   const [copiedFaciLink, setCopiedFaciLink] = useState(false)
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
+  const [dropZone, setDropZone] = useState<'live' | 'library' | null>(null)
+
+  function onCardDragStart(e: React.DragEvent, taskId: string) {
+    e.dataTransfer.setData('text/plain', taskId)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingTaskId(taskId)
+  }
+
+  function onCardDragEnd() {
+    setDraggingTaskId(null)
+    setDropZone(null)
+  }
+
+  async function onZoneDrop(e: React.DragEvent, target: 'live' | 'library') {
+    e.preventDefault()
+    const taskId = e.dataTransfer.getData('text/plain') || draggingTaskId
+    setDropZone(null)
+    setDraggingTaskId(null)
+    if (!taskId) return
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    const shouldBeLive = target === 'live'
+    if (task.is_live === shouldBeLive) return
+    try {
+      await updateTask(taskId, { is_live: shouldBeLive })
+    } catch (err) {
+      alert(`Update failed: ${(err as Error).message}`)
+    }
+  }
 
   function copyTaskLink(e: React.MouseEvent, taskId: string) {
     e.stopPropagation()
@@ -330,7 +360,14 @@ export function AdminDashboard() {
 
           {(() => {
             const renderCard = (task: Task, variant: 'live' | 'library') => (
-              <TaskCard key={task.id} task={task} size="small" onClick={() => navigate(`/admin/task/${task.id}`)}>
+              <div
+                key={task.id}
+                draggable
+                onDragStart={(e) => onCardDragStart(e, task.id)}
+                onDragEnd={onCardDragEnd}
+                className={`transition-opacity ${draggingTaskId === task.id ? 'opacity-40' : ''}`}
+              >
+              <TaskCard task={task} size="small" onClick={() => navigate(`/admin/task/${task.id}`)}>
                 {pointsEnabled && (
                   <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                     <input
@@ -378,6 +415,7 @@ export function AdminDashboard() {
                   </button>
                 </div>
               </TaskCard>
+              </div>
             )
 
             if (tasks.length === 0) {
@@ -387,7 +425,16 @@ export function AdminDashboard() {
             return (
               <div className="flex flex-col gap-6">
                 {/* Live slot */}
-                <div className="rounded-2xl border-2 border-dashed border-emerald-400 bg-emerald-50/40 p-4">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropZone('live') }}
+                  onDragLeave={(e) => { if (e.currentTarget === e.target) setDropZone(null) }}
+                  onDrop={(e) => onZoneDrop(e, 'live')}
+                  className={`rounded-2xl border-2 border-dashed p-4 transition-colors ${
+                    dropZone === 'live'
+                      ? 'border-emerald-500 bg-emerald-100/70 ring-2 ring-emerald-300'
+                      : 'border-emerald-400 bg-emerald-50/40'
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <h3 className="text-sm font-bold text-emerald-700 uppercase tracking-wide">
@@ -400,7 +447,7 @@ export function AdminDashboard() {
                   {liveTasks.length === 0 ? (
                     <div className="py-10 text-center">
                       <p className="text-emerald-700/70 text-sm font-medium">No live cards yet.</p>
-                      <p className="text-emerald-700/50 text-xs mt-1">Click <span className="font-bold">↑ Go Live</span> on any library card below to put it here.</p>
+                      <p className="text-emerald-700/50 text-xs mt-1">Drag a card here, or click <span className="font-bold">↑ Go Live</span> on any library card below.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -410,7 +457,16 @@ export function AdminDashboard() {
                 </div>
 
                 {/* Library */}
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropZone('library') }}
+                  onDragLeave={(e) => { if (e.currentTarget === e.target) setDropZone(null) }}
+                  onDrop={(e) => onZoneDrop(e, 'library')}
+                  className={`rounded-2xl border bg-gray-50 p-4 transition-colors ${
+                    dropZone === 'library'
+                      ? 'border-blue-400 ring-2 ring-blue-200 bg-blue-50'
+                      : 'border-gray-200'
+                  }`}
+                >
                   <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wide mb-3">
                     Library
                     <span className="ml-2 text-xs font-medium text-gray-400">({libraryTasks.length} unused)</span>
