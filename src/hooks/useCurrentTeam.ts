@@ -84,11 +84,15 @@ export function useCurrentTeam() {
       .single()
     if (error) throw error
 
-    const { data: memberData } = await supabase.from('team_members').insert({
+    const { data: memberData, error: memberError } = await supabase.from('team_members').insert({
       team_id: newTeam.id,
       name,
       is_creator: true,
     }).select().single()
+    if (memberError || !memberData) {
+      await supabase.from('teams').delete().eq('id', newTeam.id)
+      throw new Error(`MEMBER_INSERT_FAILED: ${memberError?.message ?? 'no row returned'}`)
+    }
 
     localStorage.setItem(TEAM_ID_KEY, newTeam.id)
     localStorage.setItem(MEMBER_NAME_KEY, name)
@@ -114,11 +118,14 @@ export function useCurrentTeam() {
       .eq('team_id', teamId)
     if ((count ?? 0) >= 20) throw new Error('TRIBE_FULL')
 
-    const { data: memberData } = await supabase.from('team_members').insert({
+    const { data: memberData, error: memberError } = await supabase.from('team_members').insert({
       team_id: teamId,
       name,
       is_creator: false,
     }).select().single()
+    if (memberError || !memberData) {
+      throw new Error(`MEMBER_INSERT_FAILED: ${memberError?.message ?? 'no row returned'}`)
+    }
 
     localStorage.setItem(TEAM_ID_KEY, teamId)
     localStorage.setItem(MEMBER_NAME_KEY, name)

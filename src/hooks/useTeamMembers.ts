@@ -6,7 +6,7 @@ export interface TeamMember {
   team_id: string
   name: string
   is_creator: boolean
-  created_at: string
+  joined_at: string
 }
 
 export function useTeamMembers() {
@@ -15,10 +15,11 @@ export function useTeamMembers() {
 
   const fetchMembers = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('team_members')
       .select('*')
-      .order('created_at', { ascending: true })
+      .order('joined_at', { ascending: true })
+    if (error) console.error('useTeamMembers fetch failed:', error)
     if (data) setMembers(data)
     setLoading(false)
   }, [])
