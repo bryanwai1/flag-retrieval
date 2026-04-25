@@ -3,13 +3,16 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import { useFullscreen } from '../hooks/useFullscreen'
 
 const DEFAULT_EVENT_NAME = 'SWIFT TEAM BUILDING'
-const TIME_RANGE = '9:00 AM – 12:00 PM'
+const DEFAULT_TIME_RANGE = '9:00 AM – 12:00 PM'
 
 export function EventSlide() {
   const [logo, setLogo] = useState<string | null>(() => localStorage.getItem('event_logo'))
   const [eventName, setEventName] = useState(() => localStorage.getItem('event_name') || DEFAULT_EVENT_NAME)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(eventName)
+  const [timeRange, setTimeRange] = useState(() => localStorage.getItem('event_time') || DEFAULT_TIME_RANGE)
+  const [editingTime, setEditingTime] = useState(false)
+  const [editTimeValue, setEditTimeValue] = useState(timeRange)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 
@@ -29,6 +32,12 @@ export function EventSlide() {
     setEventName(editValue)
     localStorage.setItem('event_name', editValue)
     setEditing(false)
+  }
+
+  const handleTimeSave = () => {
+    setTimeRange(editTimeValue)
+    localStorage.setItem('event_time', editTimeValue)
+    setEditingTime(false)
   }
 
   const removeLogo = (e: React.MouseEvent) => {
@@ -92,9 +101,28 @@ export function EventSlide() {
           </h1>
         )}
 
-        <p className="text-white/45 text-xl md:text-2xl font-medium tracking-[0.3em] uppercase animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          {TIME_RANGE}
-        </p>
+        {editingTime ? (
+          <div className="flex flex-col items-center gap-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <input
+              autoFocus
+              value={editTimeValue}
+              onChange={(e) => setEditTimeValue(e.target.value)}
+              onBlur={handleTimeSave}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleTimeSave(); if (e.key === 'Escape') setEditingTime(false) }}
+              className="text-white/70 text-xl md:text-2xl font-medium tracking-[0.3em] uppercase bg-transparent border-b-2 border-white/40 outline-none text-center w-full max-w-2xl"
+            />
+            <p className="text-white/30 text-xs uppercase tracking-widest">Press Enter to save</p>
+          </div>
+        ) : (
+          <p
+            className="text-white/45 text-xl md:text-2xl font-medium tracking-[0.3em] uppercase animate-slide-up cursor-pointer hover:text-white/70 transition-colors"
+            style={{ animationDelay: '0.1s' }}
+            onClick={() => { setEditTimeValue(timeRange); setEditingTime(true) }}
+            title="Click to edit"
+          >
+            {timeRange}
+          </p>
+        )}
 
         <a
           href="/event/grouping"
