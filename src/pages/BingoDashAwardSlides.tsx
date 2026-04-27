@@ -16,7 +16,13 @@ const BINGO_LINES: number[][] = [
   [0, 6, 12, 18, 24], [4, 8, 12, 16, 20],
 ]
 
-const DEFAULT_COUNTS = { consolation_count: 3, third_count: 1, second_count: 1, first_count: 1 }
+const DEFAULT_COUNTS = {
+  consolation_count: 0,
+  consolation_group_count: 2,
+  third_count: 1,
+  second_count: 1,
+  first_count: 1,
+}
 
 export function BingoDashAwardSlides() {
   const { sectionSlug } = useParams<{ sectionSlug?: string }>()
@@ -260,23 +266,32 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
     )
   }
 
-  const rankedForSlide: RankedTeam | null =
-    current.teamRank != null ? (ranked[current.teamRank - 1] ?? null) : null
+  const teamsForSlide: RankedTeam[] = (current.teamRanks ?? [])
+    .map(r => ranked[r - 1])
+    .filter((x): x is RankedTeam => !!x)
+
+  const isMainSlide = current.kind === 'main'
+  const slideStyle = isMainSlide
+    ? {
+        background: 'linear-gradient(135deg, #DB0011 0%, #8B0009 100%)',
+        fontFamily: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
+      }
+    : {
+        background: 'radial-gradient(ellipse at 50% 35%, #3b1f66 0%, #180a33 55%, #06020f 100%)',
+        fontFamily: `'Cinzel', 'Trajan Pro', 'Palatino Linotype', Georgia, serif`,
+      }
 
   return (
     <div
       className="h-screen w-screen overflow-hidden relative cursor-pointer select-none"
       onClick={() => setSlideIdx(i => Math.min(totalSlides - 1, i + 1))}
-      style={{
-        background: 'radial-gradient(ellipse at 50% 35%, #3b1f66 0%, #180a33 55%, #06020f 100%)',
-        fontFamily: `'Cinzel', 'Trajan Pro', 'Palatino Linotype', Georgia, serif`,
-      }}
+      style={slideStyle}
     >
       <AwardSlideRenderer
         key={safeSlideIdx}
         slideIdx={safeSlideIdx}
         descriptor={current}
-        ranked={rankedForSlide}
+        teamsForSlide={teamsForSlide}
         config={config}
         teams={teams}
       />
@@ -490,19 +505,134 @@ function tierTitle(kind: 'consolation' | 'third' | 'second' | 'first', rank: num
 }
 
 function AwardSlideRenderer({
-  slideIdx, descriptor, ranked, config, teams,
+  slideIdx, descriptor, teamsForSlide, config, teams,
 }: {
   slideIdx: number
   descriptor: AwardSlideDescriptor
-  ranked: RankedTeam | null
+  teamsForSlide: RankedTeam[]
   config: BingoAwardConfig | null
   teams: BingoTeam[]
 }) {
+  if (descriptor.kind === 'main') return <MainSlide slideIdx={slideIdx} config={config} />
   if (descriptor.kind === 'intro') return <IntroSlide slideIdx={slideIdx} />
-  if (descriptor.kind === 'holding') return <HoldingSlide slideIdx={slideIdx} config={config} />
+  if (descriptor.kind === 'holding') return <HoldingSlide slideIdx={slideIdx} />
   if (descriptor.kind === 'lineup') return <LineupSlide slideIdx={slideIdx} teams={teams} />
   const prizePoints = config?.slide_points?.[descriptor.id] ?? 0
-  return <PrizeSlide slideIdx={slideIdx} descriptor={descriptor} ranked={ranked} prizePoints={prizePoints} />
+  if (descriptor.kind === 'consolation_group') {
+    return (
+      <ConsolationGroupSlide
+        slideIdx={slideIdx}
+        descriptor={descriptor}
+        teamsForSlide={teamsForSlide}
+        prizePoints={prizePoints}
+      />
+    )
+  }
+  return (
+    <PrizeSlide
+      slideIdx={slideIdx}
+      descriptor={descriptor}
+      ranked={teamsForSlide[0] ?? null}
+      prizePoints={prizePoints}
+    />
+  )
+}
+
+// ── Main slide (HSBC red opener) ──────────────────────────────────────────
+function MainSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwardConfig | null }) {
+  const title = config?.main_title || 'HSBC KL EXPLORACE 2026'
+  const subtitle = config?.main_subtitle || 'HSBC KL Explorace 2026'
+  const tagline = config?.main_tagline || 'AWARDS CEREMONY'
+
+  return (
+    <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
+      {/* Soft animated blobs to mirror briefing aesthetics */}
+      <div
+        className="absolute pointer-events-none z-0"
+        style={{
+          top: '-10%', left: '-15%', width: '60vw', height: '60vw',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+          animation: 'medal-pulse 6s ease-in-out infinite',
+        }}
+      />
+      <div
+        className="absolute pointer-events-none z-0"
+        style={{
+          bottom: '-15%', right: '-10%', width: '55vw', height: '55vw',
+          background: 'radial-gradient(circle, rgba(255,184,28,0.16) 0%, transparent 70%)',
+          filter: 'blur(48px)',
+          animation: 'medal-pulse 8s ease-in-out 1s infinite',
+        }}
+      />
+
+      <div
+        className="relative z-10 mb-6"
+        style={{ animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' }}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 260 140"
+          style={{
+            width: '110px',
+            height: 'auto',
+            filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.55))',
+          }}
+        >
+          <polygon points="0,70 65,0 65,140" fill="#fff" />
+          <polygon points="260,70 195,0 195,140" fill="#fff" />
+          <polygon points="65,0 130,70 195,0" fill="#fff" />
+          <polygon points="65,140 130,70 195,140" fill="#fff" />
+          <polygon points="65,0 130,70 65,140" fill="rgba(200,0,12,.7)" />
+          <polygon points="195,0 130,70 195,140" fill="rgba(200,0,12,.7)" />
+        </svg>
+      </div>
+
+      <h1
+        className="relative z-10 font-black leading-[0.95] text-white"
+        style={{
+          fontSize: 'clamp(3rem, 11vw, 9rem)',
+          letterSpacing: '0.04em',
+          textShadow: '0 4px 30px rgba(0,0,0,0.45)',
+          animation: 'title-slam 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both',
+        }}
+      >
+        {title}
+      </h1>
+
+      <p
+        className="relative z-10 mt-5 text-white/95 font-light"
+        style={{
+          fontSize: 'clamp(1.1rem, 2.4vw, 1.8rem)',
+          letterSpacing: '0.02em',
+          animation: 'slide-up-fade 0.7s ease-out 0.85s both',
+        }}
+      >
+        {subtitle}
+      </p>
+
+      <div
+        className="relative z-10 mt-6 mx-auto"
+        style={{
+          width: 60,
+          height: 2,
+          background: 'rgba(255,255,255,0.65)',
+          animation: 'slide-up-fade 0.6s ease-out 1.05s both',
+        }}
+      />
+
+      <p
+        className="relative z-10 mt-6 text-white/80 font-bold uppercase"
+        style={{
+          fontSize: 'clamp(0.85rem, 1.4vw, 1.05rem)',
+          letterSpacing: '0.4em',
+          animation: 'slide-up-fade 0.7s ease-out 1.25s both',
+        }}
+      >
+        {tagline}
+      </p>
+    </div>
+  )
 }
 
 // ── Intro slide (animated opener) ─────────────────────────────────────────
@@ -564,10 +694,7 @@ function IntroSlide({ slideIdx }: { slideIdx: number }) {
 // ── Holding slide ─────────────────────────────────────────────────────────
 // Layout mirrors PrizeSlide so the hero image lands where the team photo
 // will appear on the next slides (pretitle → title → photo → name-line).
-function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwardConfig | null }) {
-  const total = config?.total_points ?? 0
-  const img = config?.image_url ?? null
-  const photoSize = TIER.first.photoSize
+function HoldingSlide({ slideIdx }: { slideIdx: number }) {
   return (
     <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
       <div
@@ -585,56 +712,23 @@ function HoldingSlide({ slideIdx, config }: { slideIdx: number; config: BingoAwa
         className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] text-amber-200/80"
         style={{ animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}
       >
-        Total Prize Pool
+        Ladies and Gentlemen
       </p>
 
       <h1
-        className="relative z-10 mt-3 mb-8 font-black leading-none animate-gold-title"
+        className="relative z-10 mt-3 font-black leading-none animate-gold-title"
         style={{
-          fontSize: 'clamp(2.6rem, 9vw, 7rem)',
+          fontSize: 'clamp(3rem, 11vw, 9rem)',
           letterSpacing: '0.05em',
           animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, gold-sweep 6s linear 0.3s infinite',
         }}
       >
-        {total.toLocaleString()} pts
+        Presenting Awards
       </h1>
-
-      <div
-        className="relative z-10"
-        style={{ animation: 'pop-bounce-in 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both' }}
-      >
-        <div
-          className="relative flex items-center justify-center"
-          style={{
-            width: `${photoSize}px`,
-            height: `${photoSize}px`,
-            borderRadius: '50%',
-            background: TIER.first.ringBg,
-            padding: TIER.first.ringWidth,
-            boxShadow: `0 0 70px ${TIER.first.ringGlow}, inset 0 0 22px rgba(0,0,0,0.3)`,
-            animation: 'medal-pulse 2.8s ease-in-out 1.1s infinite',
-          }}
-        >
-          <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
-            {img ? (
-              <img src={img} alt="Awards" className="w-full h-full object-cover" />
-            ) : (
-              <div className="text-7xl text-white/40">🏆</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <p
-        className="relative z-10 mt-8 text-white/70 text-lg sm:text-2xl font-light tracking-widest uppercase"
-        style={{ animation: 'slide-up-fade 0.6s ease-out 1.35s both' }}
-      >
-        points up for grabs
-      </p>
 
       <p
         className="relative z-10 mt-10 text-white/40 text-xs uppercase tracking-[0.4em]"
-        style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
+        style={{ animation: 'slide-up-fade 0.6s ease-out 1.0s both' }}
       >
         ▶ Continue for the winners
       </p>
@@ -869,6 +963,145 @@ function PrizeSlide({
         >
           No team for this position yet.
         </p>
+      )}
+    </div>
+  )
+}
+
+// ── Consolation group slide (3 teams revealed together) ──────────────────
+function ConsolationGroupSlide({
+  slideIdx, descriptor, teamsForSlide, prizePoints,
+}: {
+  slideIdx: number
+  descriptor: AwardSlideDescriptor
+  teamsForSlide: RankedTeam[]
+  prizePoints: number
+}) {
+  const cfg = TIER.consolation
+  const ranks = descriptor.teamRanks ?? []
+  // Display teams in order matching ranks (e.g. [9, 8, 7]) — descending so the
+  // first column shows the worst rank (ceremonial worst→best within the slide).
+  const ordered = ranks
+    .map((r, i) => ({ rank: r, team: teamsForSlide[i] }))
+    .sort((a, b) => b.rank - a.rank)
+  const photoSize = 180
+
+  const titleText = ranks.length
+    ? `🎖 HONORABLE MENTIONS · ${ordered.map(o => `#${o.rank}`).join(' · ')}`
+    : '🎖 HONORABLE MENTIONS'
+
+  return (
+    <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
+      <div
+        className="absolute top-1/2 left-1/2 pointer-events-none z-0"
+        style={{
+          width: '160vmax',
+          height: '160vmax',
+          background: `conic-gradient(from 0deg, transparent 0deg, ${cfg.beamColor}33 18deg, transparent 40deg, transparent 170deg, ${cfg.beamColor}22 200deg, transparent 230deg, transparent 360deg)`,
+          animation: 'award-spotlight 22s linear infinite',
+          opacity: 0.7,
+        }}
+      />
+      <Confetti count={cfg.confetti} slideKey={slideIdx} />
+
+      <p
+        className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] opacity-70"
+        style={{ color: cfg.labelColor, animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}
+      >
+        {cfg.preLabel}
+      </p>
+
+      <h1
+        className="relative z-10 mt-3 mb-10 font-black leading-none"
+        style={{
+          fontSize: 'clamp(1.6rem, 5vw, 3.4rem)',
+          letterSpacing: '0.05em',
+          color: cfg.labelColor,
+          textShadow: `0 0 30px ${cfg.labelColor}88`,
+          animation: 'title-slam 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both',
+        }}
+      >
+        {titleText}
+      </h1>
+
+      <div
+        className="relative z-10 grid gap-x-10 gap-y-6 max-w-[min(95vw,1500px)] w-full"
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, ordered.length)}, minmax(0, 1fr))` }}
+      >
+        {ordered.map((entry, i) => {
+          const team = entry.team?.team
+          return (
+            <div
+              key={`${entry.rank}-${team?.id ?? i}`}
+              className="flex flex-col items-center"
+              style={{ animation: `pop-bounce-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.5 + i * 0.18}s both` }}
+            >
+              <p
+                className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.45em] mb-3"
+                style={{ color: cfg.labelColor, opacity: 0.85 }}
+              >
+                #{entry.rank}
+              </p>
+              <div
+                className="relative flex items-center justify-center"
+                style={{
+                  width: `${photoSize}px`,
+                  height: `${photoSize}px`,
+                  borderRadius: '50%',
+                  background: cfg.ringBg,
+                  padding: cfg.ringWidth,
+                  boxShadow: `0 0 50px ${cfg.ringGlow}, inset 0 0 18px rgba(0,0,0,0.3)`,
+                }}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
+                  {team?.photo_url ? (
+                    <img src={team.photo_url} alt={team.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-5xl text-white/40">👥</div>
+                  )}
+                </div>
+                <div
+                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 select-none"
+                  style={{
+                    fontSize: '2.4rem',
+                    filter: `drop-shadow(0 6px 14px ${cfg.ringGlow})`,
+                  }}
+                >
+                  {cfg.medal}
+                </div>
+              </div>
+              <p
+                className="font-black text-white mt-6 leading-tight"
+                style={{
+                  fontSize: 'clamp(1rem, 1.8vw, 1.6rem)',
+                  textShadow: `0 4px 24px ${cfg.ringGlow}`,
+                }}
+              >
+                {team?.name ?? 'No team'}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
+      {prizePoints > 0 && (
+        <div
+          className="relative z-10 mt-10 flex flex-col items-center"
+          style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
+        >
+          <p className="text-[10px] uppercase tracking-[0.4em] opacity-60">Prize each</p>
+          <p
+            className="font-black leading-none mt-1"
+            style={{
+              fontSize: 'clamp(1.4rem, 4vw, 3rem)',
+              color: cfg.labelColor,
+              textShadow: `0 0 30px ${cfg.ringGlow}`,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {prizePoints.toLocaleString()} <span className="text-white/70 font-light">pts</span>
+          </p>
+        </div>
       )}
     </div>
   )

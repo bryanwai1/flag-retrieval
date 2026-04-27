@@ -21,10 +21,15 @@ type DraftConfig = {
   image_url: string | null
   slide_order: AwardSlideId[]
   slide_points: Record<string, number>
+  holding_title: string
+  main_title: string
+  main_subtitle: string
+  main_tagline: string
 }
 
 const INITIAL_ORDER: AwardSlideId[] = defaultSlideOrder({
-  consolation_count: 3,
+  consolation_count: 0,
+  consolation_group_count: 2,
   third_count: 1,
   second_count: 1,
   first_count: 1,
@@ -35,20 +40,21 @@ const EMPTY_DRAFT: DraftConfig = {
   image_url: null,
   slide_order: INITIAL_ORDER,
   slide_points: {},
+  holding_title: 'AWARDS',
+  main_title: 'HSBC KL EXPLORACE 2026',
+  main_subtitle: 'HSBC KL Explorace 2026',
+  main_tagline: 'AWARDS CEREMONY',
 }
 
 export function BingoDashAwardAdmin() {
   const { sectionSlug } = useParams<{ sectionSlug: string }>()
   const navigate = useNavigate()
-  const fileRef = useRef<HTMLInputElement>(null)
-
   const [section, setSection] = useState<BingoSection | null>(null)
   const [configId, setConfigId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftConfig>(EMPTY_DRAFT)
   const [teams, setTeams] = useState<BingoTeam[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [uploadingTeamId, setUploadingTeamId] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const teamFileRef = useRef<HTMLInputElement>(null)
@@ -75,7 +81,8 @@ export function BingoDashAwardAdmin() {
       if (cfg) {
         setConfigId(cfg.id)
         const counts = {
-          consolation_count: cfg.consolation_count ?? 3,
+          consolation_count: cfg.consolation_count ?? 0,
+          consolation_group_count: cfg.consolation_group_count ?? 0,
           third_count: cfg.third_count ?? 1,
           second_count: cfg.second_count ?? 1,
           first_count: cfg.first_count ?? 1,
@@ -85,6 +92,10 @@ export function BingoDashAwardAdmin() {
           image_url: cfg.image_url ?? null,
           slide_order: normalizeSlideOrder(cfg.slide_order, counts),
           slide_points: (cfg.slide_points && typeof cfg.slide_points === 'object') ? cfg.slide_points : {},
+          holding_title: cfg.holding_title ?? 'AWARDS',
+          main_title: cfg.main_title ?? 'HSBC KL EXPLORACE 2026',
+          main_subtitle: cfg.main_subtitle ?? 'HSBC KL Explorace 2026',
+          main_tagline: cfg.main_tagline ?? 'AWARDS CEREMONY',
         })
       }
       const { data: teamRows } = await supabase
@@ -100,6 +111,7 @@ export function BingoDashAwardAdmin() {
   }, [sectionSlug])
 
   const slides = useMemo(() => buildAwardSlides(draft.slide_order), [draft.slide_order])
+  const hasMain = draft.slide_order.includes('main')
   const hasIntro = draft.slide_order.includes('intro')
   const hasHolding = draft.slide_order.includes('holding')
   const hasLineup = draft.slide_order.includes('lineup')
@@ -175,26 +187,6 @@ export function BingoDashAwardAdmin() {
     teamFileRef.current?.click()
   }
 
-  const uploadImage = async (file: File) => {
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Image too large (max 8 MB)')
-      return
-    }
-    setUploading(true)
-    try {
-      const ext = file.name.split('.').pop() || 'jpg'
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const path = `bingo-media/awards/${fileName}`
-      const { error } = await supabase.storage.from('media').upload(path, file)
-      if (error) { alert(`Upload failed: ${error.message}`); return }
-      const { data } = supabase.storage.from('media').getPublicUrl(path)
-      setDraft(d => ({ ...d, image_url: data.publicUrl }))
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
   const save = async () => {
     if (!section) return
     setSaving(true)
@@ -205,11 +197,16 @@ export function BingoDashAwardAdmin() {
         total_points: draft.total_points,
         image_url: draft.image_url,
         consolation_count: counts.consolation_count,
+        consolation_group_count: counts.consolation_group_count,
         third_count: counts.third_count,
         second_count: counts.second_count,
         first_count: counts.first_count,
         slide_order: draft.slide_order,
         slide_points: draft.slide_points,
+        holding_title: draft.holding_title.trim() || null,
+        main_title: draft.main_title.trim() || null,
+        main_subtitle: draft.main_subtitle.trim() || null,
+        main_tagline: draft.main_tagline.trim() || null,
       }
       if (configId) {
         const { error } = await supabase.from('bingo_award_configs').update(payload).eq('id', configId)
@@ -276,65 +273,42 @@ export function BingoDashAwardAdmin() {
         {/* Left: holding slide content */}
         <div className="space-y-6">
           <section className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h2 className="font-black text-gray-900 mb-4">Holding slide</h2>
+            <h2 className="font-black text-gray-900 mb-4">Main slide (HSBC opener)</h2>
+            <p className="text-xs text-gray-400 mb-4">Red-themed branded slide. Mirrors the leader's brief opener.</p>
 
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Total points shown</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
             <input
-              type="number"
-              min={0}
-              value={draft.total_points}
-              onChange={e => setDraft(d => ({ ...d, total_points: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-              onClick={e => (e.target as HTMLInputElement).select()}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-base font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+              type="text"
+              value={draft.main_title}
+              onChange={e => setDraft(d => ({ ...d, main_title: e.target.value }))}
+              placeholder="HSBC KL EXPLORACE 2026"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-rose-300"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              Manual value — type whatever number you want. Ignores game scores entirely.
-            </p>
 
-            <div className="mt-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Hero image</label>
-              {draft.image_url ? (
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100" style={{ aspectRatio: '16/9' }}>
-                  <img src={draft.image_url} alt="Hero" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => fileRef.current?.click()}
-                      className="px-3 py-1.5 bg-white rounded-lg text-xs font-bold"
-                    >
-                      Replace
-                    </button>
-                    <button
-                      onClick={() => setDraft(d => ({ ...d, image_url: null }))}
-                      className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-bold"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full border-2 border-dashed border-gray-200 rounded-xl py-10 flex flex-col items-center gap-2 hover:border-amber-300 hover:bg-amber-50 transition-colors disabled:opacity-50"
-                >
-                  <span className="text-4xl">🖼️</span>
-                  <span className="text-sm text-gray-500 font-semibold">
-                    {uploading ? 'Uploading…' : 'Click to upload hero image'}
-                  </span>
-                  <span className="text-xs text-gray-400">JPG or PNG · max 8 MB</span>
-                </button>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (f) uploadImage(f)
-                }}
-              />
-            </div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1 mt-3">Subtitle</label>
+            <input
+              type="text"
+              value={draft.main_subtitle}
+              onChange={e => setDraft(d => ({ ...d, main_subtitle: e.target.value }))}
+              placeholder="HSBC KL Explorace 2026"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+
+            <label className="block text-sm font-semibold text-gray-700 mb-1 mt-3">Tagline</label>
+            <input
+              type="text"
+              value={draft.main_tagline}
+              onChange={e => setDraft(d => ({ ...d, main_tagline: e.target.value }))}
+              placeholder="AWARDS CEREMONY"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+          </section>
+
+          <section className="bg-white rounded-2xl border border-gray-200 p-6">
+            <h2 className="font-black text-gray-900 mb-2">Holding slide</h2>
+            <p className="text-sm text-gray-600">
+              Shows a fixed “Presenting Awards” reveal between the opener and the winners. No configuration needed.
+            </p>
           </section>
 
           <section className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -416,11 +390,9 @@ export function BingoDashAwardAdmin() {
             <ul className="text-sm text-gray-700 space-y-1 list-disc pl-5">
               <li>{slides.length} slide{slides.length === 1 ? '' : 's'} total</li>
               <li>{slides.filter(s => isPrizeKind(s.kind)).length} prize reveal{slides.filter(s => isPrizeKind(s.kind)).length === 1 ? '' : 's'}</li>
-              <li>Total points (holding slide): <span className="font-mono font-bold">{draft.total_points}</span></li>
               <li>Prize pool (sum of per-slide pts): <span className="font-mono font-bold">
                 {slides.filter(s => isPrizeKind(s.kind)).reduce((sum, s) => sum + (draft.slide_points[s.id] ?? 0), 0)}
               </span></li>
-              <li>Hero image: <span className="font-mono">{draft.image_url ? 'set' : 'none'}</span></li>
             </ul>
           </section>
         </div>
@@ -444,13 +416,17 @@ export function BingoDashAwardAdmin() {
               {slides.map((s, i) => {
                 const { label, emoji, accent } = SLIDE_LABELS[s.kind]
                 const pts = draft.slide_points[s.id] ?? 0
-                const subtitle = s.kind === 'intro'
-                  ? '🏆 Award Ceremony title reveal'
-                  : s.kind === 'holding'
-                    ? `${draft.total_points} pts tease${draft.image_url ? ' · with image' : ''}`
-                    : s.kind === 'lineup'
-                      ? `${teams.length} team${teams.length === 1 ? '' : 's'} · grid w/ photos`
-                      : `Team rank #${s.teamRank} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
+                const subtitle = s.kind === 'main'
+                  ? `${draft.main_title || 'HSBC KL EXPLORACE 2026'} · ${draft.main_tagline || 'AWARDS CEREMONY'}`
+                  : s.kind === 'intro'
+                    ? '🏆 Award Ceremony title reveal'
+                    : s.kind === 'holding'
+                      ? '“Presenting Awards” reveal'
+                      : s.kind === 'lineup'
+                        ? `${teams.length} team${teams.length === 1 ? '' : 's'} · grid w/ photos`
+                        : s.kind === 'consolation_group'
+                          ? `Team ranks ${(s.teamRanks ?? []).map(r => `#${r}`).join(', ')} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
+                          : `Team rank #${(s.teamRanks ?? [])[0] ?? '?'} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
                 return (
                   <li
                     key={s.id}
@@ -522,6 +498,14 @@ export function BingoDashAwardAdmin() {
 
             <div className="grid grid-cols-2 gap-2">
               <AddButton
+                disabled={hasMain}
+                emoji="🎬"
+                label="Main"
+                sublabel={hasMain ? 'already added' : 'HSBC-branded opener'}
+                accent="#fca5a5"
+                onClick={() => doAddSlide('main')}
+              />
+              <AddButton
                 disabled={hasIntro}
                 emoji="✨"
                 label="Intro"
@@ -533,7 +517,7 @@ export function BingoDashAwardAdmin() {
                 disabled={hasHolding}
                 emoji="⏳"
                 label="Holding"
-                sublabel={hasHolding ? 'already added' : 'total points tease'}
+                sublabel={hasHolding ? 'already added' : 'AWARDS title slide'}
                 accent="#fcd34d"
                 onClick={() => doAddSlide('holding')}
               />
@@ -545,16 +529,21 @@ export function BingoDashAwardAdmin() {
                 accent="#a5f3fc"
                 onClick={() => doAddSlide('lineup')}
               />
-              {(['first', 'second', 'third', 'consolation'] as PrizeKind[]).map(kind => (
-                <AddButton
-                  key={kind}
-                  emoji={SLIDE_LABELS[kind].emoji}
-                  label={`+ ${SLIDE_LABELS[kind].label}`}
-                  sublabel={`Currently ${slides.filter(s => s.kind === kind).length}`}
-                  accent={SLIDE_LABELS[kind].accent}
-                  onClick={() => doAddSlide(kind)}
-                />
-              ))}
+              {(['first', 'second', 'third', 'consolation_group', 'consolation'] as PrizeKind[]).map(kind => {
+                const sublabel = kind === 'consolation_group'
+                  ? `${slides.filter(s => s.kind === kind).length} group${slides.filter(s => s.kind === kind).length === 1 ? '' : 's'} · 3 teams each`
+                  : `Currently ${slides.filter(s => s.kind === kind).length}`
+                return (
+                  <AddButton
+                    key={kind}
+                    emoji={SLIDE_LABELS[kind].emoji}
+                    label={`+ ${SLIDE_LABELS[kind].label}`}
+                    sublabel={sublabel}
+                    accent={SLIDE_LABELS[kind].accent}
+                    onClick={() => doAddSlide(kind)}
+                  />
+                )
+              })}
             </div>
           </section>
         </div>

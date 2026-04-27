@@ -1306,10 +1306,6 @@ export function BingoDashAdmin() {
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-400 border border-amber-800 hover:bg-amber-950/60 transition-colors">
               Scoreboard ↗
             </a>
-            <a href="/bingo-dash/colmar-intro" target="_blank" rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-rose-400 border border-rose-800 hover:bg-rose-950/60 transition-colors">
-              Intro Slide ↗
-            </a>
             <button
               onClick={() => setActiveTab('teams')}
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 border border-gray-700 hover:bg-white/5 transition-colors"

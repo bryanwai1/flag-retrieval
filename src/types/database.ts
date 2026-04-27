@@ -151,11 +151,16 @@ export interface BingoAwardConfig {
   total_points: number
   image_url: string | null
   consolation_count: number
+  consolation_group_count: number
   third_count: number
   second_count: number
   first_count: number
   slide_order: string[]
   slide_points: Record<string, number>
+  holding_title: string | null
+  main_title: string | null
+  main_subtitle: string | null
+  main_tagline: string | null
   created_at: string
 }
 
