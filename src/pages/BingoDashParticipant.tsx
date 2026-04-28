@@ -538,6 +538,7 @@ export function BingoDashParticipant() {
             </div>
           ) : (
             /* ── Per-type completion card ──────────────────────── */
+            <>
             <div
               className="rounded-3xl p-5 border-2 animate-pulse-border"
               style={{
@@ -747,6 +748,39 @@ export function BingoDashParticipant() {
                 ← Back to Board
               </button>
             </div>
+
+            {/* ── Supplementary photo upload (any non-photo task, when toggle ON) ── */}
+            {task.task_type !== 'photo' && photoSubmissionsEnabled && (
+              <div className="mt-4 rounded-3xl p-5 border-2 border-white/15 bg-black/30">
+                <p className="text-white font-black text-base text-center mb-1">📸 Optional Photo</p>
+                <p className="text-white/50 text-xs text-center mb-4">Attach an image as evidence — your marshal will review it.</p>
+                {photoSubmitted ? (
+                  <div className="p-4 rounded-2xl bg-green-400/15 border border-green-400/40 text-center">
+                    <div className="text-3xl mb-2">⏳</div>
+                    <p className="text-green-300 font-black">Photo submitted!</p>
+                    <p className="text-green-300/60 text-sm mt-1">Waiting for marshal review</p>
+                  </div>
+                ) : (
+                  <label className={`flex flex-col items-center justify-center gap-3 w-full py-5 rounded-2xl border-2 border-dashed border-white/25 text-white/55 font-bold text-sm cursor-pointer hover:border-white/45 hover:text-white/75 hover:bg-white/5 transition-all ${photoUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <span className="text-3xl">{photoUploading ? '⏳' : '📷'}</span>
+                    <span>{photoUploading ? 'Uploading...' : 'Tap to take or upload a photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      disabled={photoUploading || !scanRecord}
+                      onChange={e => {
+                        const f = e.target.files?.[0]
+                        e.target.value = ''
+                        if (f) handlePhotoUpload(f)
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+            </>
           )}
         </div>}
       </main>

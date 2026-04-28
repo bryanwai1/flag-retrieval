@@ -19,6 +19,14 @@ const SLIDES: Slide[] = [
     available: true,
   },
   {
+    href: '/bingo-dash/slides/briefing',
+    title: 'BRIEFING SLIDES',
+    subtitle: 'Participant rules · Roles · Submissions · Safety · Observer QR',
+    icon: '📣',
+    accent: '#DB0011',
+    available: true,
+  },
+  {
     href: '/bingo-dash/slides/awards',
     title: 'AWARD SLIDES',
     subtitle: 'Ceremony · Consolation → Bronze → Silver → Gold',

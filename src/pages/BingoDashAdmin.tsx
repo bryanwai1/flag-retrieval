@@ -1683,7 +1683,7 @@ export function BingoDashAdmin() {
           <div className="mt-5 flex items-center justify-between gap-4 p-4 rounded-lg border border-white/10 bg-gray-900/50">
             <div>
               <p className="text-sm font-bold text-white">Photo submissions</p>
-              <p className="text-xs text-gray-500 mt-0.5">When off, hides photo upload on every photo-type card. Use during marshal-led rounds where photos are not collected.</p>
+              <p className="text-xs text-gray-500 mt-0.5">When ON, every task tile shows a photo upload — primary on photo-type cards, optional/evidence on marshal & answer cards. Turn OFF during marshal-led rounds where photos are not collected.</p>
             </div>
             <button
               onClick={() => {
