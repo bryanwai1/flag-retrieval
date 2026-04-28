@@ -1,4 +1,5 @@
 import type { TaskLink } from '../types/database'
+import { normalizeUrl } from '../lib/normalizeUrl'
 import { T } from './T'
 
 interface Props {
@@ -18,7 +19,7 @@ export function TaskLinkButtons({ links, hexCode }: Props) {
         {links.map((link) => (
           <a
             key={link.id}
-            href={link.url}
+            href={normalizeUrl(link.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="group relative rounded-2xl p-[2px] overflow-hidden transition-transform active:scale-[0.98]"

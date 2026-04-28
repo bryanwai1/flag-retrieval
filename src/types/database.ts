@@ -116,6 +116,7 @@ export interface BingoTask {
   completion_warning: string | null
   require_marshal: boolean
   maps_url: string | null
+  maps_label: string | null
   created_at: string
 }
 
@@ -126,6 +127,7 @@ export interface BingoSettings {
   active_section_id: string | null
   marshal_password: string
   game_started: boolean
+  photo_submissions_enabled: boolean
   created_at: string
 }
 

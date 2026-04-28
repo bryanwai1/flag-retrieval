@@ -1,9 +1,25 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
+import JSZip from 'jszip'
 import { supabase } from '../lib/supabase'
 import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
+
+// Sanitize a string into a filesystem-safe filename component.
+function sanitizeForFilename(s: string): string {
+  return s
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+    .slice(0, 80) || 'unknown'
+}
+
+function extFromUrl(url: string): string {
+  const match = url.split('?')[0].match(/\.([a-zA-Z0-9]{2,5})$/)
+  return match ? match[1].toLowerCase() : 'jpg'
+}
 
 const PRESET_COLORS = [
   { name: 'Red', hex: '#EF4444' },
@@ -448,6 +464,8 @@ export function BingoDashAdmin() {
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
   const [members, setMembers] = useState<BingoMember[]>([])
   const [photoSubmissions, setPhotoSubmissions] = useState<BingoPhotoSubmission[]>([])
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<Set<string>>(new Set())
+  const [bulkActioning, setBulkActioning] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupPassword, setNewGroupPassword] = useState('')
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState<string | null>(null)
@@ -1141,9 +1159,114 @@ export function BingoDashAdmin() {
     }
   }
 
-  const rejectPhotoSubmission = async (subId: string) => {
-    setPhotoSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: 'rejected' } : s))
-    await supabase.from('bingo_photo_submissions').update({ status: 'rejected' }).eq('id', subId)
+  const rejectPhotoSubmission = async (sub: BingoPhotoSubmission) => {
+    const wasApproved = sub.status === 'approved'
+    setPhotoSubmissions(prev => prev.map(s => s.id === sub.id ? { ...s, status: 'rejected' } : s))
+    await supabase.from('bingo_photo_submissions').update({ status: 'rejected' }).eq('id', sub.id)
+    // If we're flipping from approved → rejected, undo the scan completion.
+    if (wasApproved && sub.scan_id) {
+      await supabase.from('bingo_scans').update({ completed: false, completed_at: null }).eq('id', sub.scan_id)
+      setScans(prev => prev.map(s => s.id === sub.scan_id ? { ...s, completed: false } : s))
+    }
+  }
+
+  const toggleSubmissionSelected = (id: string) => {
+    setSelectedSubmissionIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const setAllSubmissionsSelected = (subs: BingoPhotoSubmission[], checked: boolean) => {
+    setSelectedSubmissionIds(prev => {
+      const next = new Set(prev)
+      if (checked) subs.forEach(s => next.add(s.id))
+      else subs.forEach(s => next.delete(s.id))
+      return next
+    })
+  }
+
+  const bulkSetStatus = async (subs: BingoPhotoSubmission[], status: 'approved' | 'rejected') => {
+    if (subs.length === 0) return
+    setBulkActioning(true)
+    try {
+      // Optimistic UI
+      const ids = subs.map(s => s.id)
+      setPhotoSubmissions(prev => prev.map(s => ids.includes(s.id) ? { ...s, status } : s))
+      await supabase.from('bingo_photo_submissions').update({ status }).in('id', ids)
+      // Cascade to scans:
+      // - approve → mark scans completed
+      // - reject  → if any of these were previously approved, un-complete the scan
+      const scansToComplete = subs.filter(s => s.scan_id && status === 'approved').map(s => s.scan_id!)
+      const scansToUncomplete = subs.filter(s => s.scan_id && status === 'rejected' && s.status === 'approved').map(s => s.scan_id!)
+      if (scansToComplete.length > 0) {
+        await supabase.from('bingo_scans').update({ completed: true, completed_at: new Date().toISOString() }).in('id', scansToComplete)
+        setScans(prev => prev.map(s => scansToComplete.includes(s.id) ? { ...s, completed: true } : s))
+      }
+      if (scansToUncomplete.length > 0) {
+        await supabase.from('bingo_scans').update({ completed: false, completed_at: null }).in('id', scansToUncomplete)
+        setScans(prev => prev.map(s => scansToUncomplete.includes(s.id) ? { ...s, completed: false } : s))
+      }
+    } finally {
+      setBulkActioning(false)
+    }
+  }
+
+  const [downloadingZip, setDownloadingZip] = useState(false)
+  const downloadSubmissionsZip = async (subs: BingoPhotoSubmission[]) => {
+    if (subs.length === 0) return
+    setDownloadingZip(true)
+    try {
+      const zip = new JSZip()
+      const usedNames = new Map<string, number>()
+      const results = await Promise.all(subs.map(async (sub) => {
+        try {
+          const res = await fetch(sub.photo_url)
+          if (!res.ok) return { ok: false as const, sub }
+          const blob = await res.blob()
+          const team = teams.find(t => t.id === sub.team_id)
+          const task = tasks.find(t => t.id === sub.task_id)
+          const groupPart = sanitizeForFilename(team?.name ?? 'unknown-group')
+          const stationPart = sanitizeForFilename(task?.title ?? 'unknown-station')
+          const ext = extFromUrl(sub.photo_url)
+          const base = `${groupPart}__${stationPart}`
+          const count = (usedNames.get(base) ?? 0) + 1
+          usedNames.set(base, count)
+          const name = count === 1 ? `${base}.${ext}` : `${base}_${count}.${ext}`
+          return { ok: true as const, name, blob, status: sub.status }
+        } catch {
+          return { ok: false as const, sub }
+        }
+      }))
+      const failed: BingoPhotoSubmission[] = []
+      for (const r of results) {
+        if (r.ok) {
+          // Group by status into subfolders for easier review.
+          zip.folder(r.status)?.file(r.name, r.blob)
+        } else {
+          failed.push(r.sub)
+        }
+      }
+      if (zip.files && Object.keys(zip.files).length === 0) {
+        alert('Could not download any images. Check your network and try again.')
+        return
+      }
+      const out = await zip.generateAsync({ type: 'blob' })
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(out)
+      a.download = `bingo-submissions_${stamp}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(a.href)
+      if (failed.length > 0) {
+        alert(`Downloaded ${results.length - failed.length} image(s). ${failed.length} failed to fetch.`)
+      }
+    } finally {
+      setDownloadingZip(false)
+    }
   }
 
   const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
@@ -1553,6 +1676,31 @@ export function BingoDashAdmin() {
               className="px-5 py-2.5 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 transition-colors"
             >
               Save
+            </button>
+          </div>
+
+          {/* Photo submissions global toggle */}
+          <div className="mt-5 flex items-center justify-between gap-4 p-4 rounded-lg border border-white/10 bg-gray-900/50">
+            <div>
+              <p className="text-sm font-bold text-white">Photo submissions</p>
+              <p className="text-xs text-gray-500 mt-0.5">When off, hides photo upload on every photo-type card. Use during marshal-led rounds where photos are not collected.</p>
+            </div>
+            <button
+              onClick={() => {
+                if (!settings) return
+                updateSettings({ photo_submissions_enabled: !settings.photo_submissions_enabled })
+              }}
+              role="switch"
+              aria-checked={settings?.photo_submissions_enabled ?? true}
+              className={`relative shrink-0 w-14 h-8 rounded-full transition-colors ${
+                settings?.photo_submissions_enabled ?? true ? 'bg-violet-500' : 'bg-gray-600'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                  settings?.photo_submissions_enabled ?? true ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
             </button>
           </div>
         </section>
@@ -2664,11 +2812,73 @@ export function BingoDashAdmin() {
         )}
 
         {/* ── Submissions tab ──────────────────────────────────────────────── */}
-        {activeTab === 'submissions' && (
+        {activeTab === 'submissions' && (() => {
+        const filteredSubmissions = photoSubmissions.filter(sub => {
+          if (submissionStatusFilter !== 'all' && sub.status !== submissionStatusFilter) return false
+          if (submissionBoardFilter === 'current') {
+            const subTeam = teams.find(t => t.id === sub.team_id)
+            if (!subTeam || subTeam.section_id !== currentSectionId) return false
+          }
+          return true
+        })
+        const selectedSubs = filteredSubmissions.filter(s => selectedSubmissionIds.has(s.id))
+        const actionTargets = selectedSubs.length > 0 ? selectedSubs : filteredSubmissions
+        const allVisibleSelected = filteredSubmissions.length > 0 && filteredSubmissions.every(s => selectedSubmissionIds.has(s.id))
+        const someVisibleSelected = filteredSubmissions.some(s => selectedSubmissionIds.has(s.id))
+        const actionLabelSuffix = selectedSubs.length > 0 ? `${selectedSubs.length} selected` : `all ${filteredSubmissions.length}`
+        return (
         <section>
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-white mb-1">Photo Submissions</h2>
-            <p className="text-xs text-gray-500">Review images submitted by groups for photo challenges.</p>
+          <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">Photo Submissions</h2>
+              <p className="text-xs text-gray-500">Review images submitted by groups for photo challenges. Tick a card to act on it specifically — otherwise actions apply to every submission in view.</p>
+            </div>
+          </div>
+
+          {/* Selection + bulk action bar */}
+          <div className="mb-4 flex flex-wrap items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
+            <label className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                ref={el => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected }}
+                onChange={e => setAllSubmissionsSelected(filteredSubmissions, e.target.checked)}
+                disabled={filteredSubmissions.length === 0}
+                className="w-4 h-4 accent-violet-500"
+              />
+              Select all
+            </label>
+            {selectedSubs.length > 0 && (
+              <button
+                onClick={() => setSelectedSubmissionIds(new Set())}
+                className="text-xs text-gray-400 hover:text-white underline"
+              >
+                Clear ({selectedSubs.length})
+              </button>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={() => bulkSetStatus(actionTargets, 'approved')}
+              disabled={bulkActioning || actionTargets.length === 0}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ✓ Approve {actionLabelSuffix}
+            </button>
+            <button
+              onClick={() => bulkSetStatus(actionTargets, 'rejected')}
+              disabled={bulkActioning || actionTargets.length === 0}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ✗ Reject {actionLabelSuffix}
+            </button>
+            <button
+              onClick={() => downloadSubmissionsZip(actionTargets)}
+              disabled={downloadingZip || actionTargets.length === 0}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Download these images as a ZIP. Filenames are <group>__<station>.jpg, sorted into approved/rejected/pending folders."
+            >
+              {downloadingZip ? '⏳ Zipping…' : `⬇ Download ${actionLabelSuffix}`}
+            </button>
           </div>
 
           {/* Filters */}
@@ -2715,15 +2925,7 @@ export function BingoDashAdmin() {
 
           {/* List */}
           {(() => {
-            const filtered = photoSubmissions.filter(sub => {
-              if (submissionStatusFilter !== 'all' && sub.status !== submissionStatusFilter) return false
-              if (submissionBoardFilter === 'current') {
-                const subTeam = teams.find(t => t.id === sub.team_id)
-                if (!subTeam || subTeam.section_id !== currentSectionId) return false
-              }
-              return true
-            })
-            if (filtered.length === 0) {
+            if (filteredSubmissions.length === 0) {
               return (
                 <div className="bg-white/5 border border-white/10 rounded-xl p-8 text-center">
                   <p className="text-gray-400 text-sm">No {submissionStatusFilter === 'all' ? '' : submissionStatusFilter} submissions{submissionBoardFilter === 'current' ? ' for this board' : ''}.</p>
@@ -2732,7 +2934,7 @@ export function BingoDashAdmin() {
             }
             return (
               <div className="flex flex-col gap-3">
-                {filtered.map(sub => {
+                {filteredSubmissions.map(sub => {
                   const subTeam = teams.find(t => t.id === sub.team_id)
                   const subTask = tasks.find(t => t.id === sub.task_id)
                   const subSection = sections.find(s => s.id === subTeam?.section_id)
@@ -2741,8 +2943,22 @@ export function BingoDashAdmin() {
                     approved: 'bg-green-500/20 text-green-300 border-green-500/30',
                     rejected: 'bg-red-500/20 text-red-300 border-red-500/30',
                   }[sub.status]
+                  const isSelected = selectedSubmissionIds.has(sub.id)
                   return (
-                    <div key={sub.id} className="flex items-start gap-4 bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/[0.07] transition-colors">
+                    <div
+                      key={sub.id}
+                      className={`flex items-start gap-4 bg-white/5 border rounded-xl p-4 hover:bg-white/[0.07] transition-colors ${
+                        isSelected ? 'border-violet-400/60 bg-violet-500/[0.08]' : 'border-white/10'
+                      }`}
+                    >
+                      <label className="pt-1 cursor-pointer select-none flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSubmissionSelected(sub.id)}
+                          className="w-4 h-4 accent-violet-500"
+                        />
+                      </label>
                       <a href={sub.photo_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
                         <img
                           src={sub.photo_url}
@@ -2764,22 +2980,30 @@ export function BingoDashAdmin() {
                         </div>
                         <p className="text-xs text-gray-400 truncate mb-1">{subTask?.title ?? 'Unknown task'}</p>
                         <p className="text-[10px] text-gray-500">{new Date(sub.created_at).toLocaleString()}</p>
-                        {sub.status === 'pending' && (
-                          <div className="flex gap-2 mt-3">
-                            <button
-                              onClick={() => approvePhotoSubmission(sub)}
-                              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors"
-                            >
-                              ✓ Approve
-                            </button>
-                            <button
-                              onClick={() => rejectPhotoSubmission(sub.id)}
-                              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                            >
-                              ✗ Reject
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => approvePhotoSubmission(sub)}
+                            disabled={sub.status === 'approved'}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              sub.status === 'approved'
+                                ? 'bg-green-500 text-white cursor-default opacity-60'
+                                : 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30'
+                            }`}
+                          >
+                            ✓ {sub.status === 'approved' ? 'Approved' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => rejectPhotoSubmission(sub)}
+                            disabled={sub.status === 'rejected'}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              sub.status === 'rejected'
+                                ? 'bg-red-500 text-white cursor-default opacity-60'
+                                : 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
+                            }`}
+                          >
+                            ✗ {sub.status === 'rejected' ? 'Rejected' : 'Reject'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -2788,7 +3012,8 @@ export function BingoDashAdmin() {
             )
           })()}
         </section>
-        )}
+        )
+        })()}
 
       </main>
 

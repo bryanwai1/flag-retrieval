@@ -9,6 +9,7 @@ import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
+import { normalizeUrl } from '../lib/normalizeUrl'
 import type { BingoTask, SnakeTeam } from '../types/database'
 
 export function BingoDashParticipant() {
@@ -43,6 +44,8 @@ export function BingoDashParticipant() {
   const [marshalPassword, setMarshalPassword] = useState('')
   const [marshalInput, setMarshalInput] = useState('')
   const [marshalError, setMarshalError] = useState('')
+  // Global photo submissions toggle (controlled from marshal admin)
+  const [photoSubmissionsEnabled, setPhotoSubmissionsEnabled] = useState(true)
   // Photo submission state
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoSubmitted, setPhotoSubmitted] = useState(false)
@@ -77,10 +80,24 @@ export function BingoDashParticipant() {
     })
   }, [taskId])
 
-  // Load marshal password from settings
+  // Load marshal password + photo-submissions toggle, subscribe to live changes
   useEffect(() => {
-    supabase.from('bingo_settings').select('marshal_password').eq('id', 'main').single()
-      .then(({ data }) => { if (data?.marshal_password) setMarshalPassword(data.marshal_password) })
+    const applySettings = (data: { marshal_password?: string | null; photo_submissions_enabled?: boolean | null } | null) => {
+      if (!data) return
+      if (typeof data.marshal_password === 'string') setMarshalPassword(data.marshal_password)
+      if (typeof data.photo_submissions_enabled === 'boolean') {
+        setPhotoSubmissionsEnabled(data.photo_submissions_enabled)
+      }
+    }
+    supabase.from('bingo_settings').select('marshal_password, photo_submissions_enabled').eq('id', 'main').single()
+      .then(({ data }) => applySettings(data))
+    const channel = supabase
+      .channel('bingo-settings-participant')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_settings', filter: 'id=eq.main' }, (payload) => {
+        applySettings(payload.new as { marshal_password?: string | null; photo_submissions_enabled?: boolean | null })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   // Snake & Ladder mode: load teams + board config
@@ -371,12 +388,12 @@ export function BingoDashParticipant() {
         {task.maps_url && (
           <div className="mb-5 animate-slide-up">
             <a
-              href={task.maps_url}
+              href={normalizeUrl(task.maps_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-black text-sm text-white border-2 border-white/30 bg-white/10 hover:bg-white/20 active:scale-95 transition-all"
             >
-              📍 Open in Maps
+              📍 {task.maps_label?.trim() || 'Open in Maps'}
             </a>
           </div>
         )}
@@ -585,7 +602,7 @@ export function BingoDashParticipant() {
               )}
 
               {/* ── Photo: Submit image for marshal approval ── */}
-              {task.task_type === 'photo' && (
+              {task.task_type === 'photo' && photoSubmissionsEnabled && (
                 <>
                   <p className="text-white font-black text-lg text-center mb-4">📸 Submit Your Photo</p>
                   <p className="text-white/50 text-sm text-center mb-5">A marshal will review and approve your submission.</p>

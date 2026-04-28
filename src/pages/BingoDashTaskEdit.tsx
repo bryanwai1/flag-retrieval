@@ -28,6 +28,7 @@ export function BingoDashTaskEdit() {
   const [completionWarning, setCompletionWarning] = useState('')
   const [warningSaving, setWarningSaving] = useState(false)
   const [mapsUrl, setMapsUrl] = useState('')
+  const [mapsLabel, setMapsLabel] = useState('')
   const [mapsUrlSaving, setMapsUrlSaving] = useState(false)
   const { pages, createPage, updatePage, deletePage, reorderPages } = useBingoTaskPages(taskId)
 
@@ -42,6 +43,7 @@ export function BingoDashTaskEdit() {
         setAnswerText(data.answer_text ?? '')
         setCompletionWarning(data.completion_warning ?? '')
         setMapsUrl(data.maps_url ?? '')
+        setMapsLabel(data.maps_label ?? '')
       }
     })
   }, [taskId])
@@ -447,23 +449,33 @@ export function BingoDashTaskEdit() {
         {/* Maps URL */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
           <h2 className="text-lg font-bold text-gray-900 mb-1">Google Maps Link</h2>
-          <p className="text-xs text-gray-400 mb-4">If set, participants see an "Open in Maps" button on this task. Paste a Google Maps URL or any navigation link.</p>
+          <p className="text-xs text-gray-400 mb-4">If set, participants see a button on this task that opens the location in Google Maps. The link can be a Google Maps URL, a Plus Code, an address, or a place name.</p>
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Button label</label>
           <input
-            type="url"
+            type="text"
+            value={mapsLabel}
+            onChange={e => setMapsLabel(e.target.value)}
+            placeholder="e.g. Petronas Twin Towers"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mb-3"
+          />
+          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">URL or Plus Code</label>
+          <input
+            type="text"
             value={mapsUrl}
             onChange={e => setMapsUrl(e.target.value)}
-            placeholder="https://maps.google.com/?q=..."
+            placeholder="https://maps.google.com/?q=...  or  4MWW+R3 Kuala Lumpur"
             className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
           />
           <button
             onClick={async () => {
               if (!task) return
               setMapsUrlSaving(true)
-              const val = mapsUrl.trim() || null
-              const { error } = await supabase.from('bingo_tasks').update({ maps_url: val }).eq('id', task.id)
+              const url = mapsUrl.trim() || null
+              const label = mapsLabel.trim() || null
+              const { error } = await supabase.from('bingo_tasks').update({ maps_url: url, maps_label: label }).eq('id', task.id)
               setMapsUrlSaving(false)
               if (error) { alert('Failed to save: ' + error.message); return }
-              setTask({ ...task, maps_url: val })
+              setTask({ ...task, maps_url: url, maps_label: label })
             }}
             disabled={mapsUrlSaving}
             className="mt-3 px-6 py-2.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-bold transition-colors disabled:opacity-50"
