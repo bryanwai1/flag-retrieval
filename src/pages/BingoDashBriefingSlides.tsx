@@ -94,8 +94,10 @@ function SectionPicker() {
 type SlideKind =
   | 'main'
   | 'holding'
-  | 'how-to-play'
-  | 'read-card'
+  | 'step1-roam'
+  | 'step2-card'
+  | 'step3-bingo'
+  | 'step4-time'
   | 'roles'
   | 'submissions'
   | 'how-to-submit'
@@ -105,8 +107,10 @@ type SlideKind =
 const SLIDES: SlideKind[] = [
   'main',
   'holding',
-  'how-to-play',
-  'read-card',
+  'step1-roam',
+  'step2-card',
+  'step3-bingo',
+  'step4-time',
   'roles',
   'submissions',
   'how-to-submit',
@@ -236,8 +240,10 @@ function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName }: {
   switch (kind) {
     case 'main':           return <MainSlide slideIdx={slideIdx} />
     case 'holding':        return <HoldingSlide slideIdx={slideIdx} />
-    case 'how-to-play':    return <HowToPlaySlide slideIdx={slideIdx} />
-    case 'read-card':      return <ReadCardSlide slideIdx={slideIdx} />
+    case 'step1-roam':     return <Step1RoamSlide slideIdx={slideIdx} />
+    case 'step2-card':     return <Step2CardSlide slideIdx={slideIdx} />
+    case 'step3-bingo':    return <Step3BingoSlide slideIdx={slideIdx} />
+    case 'step4-time':     return <Step4TimeSlide slideIdx={slideIdx} />
     case 'roles':          return <RolesSlide slideIdx={slideIdx} />
     case 'submissions':    return <SubmissionTypesSlide slideIdx={slideIdx} />
     case 'how-to-submit':  return <HowToSubmitSlide slideIdx={slideIdx} />
@@ -266,21 +272,21 @@ function MainSlide({ slideIdx }: { slideIdx: number }) {
         <HsbcHexagon size={110} />
       </div>
 
-      <h1 className="relative z-10 font-black leading-[0.95] text-white" style={{
-        fontSize: 'clamp(3rem, 11vw, 9rem)',
-        letterSpacing: '0.04em',
+      <h1 className="relative z-10 font-black leading-[0.92] text-white" style={{
+        fontSize: 'clamp(2.4rem, 8.5vw, 7rem)',
+        letterSpacing: '0.035em',
         textShadow: '0 4px 30px rgba(0,0,0,0.45)',
         animation: 'title-slam 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both',
       }}>
-        BINGO DASH
+        HSBC KL<br />EXPLORACE 2026
       </h1>
 
-      <p className="relative z-10 mt-5 text-white/95 font-light" style={{
-        fontSize: 'clamp(1.1rem, 2.4vw, 1.8rem)',
-        letterSpacing: '0.02em',
+      <p className="relative z-10 mt-6 text-white/95 font-black uppercase" style={{
+        fontSize: 'clamp(1.4rem, 3.4vw, 2.6rem)',
+        letterSpacing: '0.35em',
         animation: 'slide-up-fade 0.7s ease-out 0.85s both',
       }}>
-        HSBC KL Explorace 2026
+        Bingo Dash
       </p>
 
       <div className="relative z-10 mt-6 mx-auto" style={{
@@ -331,62 +337,115 @@ function HoldingSlide({ slideIdx }: { slideIdx: number }) {
   )
 }
 
-// ── 3. How to Play ───────────────────────────────────────────────────────
-function HowToPlaySlide({ slideIdx }: { slideIdx: number }) {
-  const items = [
-    { icon: '🗺', title: 'Roam the route', body: 'Explore the locations marked on your team map. Tasks are scattered around the area.' },
-    { icon: '🔲', title: 'Fill a 5 × 5 card', body: 'Each task you complete unlocks a tile on your team\'s bingo card.' },
-    { icon: '🎯', title: 'Form Bingo lines', body: 'Any complete row, column, or diagonal scores extra points for your team.' },
-    { icon: '⏱', title: 'Beat the clock', body: 'You\'re competing against time and other teams. More tasks done = more points.' },
+// ── Step 1 · Roam the route ──────────────────────────────────────────────
+function Step1RoamSlide({ slideIdx }: { slideIdx: number }) {
+  const cards = [
+    {
+      icon: '📍',
+      tint: '#22c55e',
+      label: 'Anchored tasks',
+      pill: 'Go to the spot',
+      body: 'A specific location around the route. You scan the QR there to unlock the task.',
+      examples: ['Statue · Bridge · Plaza'],
+    },
+    {
+      icon: '🌐',
+      tint: '#38bdf8',
+      label: 'Anywhere tasks',
+      pill: 'Do it from any spot',
+      body: 'No location required. Open the tile, do the activity, submit — wherever you are.',
+      examples: ['Group selfie · Trivia · Word puzzle'],
+    },
   ]
   return (
-    <ContentShell slideIdx={slideIdx} pretitle="How It Works" title="How to Play" beam="#fcd34d">
-      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-5xl w-full mx-auto">
-        {items.map((it, i) => (
-          <div key={i} className="flex items-start gap-4 p-5 rounded-2xl border border-white/15 bg-white/5"
-               style={{ animation: `pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) ${0.55 + i * 0.1}s both` }}>
-            <div className="text-4xl leading-none flex-shrink-0">{it.icon}</div>
-            <div className="text-left">
-              <p className="text-amber-200 font-black text-lg leading-tight">{it.title}</p>
-              <p className="text-white/80 text-sm sm:text-base mt-1.5 leading-snug" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                {it.body}
-              </p>
+    <ContentShell slideIdx={slideIdx} pretitle="Step 1" title="Roam the Route" beam="#86efac">
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl w-full mx-auto">
+        {cards.map((c, i) => (
+          <div key={c.label}
+               className="p-7 rounded-3xl border-2 flex flex-col gap-4 text-left"
+               style={{
+                 borderColor: `${c.tint}55`,
+                 background: `linear-gradient(160deg, ${c.tint}22 0%, rgba(0,0,0,0.42) 100%)`,
+                 boxShadow: `0 0 36px ${c.tint}26`,
+                 animation: `pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) ${0.45 + i * 0.15}s both`,
+               }}>
+            <div className="flex items-center gap-4">
+              <div className="text-6xl leading-none" style={{ filter: `drop-shadow(0 0 14px ${c.tint}aa)` }}>{c.icon}</div>
+              <div>
+                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.25em]"
+                      style={{ background: `${c.tint}33`, color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                  {c.pill}
+                </span>
+                <h3 className="text-white font-black text-3xl tracking-tight leading-none mt-2">{c.label}</h3>
+              </div>
             </div>
+            <p className="text-white/85 text-base sm:text-lg leading-snug"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              {c.body}
+            </p>
+            <p className="text-white/55 text-xs sm:text-sm italic"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              {c.examples[0]}
+            </p>
           </div>
         ))}
+
+        <div className="md:col-span-2 mt-2 px-5 py-3.5 rounded-2xl border border-amber-300/40 bg-amber-300/10 text-amber-100 text-sm sm:text-base text-center"
+             style={{ fontFamily: 'system-ui, -apple-system, sans-serif',
+                      animation: 'slide-up-fade 0.6s ease-out 0.95s both' }}>
+          <span className="font-black mr-2">🗺 Your team map</span>
+          shows every anchored task. Anywhere tasks just appear on your bingo card.
+        </div>
       </div>
     </ContentShell>
   )
 }
 
-// ── 4. Read the Card ─────────────────────────────────────────────────────
-function ReadCardSlide({ slideIdx }: { slideIdx: number }) {
-  const tiles: Array<'locked' | 'scanned' | 'done' | 'bingo'> = [
-    'done',   'bingo',  'done',   'locked', 'scanned',
-    'locked', 'bingo',  'scanned','done',   'locked',
-    'done',   'bingo',  'done',   'locked', 'scanned',
-    'scanned','bingo',  'locked', 'done',   'locked',
-    'locked', 'bingo',  'done',   'scanned','done',
+// ── Step 2 · Pick a tile, play the task ──────────────────────────────────
+function Step2CardSlide({ slideIdx }: { slideIdx: number }) {
+  /**
+   * 5x5 card pick & play animation.
+   * Tiles transition through: locked → scanned → done in a wave, with one tile
+   * highlighted as the "currently playing" tile. Loops continuously.
+   */
+  // Sequence each tile's start moment (seconds) so the play wave looks natural.
+  const seq: number[] = [
+    0.0, 1.4, 0.4, 2.6, 1.0,
+    0.7, 2.1, 1.7, 0.2, 2.4,
+    1.9, 0.9, 2.8, 1.3, 0.5,
+    2.3, 1.6, 0.3, 2.0, 1.1,
+    0.8, 2.5, 1.5, 0.6, 2.2,
   ]
-  const legend = [
-    { kind: 'locked',  label: 'Locked',    desc: 'Not visited yet' },
-    { kind: 'scanned', label: 'Scanned',   desc: 'You scanned it — finish to lock the tile' },
-    { kind: 'done',    label: 'Done',      desc: 'Task completed' },
-    { kind: 'bingo',   label: 'Bingo Line',desc: 'Five-in-a-row! Bonus points' },
-  ] as const
-
+  const cycle = 4.5
   return (
-    <ContentShell slideIdx={slideIdx} pretitle="Reading the Card" title="Your Bingo Card" beam="#a5f3fc">
+    <ContentShell slideIdx={slideIdx} pretitle="Step 2" title="Pick a Tile · Play the Task" beam="#a5f3fc">
       <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center gap-10 max-w-6xl w-full mx-auto">
-        {/* 5x5 grid */}
+        {/* 5x5 animated grid */}
         <div className="grid grid-cols-5 gap-2 p-4 rounded-2xl bg-black/30 border border-white/10"
              style={{ animation: 'pop-bounce-in 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.4s both' }}>
-          {tiles.map((t, i) => <DemoTile key={i} kind={t} />)}
+          {seq.map((delay, i) => (
+            <div key={i} className="relative flex items-center justify-center rounded-md border-2"
+                 style={{
+                   width: 64, height: 64,
+                   background: 'rgba(255,255,255,0.04)',
+                   borderColor: 'rgba(255,255,255,0.12)',
+                   animation: `tile-cycle ${cycle}s linear ${delay}s infinite`,
+                   fontFamily: 'system-ui, -apple-system, sans-serif',
+                   fontWeight: 900, fontSize: 24, color: 'transparent',
+                 }}>
+              ✓
+            </div>
+          ))}
         </div>
 
         {/* Legend */}
-        <div className="flex flex-col gap-3 max-w-md w-full">
-          {legend.map((l, i) => (
+        <div className="flex flex-col gap-3 max-w-sm w-full">
+          {[
+            { kind: 'locked' as const,  label: 'Locked',    desc: 'Untouched tile' },
+            { kind: 'scanned' as const, label: 'Scanned',   desc: 'You opened it — finish the task' },
+            { kind: 'done' as const,    label: 'Done',      desc: 'Task completed' },
+            { kind: 'bingo' as const,   label: 'Bingo Tile', desc: 'Part of a 5-in-a-row line' },
+          ].map((l, i) => (
             <div key={l.kind} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/10"
                  style={{ animation: `slide-up-fade 0.5s ease-out ${0.65 + i * 0.1}s both` }}>
               <DemoTile kind={l.kind} small />
@@ -398,6 +457,186 @@ function ReadCardSlide({ slideIdx }: { slideIdx: number }) {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </ContentShell>
+  )
+}
+
+// ── Step 3 · Form Bingo lines ────────────────────────────────────────────
+function Step3BingoSlide({ slideIdx }: { slideIdx: number }) {
+  /**
+   * Animated multiplier ladder. The grid fills row → row → diagonal in waves,
+   * and the multiplier card on the side ticks up: 1.2× · 1.4× · 1.6× · 1.8× · 2.0×
+   */
+  // Map each tile (row*5+col) to which "wave" lights it (0-3). Wave 0 = first row,
+  // wave 1 = second row, wave 2 = first column, wave 3 = main diagonal.
+  const waveOf: number[] = [
+    0, 0, 0, 0, 0,   // row 0 → wave 0 (1st bingo line)
+    1, 1, 1, 1, 1,   // row 1 → wave 1 (2nd bingo line)
+    2, 3, 4, 4, 4,   // partial row 2
+    2, 4, 3, 4, 4,   // partial
+    2, 4, 4, 4, 3,   // bottom-left col + diag end
+  ]
+  const ladder = [
+    { lines: 1, mult: '1.2×', tint: '#fbbf24' },
+    { lines: 2, mult: '1.4×', tint: '#fb923c' },
+    { lines: 3, mult: '1.6×', tint: '#f97316' },
+    { lines: 4, mult: '1.8×', tint: '#ef4444' },
+    { lines: 5, mult: '2.0×', tint: '#dc2626' },
+  ]
+  const period = 6 // seconds per full cycle
+  return (
+    <ContentShell slideIdx={slideIdx} pretitle="Step 3" title="Form Bingo Lines" beam="#fcd34d">
+      <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center gap-8 max-w-6xl w-full mx-auto">
+        {/* 5x5 grid that fills + flashes lines */}
+        <div className="relative grid grid-cols-5 gap-2 p-4 rounded-2xl bg-black/30 border border-white/10"
+             style={{ animation: 'pop-bounce-in 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.4s both' }}>
+          {waveOf.map((wave, i) => {
+            const baseDelay = wave * 1.2
+            return (
+              <div key={i} className="rounded-md border-2"
+                   style={{
+                     width: 60, height: 60,
+                     background: 'rgba(255,255,255,0.04)',
+                     borderColor: 'rgba(255,255,255,0.12)',
+                     animation: `tile-fill-bingo ${period}s linear ${baseDelay}s infinite`,
+                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                     fontFamily: 'system-ui, -apple-system, sans-serif',
+                     fontWeight: 900, fontSize: 22,
+                   }}
+              />
+            )
+          })}
+          {/* Bingo line flashes (overlay strokes) — row 0, row 1, col 0, diag */}
+          <span className="absolute pointer-events-none rounded-full"
+                style={{
+                  left: 14, right: 14, top: 30, height: 6,
+                  background: 'linear-gradient(90deg, #fde68a, #fbbf24)',
+                  boxShadow: '0 0 18px #fbbf24cc',
+                  animation: `bingo-line-flash ${period}s linear 1.0s infinite`,
+                }} />
+          <span className="absolute pointer-events-none rounded-full"
+                style={{
+                  left: 14, right: 14, top: 92, height: 6,
+                  background: 'linear-gradient(90deg, #fed7aa, #fb923c)',
+                  boxShadow: '0 0 18px #fb923ccc',
+                  animation: `bingo-line-flash ${period}s linear 2.2s infinite`,
+                }} />
+          <span className="absolute pointer-events-none rounded-full"
+                style={{
+                  top: 14, bottom: 14, left: 30, width: 6,
+                  background: 'linear-gradient(180deg, #f97316, #ef4444)',
+                  boxShadow: '0 0 18px #f97316cc',
+                  animation: `bingo-line-flash ${period}s linear 3.4s infinite`,
+                }} />
+          <span className="absolute pointer-events-none rounded-full"
+                style={{
+                  left: '6%', top: '6%', width: '128%', height: 6,
+                  transform: 'rotate(45deg)', transformOrigin: 'top left',
+                  background: 'linear-gradient(90deg, #ef4444, #dc2626)',
+                  boxShadow: '0 0 18px #dc2626cc',
+                  animation: `bingo-line-flash ${period}s linear 4.6s infinite`,
+                }} />
+        </div>
+
+        {/* Multiplier ladder */}
+        <div className="flex flex-col gap-2.5 max-w-xs w-full">
+          <p className="text-amber-200 font-black uppercase tracking-[0.3em] text-xs sm:text-sm text-center mb-1"
+             style={{ fontFamily: 'system-ui, -apple-system, sans-serif',
+                      animation: 'slide-up-fade 0.5s ease-out 0.5s both' }}>
+            Score Multiplier
+          </p>
+          {ladder.map((l, i) => (
+            <div key={l.lines} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2"
+                 style={{
+                   borderColor: `${l.tint}66`,
+                   background: `linear-gradient(90deg, ${l.tint}22 0%, rgba(0,0,0,0.4) 100%)`,
+                   animation: `ladder-pulse ${period}s linear ${0.4 + i * 1.2}s infinite, slide-up-fade 0.5s ease-out ${0.6 + i * 0.08}s both`,
+                 }}>
+              <div className="flex items-center gap-2 text-left" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                <span className="text-white font-black text-2xl tabular-nums">{l.lines}</span>
+                <span className="text-white/65 text-xs uppercase tracking-wider">{l.lines === 1 ? 'line' : 'lines'}</span>
+              </div>
+              <span className="font-black text-2xl tabular-nums" style={{ color: l.tint, textShadow: `0 0 10px ${l.tint}88` }}>
+                {l.mult}
+              </span>
+            </div>
+          ))}
+          <p className="text-white/55 text-[11px] text-center mt-1 italic"
+             style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            Multipliers stack with each new line you complete.
+          </p>
+        </div>
+      </div>
+    </ContentShell>
+  )
+}
+
+// ── Step 4 · Beat the clock (240 mins · ends 1:30 PM · lunch L16) ────────
+function Step4TimeSlide({ slideIdx }: { slideIdx: number }) {
+  return (
+    <ContentShell slideIdx={slideIdx} pretitle="Step 4" title="Beat the Clock" beam="#fda4af">
+      <div className="relative z-10 flex flex-col items-center gap-8 max-w-5xl w-full mx-auto">
+        {/* Big duration */}
+        <div className="flex items-end justify-center gap-4 sm:gap-6"
+             style={{ animation: 'pop-bounce-in 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.4s both' }}>
+          <span className="text-7xl sm:text-8xl leading-none" style={{ filter: 'drop-shadow(0 0 18px #fda4afaa)' }}>⏱</span>
+          <div className="text-left">
+            <p className="text-white/65 text-xs sm:text-sm font-black uppercase tracking-[0.35em]"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>You have</p>
+            <p className="font-black tabular-nums leading-[0.9] text-white"
+               style={{
+                 fontSize: 'clamp(4rem, 14vw, 10rem)',
+                 textShadow: '0 4px 24px rgba(252,165,165,0.55)',
+                 letterSpacing: '0.02em',
+               }}>
+              240<span className="text-amber-300 ml-3" style={{ fontSize: '0.4em', verticalAlign: 'middle' }}>MIN</span>
+            </p>
+            <p className="text-amber-200/85 text-base sm:text-lg font-black uppercase tracking-[0.3em] mt-1"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>4 hours · one shot</p>
+          </div>
+        </div>
+
+        {/* End time + lunch */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
+          <div className="p-7 rounded-3xl border-2 text-center"
+               style={{
+                 borderColor: '#ef444466',
+                 background: 'linear-gradient(160deg, #ef444433 0%, rgba(0,0,0,0.4) 100%)',
+                 boxShadow: '0 0 40px #ef444433',
+                 animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.7s both',
+               }}>
+            <p className="text-red-200 text-xs sm:text-sm font-black uppercase tracking-[0.4em] mb-3"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>🛑 Hard stop</p>
+            <p className="font-black text-white tabular-nums leading-none"
+               style={{ fontSize: 'clamp(3rem, 9vw, 6rem)', textShadow: '0 4px 24px rgba(239,68,68,0.55)' }}>
+              1:30 PM
+            </p>
+            <p className="text-white/70 text-sm sm:text-base mt-3"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              Submissions close. Bingo card freezes.
+            </p>
+          </div>
+
+          <div className="p-7 rounded-3xl border-2 text-center"
+               style={{
+                 borderColor: '#fbbf2466',
+                 background: 'linear-gradient(160deg, #fbbf2433 0%, rgba(0,0,0,0.4) 100%)',
+                 boxShadow: '0 0 40px #fbbf2433',
+                 animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.85s both',
+               }}>
+            <p className="text-amber-200 text-xs sm:text-sm font-black uppercase tracking-[0.4em] mb-3"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>🍱 Then</p>
+            <p className="font-black text-white leading-none"
+               style={{ fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', textShadow: '0 4px 24px rgba(251,191,36,0.55)' }}>
+              Level 16
+            </p>
+            <p className="text-white/70 text-sm sm:text-base mt-3"
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+              Lunch is provided — head straight up after time's up.
+            </p>
+          </div>
         </div>
       </div>
     </ContentShell>
@@ -488,6 +727,24 @@ function RolesSlide({ slideIdx }: { slideIdx: number }) {
             </ul>
           </div>
         ))}
+
+        {/* Stuck-or-logged-out escalation */}
+        <div className="md:col-span-2 mt-2 px-6 py-5 rounded-2xl border-2 border-amber-300/45 bg-amber-300/10 text-left"
+             style={{ fontFamily: 'system-ui, -apple-system, sans-serif',
+                      animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.95s both' }}>
+          <div className="flex items-start gap-4">
+            <div className="text-4xl flex-shrink-0" style={{ filter: 'drop-shadow(0 0 10px #fbbf24aa)' }}>🆘</div>
+            <div className="flex-1">
+              <p className="text-amber-200 font-black text-lg sm:text-xl leading-tight">
+                Stuck, signed out, or something broke?
+              </p>
+              <p className="text-white/85 text-sm sm:text-base mt-1.5 leading-snug">
+                Find the <span className="font-black text-white">nearest marshal</span> or
+                <span className="font-black text-white"> WhatsApp the marshal</span> on the contact list — we'll get you sorted.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </ContentShell>
   )
@@ -586,11 +843,11 @@ function HowToSubmitSlide({ slideIdx }: { slideIdx: number }) {
 // ── 8. Safety ────────────────────────────────────────────────────────────
 function SafetySlide({ slideIdx }: { slideIdx: number }) {
   const rules = [
-    { icon: '🚦', text: 'Cross roads only at marked crossings — pavements over speed.' },
-    { icon: '👫', text: 'Stay together as a team. No teammate left behind.' },
-    { icon: '💧', text: 'Hydrate often — Colmar in April can still be cold AND tiring.' },
-    { icon: '🚫', text: 'Respect locals, signage, and private property — no climbing, no trespass.' },
-    { icon: '📱', text: 'Keep your phone charged — it\'s your bingo card and your lifeline.' },
+    { icon: '🚦', text: 'Cross roads only at marked crossings.' },
+    { icon: '👫', text: 'Stay together — no teammate left behind.' },
+    { icon: '💧', text: 'Hydrate often. KL heat is no joke.' },
+    { icon: '🚫', text: 'Respect locals, signage, and private property.' },
+    { icon: '📱', text: 'Keep your phone charged — it\'s your bingo card.' },
   ]
   const contacts = [
     { name: 'Bryan Ng',  phone: '012-661 1043', role: 'Facilitator' },
@@ -600,13 +857,22 @@ function SafetySlide({ slideIdx }: { slideIdx: number }) {
   return (
     <ContentShell slideIdx={slideIdx} pretitle="Stay Safe Out There" title="Safety First" beam="#fca5a5">
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl w-full mx-auto items-stretch">
-        {/* Rules */}
-        <div className="flex flex-col gap-2.5">
+        {/* Rules — bigger tiles, icon pulse */}
+        <div className="flex flex-col gap-3.5">
           {rules.map((r, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10"
-                 style={{ animation: `slide-up-fade 0.45s ease-out ${0.4 + i * 0.08}s both` }}>
-              <div className="text-2xl flex-shrink-0">{r.icon}</div>
-              <p className="text-white/85 text-sm sm:text-base leading-snug text-left"
+            <div key={i} className="flex items-center gap-5 p-5 rounded-2xl bg-white/5 border-2 border-white/15"
+                 style={{
+                   animation: `pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) ${0.4 + i * 0.1}s both`,
+                   boxShadow: '0 0 24px rgba(252,165,165,0.08)',
+                 }}>
+              <div className="text-5xl sm:text-6xl flex-shrink-0"
+                   style={{
+                     animation: `safety-icon-pulse 2.4s ease-in-out ${i * 0.25}s infinite`,
+                     filter: 'drop-shadow(0 0 12px rgba(252,165,165,0.55))',
+                   }}>
+                {r.icon}
+              </div>
+              <p className="text-white text-lg sm:text-2xl font-black leading-snug text-left"
                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
                 {r.text}
               </p>
@@ -614,25 +880,36 @@ function SafetySlide({ slideIdx }: { slideIdx: number }) {
           ))}
         </div>
 
-        {/* Emergency contacts */}
-        <div className="rounded-2xl border-2 border-red-400/40 bg-red-950/40 overflow-hidden"
-             style={{ animation: `pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.55s both` }}>
-          <div className="px-5 py-3 flex items-center gap-2 border-b border-red-400/30 bg-red-900/40">
-            <span className="text-xl">🆘</span>
-            <span className="text-red-200 text-xs font-black uppercase tracking-[0.3em]"
+        {/* Emergency contacts — pulsing border + bigger numbers */}
+        <div className="rounded-3xl border-2 border-red-400/55 bg-red-950/45 overflow-hidden relative"
+             style={{
+               animation: `pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.55s both, safety-card-glow 3s ease-in-out infinite`,
+             }}>
+          <div className="px-6 py-4 flex items-center gap-3 border-b border-red-400/30 bg-red-900/50">
+            <span className="text-3xl"
+                  style={{ animation: 'safety-sos-shake 1.6s ease-in-out infinite',
+                           filter: 'drop-shadow(0 0 10px #fca5a5cc)' }}>
+              🆘
+            </span>
+            <span className="text-red-100 text-sm sm:text-base font-black uppercase tracking-[0.35em]"
                   style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
               Emergency Contacts
             </span>
           </div>
-          <div className="divide-y divide-red-400/20">
-            {contacts.map(c => (
-              <div key={c.phone} className="flex items-center justify-between px-5 py-3.5 gap-3 text-left">
+          <div className="divide-y divide-red-400/25">
+            {contacts.map((c, i) => (
+              <div key={c.phone}
+                   className="flex items-center justify-between px-6 py-5 gap-3 text-left"
+                   style={{ animation: `slide-up-fade 0.5s ease-out ${0.85 + i * 0.12}s both` }}>
                 <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  <div className="text-white text-base font-black leading-tight">{c.name}</div>
-                  <div className="text-red-300/80 text-xs font-semibold mt-0.5">{c.role}</div>
+                  <div className="text-white text-xl sm:text-2xl font-black leading-tight">{c.name}</div>
+                  <div className="text-red-300/85 text-sm font-bold uppercase tracking-wider mt-1">{c.role}</div>
                 </div>
-                <div className="text-red-200 text-base sm:text-lg font-black tracking-wide tabular-nums"
-                     style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                <div className="text-red-100 text-2xl sm:text-3xl font-black tracking-wide tabular-nums"
+                     style={{
+                       fontFamily: 'system-ui, -apple-system, sans-serif',
+                       textShadow: '0 0 14px rgba(252,165,165,0.55)',
+                     }}>
                   {c.phone}
                 </div>
               </div>
