@@ -53,6 +53,18 @@ body {
   50% { transform: translateX(8px); }
 }
 .animate-swipe-nudge { animation: swipe-nudge 1.6s ease-in-out infinite; }
+
+@keyframes alarm-flash {
+  0%, 49% { background-color: rgba(127, 29, 29, 0.92); }
+  50%, 100% { background-color: rgba(220, 38, 38, 0.96); }
+}
+.animate-alarm-flash { animation: alarm-flash 0.7s steps(1, end) infinite; }
+
+@keyframes alarm-pulse {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 24px rgba(255,255,255,0.4); }
+  50% { transform: scale(1.04); text-shadow: 0 0 48px rgba(255,255,255,0.9); }
+}
+.animate-alarm-pulse { animation: alarm-pulse 0.7s ease-in-out infinite; }
 .animate-gradient {
   background-size: 200% 200%;
   animation: gradient-shift 3s ease infinite;
@@ -401,4 +413,17 @@ body {
   0%, 100% { transform: rotate(0deg); }
   25%      { transform: rotate(-8deg); }
   75%      { transform: rotate(8deg); }
+}
+
+/* Briefing · Preview clue tile pulse (idle "tap me") */
+@keyframes preview-tile-pulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 30px rgba(168,85,247,0.30); }
+  50%      { transform: scale(1.04); box-shadow: 0 0 56px rgba(168,85,247,0.55); }
+}
+
+/* Briefing · Preview clue input shake on wrong answer */
+@keyframes preview-shake {
+  0%, 100%   { transform: translateX(0); }
+  20%, 60%   { transform: translateX(-6px); }
+  40%, 80%   { transform: translateX(6px); }
 }

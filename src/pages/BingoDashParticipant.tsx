@@ -9,6 +9,7 @@ import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { SwipeablePages } from '../components/SwipeablePages'
 import { ParticleBackground } from '../components/ParticleBackground'
+import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
 import { normalizeUrl } from '../lib/normalizeUrl'
 import type { BingoTask, SnakeTeam } from '../types/database'
@@ -248,12 +249,19 @@ export function BingoDashParticipant() {
     }
   }
 
+  // The bingo time-up alarm overlays every state below — only mounted in the
+  // bingo flow so Snake & Ladder players are unaffected.
+  const timeUpOverlay = !isSnakeLadder ? <TimeUpAlarm /> : null
+
   // ── Loading ─────────────────────────────────────────────────────────
   if ((!isSnakeLadder && teamLoading) || !task) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
-      </div>
+      <>
+        <div className="min-h-screen flex items-center justify-center bg-gray-950">
+          <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
+        </div>
+        {timeUpOverlay}
+      </>
     )
   }
 
@@ -261,37 +269,44 @@ export function BingoDashParticipant() {
   // Admin creates teams in advance; participants must join from /bingo-dash (search + password).
   if (!isSnakeLadder && !isRegistered) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-center px-6">
-        <ParticleBackground />
-        <div className="relative z-10 max-w-sm">
-          <div className="text-5xl mb-4">🎯</div>
-          <h2 className="text-white text-2xl font-black mb-2">Join your group first</h2>
-          <p className="text-gray-400 text-sm mb-6">
-            You need to pick your group before you can complete this task.
-          </p>
-          <button
-            onClick={() => navigate('/bingo-dash')}
-            className="px-6 py-3 rounded-2xl text-white font-black text-base"
-            style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
-          >
-            Go to Join Page →
-          </button>
+      <>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 text-center px-6">
+          <ParticleBackground />
+          <div className="relative z-10 max-w-sm">
+            <div className="text-5xl mb-4">🎯</div>
+            <h2 className="text-white text-2xl font-black mb-2">Join your group first</h2>
+            <p className="text-gray-400 text-sm mb-6">
+              You need to pick your group before you can complete this task.
+            </p>
+            <button
+              onClick={() => navigate('/bingo-dash')}
+              className="px-6 py-3 rounded-2xl text-white font-black text-base"
+              style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+            >
+              Go to Join Page →
+            </button>
+          </div>
         </div>
-      </div>
+        {timeUpOverlay}
+      </>
     )
   }
 
   if (pagesLoading || photosLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-gray-400 text-xl font-bold animate-pulse">Loading challenge...</div>
-      </div>
+      <>
+        <div className="min-h-screen flex items-center justify-center bg-gray-950">
+          <div className="text-gray-400 text-xl font-bold animate-pulse">Loading challenge...</div>
+        </div>
+        {timeUpOverlay}
+      </>
     )
   }
 
   // ── Splash ───────────────────────────────────────────────────────────
   if (showSplash) {
     return (
+      <>
       <div
         className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white overflow-hidden"
         style={{ backgroundColor: task.hex_code }}
@@ -328,11 +343,14 @@ export function BingoDashParticipant() {
         </button>
         <p className="relative z-10 mt-4 text-sm opacity-50 animate-pulse">Tap anywhere to begin</p>
       </div>
+      {timeUpOverlay}
+      </>
     )
   }
 
   // ── Main view ────────────────────────────────────────────────────────
   return (
+    <>
     <div
       className="min-h-screen relative overflow-x-hidden"
       style={{ backgroundColor: `color-mix(in srgb, ${task.hex_code} 50%, #0a0a0a)` }}
@@ -841,5 +859,7 @@ export function BingoDashParticipant() {
         </div>}
       </main>
     </div>
+    {timeUpOverlay}
+    </>
   )
 }

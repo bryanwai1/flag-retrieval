@@ -128,6 +128,9 @@ export interface BingoSettings {
   marshal_password: string
   game_started: boolean
   photo_submissions_enabled: boolean
+  time_up_message: string
+  time_up_label: string
+  time_up_maps_url: string
   created_at: string
 }
 

@@ -1760,6 +1760,68 @@ export function BingoDashAdmin() {
                 </button>
               ))}
             </div>
+
+            {/* ── Time's-Up Alarm (shown to players when timer hits 0) ───── */}
+            <div className="mt-6 pt-5 border-t border-white/10">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Time's-Up Alarm</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Shown full-screen to all players when the timer reaches 0. Press <span className="font-bold">Reset</span> above to clear it.</p>
+                </div>
+                {settings?.timer_end_at && new Date(settings.timer_end_at).getTime() <= Date.now() && (
+                  <span className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse">● Alarm live</span>
+                )}
+              </div>
+
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Message</label>
+              <textarea
+                value={settings?.time_up_message ?? ''}
+                onChange={e => setSettings(prev => prev ? { ...prev, time_up_message: e.target.value } : prev)}
+                placeholder="Time's up! Please return to the meeting point."
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500 resize-none"
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Location label</label>
+                  <input
+                    type="text"
+                    value={settings?.time_up_label ?? ''}
+                    onChange={e => setSettings(prev => prev ? { ...prev, time_up_label: e.target.value } : prev)}
+                    placeholder="e.g. Colmar Plaza"
+                    className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Google Maps link</label>
+                  <input
+                    type="text"
+                    value={settings?.time_up_maps_url ?? ''}
+                    onChange={e => setSettings(prev => prev ? { ...prev, time_up_maps_url: e.target.value } : prev)}
+                    placeholder="https://maps.app.goo.gl/..."
+                    className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => {
+                    if (!settings) return
+                    updateSettings({
+                      time_up_message: settings.time_up_message ?? '',
+                      time_up_label: settings.time_up_label ?? '',
+                      time_up_maps_url: settings.time_up_maps_url ?? '',
+                    })
+                  }}
+                  disabled={timerSaving}
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 disabled:opacity-40 transition-colors"
+                >
+                  Save alarm
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

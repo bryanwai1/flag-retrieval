@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
+import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import type { BingoTask, BingoScan, BingoSection, BingoSettings, BingoTeam, BingoMember } from '../types/database'
 
 /* ── helpers ─────────────────────────────────────────────────────────────────── */
@@ -954,72 +955,91 @@ export function BingoDashJoin() {
     setPageState('join')
   }
 
+  const timeUpOverlay = <TimeUpAlarm settings={settings} />
+
   if (pageState === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
-      </div>
+      <>
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+          <div className="text-gray-400 text-xl font-bold animate-pulse">Loading...</div>
+        </div>
+        {timeUpOverlay}
+      </>
     )
   }
 
   if (pageState === 'not-found') {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
-        <ParticleBackground />
-        <div className="relative z-10 text-center">
-          <div className="text-6xl mb-4">😵</div>
-          <h1 className="text-3xl font-black text-white mb-2">Game Not Found</h1>
-          <p className="text-gray-400">
-            The link <span className="text-purple-400 font-mono">/play/{sectionSlug}</span> doesn't match any active game.
-          </p>
-          <p className="text-gray-500 text-sm mt-2">Check the QR code or ask your facilitator for the correct link.</p>
+      <>
+        <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+          <ParticleBackground />
+          <div className="relative z-10 text-center">
+            <div className="text-6xl mb-4">😵</div>
+            <h1 className="text-3xl font-black text-white mb-2">Game Not Found</h1>
+            <p className="text-gray-400">
+              The link <span className="text-purple-400 font-mono">/play/{sectionSlug}</span> doesn't match any active game.
+            </p>
+            <p className="text-gray-500 text-sm mt-2">Check the QR code or ask your facilitator for the correct link.</p>
+          </div>
         </div>
-      </div>
+        {timeUpOverlay}
+      </>
     )
   }
 
   if (pageState === 'join' && section) {
-    return <JoinScreen sectionName={section.name} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} isObserver={isObserver} />
+    return (
+      <>
+        <JoinScreen sectionName={section.name} groups={groups} memberCounts={memberCounts} onJoinGroup={joinGroup} isObserver={isObserver} />
+        {timeUpOverlay}
+      </>
+    )
   }
 
   if (pageState === 'board' && team && section) {
     if (!section.game_started) {
       return (
-        <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
-          <ParticleBackground />
-          <div className="relative z-10 text-center animate-slide-up">
-            <div className="text-6xl mb-5">⏳</div>
-            <h1 className="text-4xl font-black text-white tracking-tight mb-2">Game Not Started Yet</h1>
-            <p className="text-purple-400 font-bold text-base mb-1">{section.name}</p>
-            <p className="text-gray-400 text-sm mb-8">
-              You're in <span className="text-white font-bold">{team.name}</span>. Hang tight — the game will begin soon!
-            </p>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-600 text-xs mt-2">Waiting for facilitator to start the game...</p>
+        <>
+          <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+            <ParticleBackground />
+            <div className="relative z-10 text-center animate-slide-up">
+              <div className="text-6xl mb-5">⏳</div>
+              <h1 className="text-4xl font-black text-white tracking-tight mb-2">Game Not Started Yet</h1>
+              <p className="text-purple-400 font-bold text-base mb-1">{section.name}</p>
+              <p className="text-gray-400 text-sm mb-8">
+                You're in <span className="text-white font-bold">{team.name}</span>. Hang tight — the game will begin soon!
+              </p>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-600 text-xs mt-2">Waiting for facilitator to start the game...</p>
+              </div>
+              <button
+                onClick={leaveTeam}
+                className="mt-10 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+              >
+                Switch Team
+              </button>
             </div>
-            <button
-              onClick={leaveTeam}
-              className="mt-10 text-xs text-gray-600 hover:text-gray-400 transition-colors"
-            >
-              Switch Team
-            </button>
           </div>
-        </div>
+          {timeUpOverlay}
+        </>
       )
     }
 
     return (
-      <BoardScreen
-        team={team}
-        sectionName={section.name}
-        sectionSlug={sectionSlug!}
-        memberRole={memberRole}
-        gridTasks={gridTasks}
-        scans={scans}
-        settings={settings}
-        onLeave={leaveTeam}
-      />
+      <>
+        <BoardScreen
+          team={team}
+          sectionName={section.name}
+          sectionSlug={sectionSlug!}
+          memberRole={memberRole}
+          gridTasks={gridTasks}
+          scans={scans}
+          settings={settings}
+          onLeave={leaveTeam}
+        />
+        {timeUpOverlay}
+      </>
     )
   }
 

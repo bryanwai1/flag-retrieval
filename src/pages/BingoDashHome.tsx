@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { ParticleBackground } from '../components/ParticleBackground'
+import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import type { BingoTask, BingoScan, BingoSettings, BingoTeam } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
@@ -683,16 +684,24 @@ export function BingoDashHome() {
   }
 
   if (!isRegistered) {
-    return <JoinScreen onJoin={async (teamId, pwd) => { await joinTeamById(teamId, pwd) }} />
+    return (
+      <>
+        <JoinScreen onJoin={async (teamId, pwd) => { await joinTeamById(teamId, pwd) }} />
+        <TimeUpAlarm settings={settings} />
+      </>
+    )
   }
 
   return (
-    <BoardScreen
-      team={team!}
-      gridTasks={gridTasks}
-      scans={scans}
-      settings={settings}
-      onLeave={leaveTeam}
-    />
+    <>
+      <BoardScreen
+        team={team!}
+        gridTasks={gridTasks}
+        scans={scans}
+        settings={settings}
+        onLeave={leaveTeam}
+      />
+      <TimeUpAlarm settings={settings} />
+    </>
   )
 }
