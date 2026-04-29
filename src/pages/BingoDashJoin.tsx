@@ -27,16 +27,7 @@ const MEMBER_DATA_KEY = (sectionSlug: string) => `bingo-join-member-data-${secti
 const TEAM_ID_KEY = (sectionSlug: string) => `bingo-join-team-${sectionSlug}`
 const TEAM_DATA_KEY = (sectionSlug: string) => `bingo-join-data-${sectionSlug}`
 const MEMBER_ROLE_KEY = (sectionSlug: string) => `bingo-join-role-${sectionSlug}`
-const DEVICE_NAME_KEY = 'bingo-device-name'
-
-function getOrCreateDeviceName(): string {
-  const stored = localStorage.getItem(DEVICE_NAME_KEY)
-  if (stored) return stored
-  const id = Math.random().toString(36).slice(2, 7).toUpperCase()
-  const name = `Player-${id}`
-  localStorage.setItem(DEVICE_NAME_KEY, name)
-  return name
-}
+const PLAYER_NAME_KEY = 'bingo-player-name'
 
 // Shared with useBingoDashTeam so the task page recognizes the user without re-registering.
 const GLOBAL_TEAM_ID_KEY = 'bingo-dash-team-id'
@@ -60,22 +51,33 @@ function JoinScreen({
   onJoinGroup: (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => Promise<void>
   isObserver?: boolean
 }) {
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<'name' | 'group' | 'password'>('name')
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(PLAYER_NAME_KEY) ?? '')
   const [password, setPassword] = useState('')
   const [search, setSearch] = useState('')
   const [selectedTeam, setSelectedTeam] = useState<BingoTeam | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: pick a group
+  const trimmedName = playerName.trim()
+
+  const handleSubmitName = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!trimmedName) return
+    localStorage.setItem(PLAYER_NAME_KEY, trimmedName)
+    setError('')
+    setStep('group')
+  }
+
+  // Group step: pick a group
   const handlePickGroup = async (team: BingoTeam) => {
+    if (!trimmedName) { setStep('name'); return }
     if (isObserver) {
       // Observers skip the password step and join directly
       setSubmitting(true)
       setError('')
       try {
-        const deviceName = getOrCreateDeviceName()
-        await onJoinGroup(deviceName, '', team.id, 'observer')
+        await onJoinGroup(trimmedName, '', team.id, 'observer')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to join group')
         setSubmitting(false)
@@ -85,18 +87,17 @@ function JoinScreen({
     setSelectedTeam(team)
     setPassword('')
     setError('')
-    setStep(2)
+    setStep('password')
   }
 
-  // Step 2: submit password (members only)
+  // Password step: submit password (members only)
   const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedTeam || password.length !== 4) return
+    if (!selectedTeam || password.length !== 4 || !trimmedName) return
     setSubmitting(true)
     setError('')
     try {
-      const deviceName = getOrCreateDeviceName()
-      await onJoinGroup(deviceName, password, selectedTeam.id, 'member')
+      await onJoinGroup(trimmedName, password, selectedTeam.id, 'member')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join group')
       setSubmitting(false)
@@ -121,11 +122,66 @@ function JoinScreen({
         }
       </div>
 
-      {step === 1 && (
+      {step === 'name' && (
         <div
           className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
-          style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
+          style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
         >
+          {isObserver && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-5">
+              <span className="text-base">👁</span>
+              <p className="text-blue-700 text-xs font-bold">You're joining as an Observer — view only, no submissions.</p>
+            </div>
+          )}
+          <h2 className="text-2xl font-black text-gray-900 text-center mb-1">
+            What's your name?
+          </h2>
+          <p className="text-gray-400 text-center text-sm mb-5">
+            This is how your team will see you on the leaderboard.
+          </p>
+
+          <form onSubmit={handleSubmitName} className="flex flex-col gap-3">
+            <input
+              type="text"
+              value={playerName}
+              onChange={e => { setPlayerName(e.target.value); setError('') }}
+              placeholder="Your name"
+              maxLength={40}
+              className="w-full px-5 py-4 rounded-2xl border-2 text-lg font-bold focus:outline-none transition-colors text-center"
+              style={{ borderColor: trimmedName ? '#a855f7' : '#e5e7eb' }}
+              autoFocus
+            />
+
+            {error && (
+              <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <span>🚫</span>
+                <p className="text-red-600 font-bold text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={!trimmedName}
+              className="w-full py-4 rounded-2xl text-white font-black text-xl transition-all duration-200 disabled:opacity-40 hover:scale-105 active:scale-95 mt-1"
+              style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
+            >
+              Continue →
+            </button>
+          </form>
+        </div>
+      )}
+
+      {step === 'group' && (
+        <div
+          className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
+          style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
+        >
+          <button
+            onClick={() => { setStep('name'); setError('') }}
+            className="text-sm text-purple-500 font-bold mb-4 hover:text-purple-700 transition-colors"
+          >
+            &larr; Back
+          </button>
           {isObserver && (
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 mb-5">
               <span className="text-base">👁</span>
@@ -135,6 +191,9 @@ function JoinScreen({
           <h2 className="text-2xl font-black text-gray-900 text-center mb-1">
             {isObserver ? 'Select Group to Watch' : 'Join Game'}
           </h2>
+          <p className="text-gray-400 text-center text-sm mb-1">
+            Hi <span className="text-purple-500 font-bold">{trimmedName}</span>!
+          </p>
           <p className="text-gray-400 text-center text-sm mb-5">
             {isObserver ? 'Pick the group you want to observe' : 'Search and select your group'}
           </p>
@@ -206,14 +265,14 @@ function JoinScreen({
         </div>
       )}
 
-      {step === 2 && selectedTeam && (
+      {step === 'password' && selectedTeam && (
         <div
           className="relative z-10 bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm animate-bounce-in"
           style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}
         >
           <button
             onClick={() => {
-              setStep(1)
+              setStep('group')
               setPassword('')
               setError('')
             }}
@@ -225,7 +284,7 @@ function JoinScreen({
             Enter Password
           </h2>
           <p className="text-gray-400 text-center text-sm mb-1">
-            Group: <span className="text-purple-500 font-bold">{selectedTeam.name}</span>
+            <span className="text-purple-500 font-bold">{trimmedName}</span> joining <span className="text-purple-500 font-bold">{selectedTeam.name}</span>
           </p>
           <p className="text-gray-400 text-center text-xs mb-5">
             Enter the 4-digit password given to your group.

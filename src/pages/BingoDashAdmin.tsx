@@ -1158,6 +1158,25 @@ export function BingoDashAdmin() {
     await fetchAll()
   }
 
+  const resetTeamScore = async (id: string, name: string) => {
+    if (!confirm(`Reset all progress for "${name}"? This clears scans, photo submissions, and bonus points. The team itself, members, and password are kept.`)) return
+    const teamSubs = photoSubmissions.filter(s => s.team_id === id)
+    const subIds = teamSubs.map(s => s.id)
+    const photoPaths = teamSubs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
+    // Optimistic UI
+    setScans(prev => prev.filter(s => s.team_id !== id))
+    setPhotoSubmissions(prev => prev.filter(s => s.team_id !== id))
+    setTeams(prev => prev.map(t => t.id === id ? { ...t, bonus_points: 0 } : t))
+    // Persist
+    await Promise.all([
+      supabase.from('bingo_scans').delete().eq('team_id', id),
+      subIds.length > 0 ? supabase.from('bingo_photo_submissions').delete().in('id', subIds) : Promise.resolve({ error: null } as any),
+      supabase.from('bingo_teams').update({ bonus_points: 0 }).eq('id', id),
+    ])
+    if (photoPaths.length > 0) await supabase.storage.from('media').remove(photoPaths)
+    await fetchAll()
+  }
+
   const removeMember = async (memberId: string, memberName: string, teamName: string) => {
     if (!confirm(`Remove "${memberName}" from ${teamName}?`)) return
     setMembers(prev => prev.filter(m => m.id !== memberId))
@@ -2662,7 +2681,7 @@ export function BingoDashAdmin() {
                         <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px]">Board</th>
                         <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-36">Progress</th>
                         <th className="text-left px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-16" title="Bonus points from other games">Bonus</th>
-                        <th className="text-right px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-28">Actions</th>
+                        <th className="text-right px-3 py-2.5 font-bold text-gray-500 uppercase tracking-wide text-[11px] w-36">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -2848,6 +2867,14 @@ export function BingoDashAdmin() {
                                   className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-violet-400 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 transition-colors whitespace-nowrap"
                                 >
                                   Grid
+                                </button>
+                                <button
+                                  onClick={() => resetTeamScore(team.id, team.name)}
+                                  disabled={completedCount === 0 && (team.bonus_points ?? 0) === 0}
+                                  className="text-[11px] text-amber-500 hover:text-amber-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  title="Reset this team's scans, photo submissions, and bonus points"
+                                >
+                                  Reset
                                 </button>
                                 <button onClick={() => deleteTeam(team.id, team.name)}
                                   className="text-[11px] text-gray-600 hover:text-red-400 transition-colors">Del</button>
