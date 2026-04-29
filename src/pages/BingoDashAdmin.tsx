@@ -21,6 +21,31 @@ function extFromUrl(url: string): string {
   return match ? match[1].toLowerCase() : 'jpg'
 }
 
+function SubmissionThumb({ url }: { url: string }) {
+  const [broken, setBroken] = useState(false)
+  if (broken) {
+    return (
+      <div
+        className="w-28 h-28 flex flex-col items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 text-[10px] font-bold flex-shrink-0 text-center px-2"
+        title="The photo file is missing from storage. The submission row can be deleted."
+      >
+        <span className="text-2xl mb-1">🚫</span>
+        <span>Photo missing</span>
+      </div>
+    )
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+      <img
+        src={url}
+        alt="submission"
+        onError={() => setBroken(true)}
+        className="w-28 h-28 object-cover rounded-lg border border-white/10 hover:opacity-90 transition-opacity"
+      />
+    </a>
+  )
+}
+
 const PRESET_COLORS = [
   { name: 'Red', hex: '#EF4444' },
   { name: 'Orange', hex: '#F97316' },
@@ -3051,13 +3076,7 @@ export function BingoDashAdmin() {
                           className="w-4 h-4 accent-violet-500"
                         />
                       </label>
-                      <a href={sub.photo_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                        <img
-                          src={sub.photo_url}
-                          alt="submission"
-                          className="w-28 h-28 object-cover rounded-lg border border-white/10 hover:opacity-90 transition-opacity"
-                        />
-                      </a>
+                      <SubmissionThumb url={sub.photo_url} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <p className="font-bold text-sm text-white truncate">{subTeam?.name ?? 'Unknown team'}</p>
