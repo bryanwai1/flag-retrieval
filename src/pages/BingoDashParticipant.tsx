@@ -12,6 +12,49 @@ import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
 import { normalizeUrl } from '../lib/normalizeUrl'
 import type { BingoTask, SnakeTeam } from '../types/database'
 
+async function compressToJpeg(file: File, maxDim = 1920, quality = 0.85): Promise<Blob> {
+  let width = 0, height = 0
+  let drawSource: CanvasImageSource | null = null
+  let bitmap: ImageBitmap | null = null
+  let objectUrl: string | null = null
+  let imgEl: HTMLImageElement | null = null
+  try {
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions)
+      width = bitmap.width
+      height = bitmap.height
+      drawSource = bitmap
+    } catch {
+      objectUrl = URL.createObjectURL(file)
+      imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image()
+        i.onload = () => resolve(i)
+        i.onerror = () => reject(new Error('decode-failed'))
+        i.src = objectUrl!
+      })
+      width = imgEl.naturalWidth
+      height = imgEl.naturalHeight
+      drawSource = imgEl
+    }
+    if (!width || !height) throw new Error('decode-failed')
+    const scale = Math.min(1, maxDim / Math.max(width, height))
+    const w = Math.max(1, Math.round(width * scale))
+    const h = Math.max(1, Math.round(height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('canvas-context-failed')
+    ctx.drawImage(drawSource, 0, 0, w, h)
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob-failed')), 'image/jpeg', quality)
+    })
+  } finally {
+    bitmap?.close?.()
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
+  }
+}
+
 export function BingoDashParticipant() {
   const { taskId } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
@@ -173,12 +216,21 @@ export function BingoDashParticipant() {
 
   const handlePhotoUpload = async (file: File) => {
     if (!team || !taskId || !scanRecord) return
-    if (file.size > 10 * 1024 * 1024) { alert('Photo too large (max 10 MB).'); return }
+    if (file.size > 25 * 1024 * 1024) { alert('Photo too large (max 25 MB).'); return }
     setPhotoUploading(true)
     try {
-      const ext = file.name.split('.').pop() || 'jpg'
-      const path = `bingo-media/photo-submissions/${team.id}-${taskId}-${Date.now()}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('media').upload(path, file, { upsert: false })
+      let upload: Blob = file
+      try {
+        upload = await compressToJpeg(file)
+      } catch (err) {
+        if (file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)) {
+          alert("This iPhone photo format (HEIC) couldn't be processed on this device. In iPhone Settings → Camera → Formats, choose 'Most Compatible', or share the photo via the Photos app.")
+          return
+        }
+        console.warn('Image compression failed, uploading original:', err)
+      }
+      const path = `bingo-media/photo-submissions/${team.id}-${taskId}-${Date.now()}.jpg`
+      const { error: uploadErr } = await supabase.storage.from('media').upload(path, upload, { upsert: false, contentType: 'image/jpeg' })
       if (uploadErr) { alert('Upload failed: ' + uploadErr.message); return }
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
       const { error: insertErr } = await supabase.from('bingo_photo_submissions').insert({
