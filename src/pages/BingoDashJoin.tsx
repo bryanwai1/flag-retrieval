@@ -679,7 +679,20 @@ export function BingoDashJoin() {
         const cachedTeamId = localStorage.getItem(TEAM_ID_KEY(sectionSlug))
         const cachedTeamData = localStorage.getItem(TEAM_DATA_KEY(sectionSlug))
         const cachedRole = (localStorage.getItem(MEMBER_ROLE_KEY(sectionSlug)) ?? 'member') as 'member' | 'observer'
-        if (cachedMemberId && cachedTeamId && cachedTeamData) {
+        // Player URL (no ?mode=observer) means the user wants to play, not observe.
+        // Drop any stale observer session so they aren't silently kept in observer mode
+        // — that would make every task QR they scan show "Observer Mode".
+        if (!isObserver && cachedRole === 'observer') {
+          localStorage.removeItem(MEMBER_ID_KEY(sectionSlug))
+          localStorage.removeItem(MEMBER_DATA_KEY(sectionSlug))
+          localStorage.removeItem(TEAM_ID_KEY(sectionSlug))
+          localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
+          localStorage.removeItem(MEMBER_ROLE_KEY(sectionSlug))
+          localStorage.removeItem(GLOBAL_TEAM_ID_KEY)
+          localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
+          localStorage.removeItem(GLOBAL_MEMBER_ROLE_KEY)
+          setPageState('join')
+        } else if (cachedMemberId && cachedTeamId && cachedTeamData) {
           try {
             const parsed = JSON.parse(cachedTeamData)
             setTeam(parsed)

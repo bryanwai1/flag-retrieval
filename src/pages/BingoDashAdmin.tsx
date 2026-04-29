@@ -814,6 +814,26 @@ export function BingoDashAdmin() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  // Real-time photo submissions sync — without this, new uploads don't appear until the admin refreshes
+  useEffect(() => {
+    const channel = supabase
+      .channel('bingo-submissions-admin')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bingo_photo_submissions' }, ({ new: row }) => {
+        const sub = row as BingoPhotoSubmission
+        setPhotoSubmissions(prev => prev.some(s => s.id === sub.id) ? prev : [sub, ...prev])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_photo_submissions' }, ({ new: row }) => {
+        const sub = row as BingoPhotoSubmission
+        setPhotoSubmissions(prev => prev.map(s => s.id === sub.id ? sub : s))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bingo_photo_submissions' }, ({ old: row }) => {
+        const sub = row as BingoPhotoSubmission
+        setPhotoSubmissions(prev => prev.filter(s => s.id !== sub.id))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   // Countdown tick
   useEffect(() => {
     const id = setInterval(() => {
@@ -1185,6 +1205,43 @@ export function BingoDashAdmin() {
       else subs.forEach(s => next.delete(s.id))
       return next
     })
+  }
+
+  const extractStoragePath = (publicUrl: string): string | null => {
+    const match = publicUrl.match(/\/storage\/v1\/object\/public\/media\/(.+)$/)
+    return match ? decodeURIComponent(match[1]) : null
+  }
+
+  const deletePhotoSubmission = async (sub: BingoPhotoSubmission) => {
+    if (!confirm("Delete this submission? The photo will be removed and the team's progress on this tile will reset.")) return
+    setPhotoSubmissions(prev => prev.filter(s => s.id !== sub.id))
+    if (sub.status === 'approved' && sub.scan_id) {
+      await supabase.from('bingo_scans').update({ completed: false, completed_at: null }).eq('id', sub.scan_id)
+      setScans(prev => prev.map(s => s.id === sub.scan_id ? { ...s, completed: false } : s))
+    }
+    await supabase.from('bingo_photo_submissions').delete().eq('id', sub.id)
+    const path = extractStoragePath(sub.photo_url)
+    if (path) await supabase.storage.from('media').remove([path])
+  }
+
+  const bulkDeleteSubmissions = async (subs: BingoPhotoSubmission[]) => {
+    if (subs.length === 0) return
+    if (!confirm(`Delete ${subs.length} submission${subs.length === 1 ? '' : 's'}? Photos will be removed and progress on the affected tiles will reset.`)) return
+    setBulkActioning(true)
+    try {
+      const ids = subs.map(s => s.id)
+      setPhotoSubmissions(prev => prev.filter(s => !ids.includes(s.id)))
+      const scansToUncomplete = subs.filter(s => s.status === 'approved' && s.scan_id).map(s => s.scan_id!)
+      if (scansToUncomplete.length > 0) {
+        await supabase.from('bingo_scans').update({ completed: false, completed_at: null }).in('id', scansToUncomplete)
+        setScans(prev => prev.map(s => scansToUncomplete.includes(s.id) ? { ...s, completed: false } : s))
+      }
+      await supabase.from('bingo_photo_submissions').delete().in('id', ids)
+      const paths = subs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
+      if (paths.length > 0) await supabase.storage.from('media').remove(paths)
+    } finally {
+      setBulkActioning(false)
+    }
   }
 
   const bulkSetStatus = async (subs: BingoPhotoSubmission[], status: 'approved' | 'rejected') => {
@@ -2879,6 +2936,14 @@ export function BingoDashAdmin() {
             >
               {downloadingZip ? '⏳ Zipping…' : `⬇ Download ${actionLabelSuffix}`}
             </button>
+            <button
+              onClick={() => bulkDeleteSubmissions(actionTargets)}
+              disabled={bulkActioning || actionTargets.length === 0}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Permanently delete these submissions and their photos. Resets the team's progress on affected tiles. Use to clear test data."
+            >
+              🗑 Delete {actionLabelSuffix}
+            </button>
           </div>
 
           {/* Filters */}
@@ -3002,6 +3067,13 @@ export function BingoDashAdmin() {
                             }`}
                           >
                             ✗ {sub.status === 'rejected' ? 'Rejected' : 'Reject'}
+                          </button>
+                          <button
+                            onClick={() => deletePhotoSubmission(sub)}
+                            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete this submission and its photo. Resets the team's progress on this tile."
+                          >
+                            🗑 Delete
                           </button>
                         </div>
                       </div>

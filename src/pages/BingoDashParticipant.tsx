@@ -181,13 +181,14 @@ export function BingoDashParticipant() {
       const { error: uploadErr } = await supabase.storage.from('media').upload(path, file, { upsert: false })
       if (uploadErr) { alert('Upload failed: ' + uploadErr.message); return }
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
-      await supabase.from('bingo_photo_submissions').insert({
+      const { error: insertErr } = await supabase.from('bingo_photo_submissions').insert({
         team_id: team.id,
         task_id: taskId,
         scan_id: scanRecord.id,
         photo_url: urlData.publicUrl,
         status: 'pending',
       })
+      if (insertErr) { alert('Could not save submission: ' + insertErr.message); return }
       setPhotoSubmitted(true)
     } finally {
       setPhotoUploading(false)
