@@ -10,6 +10,7 @@ import { useSetting } from '../hooks/useSettings'
 import { TeamRegistration } from '../components/TeamRegistration'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
+import { SwipeablePages } from '../components/SwipeablePages'
 import { PhotoGalleryView } from '../components/PhotoGalleryView'
 import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { ParticleBackground } from '../components/ParticleBackground'
@@ -215,7 +216,11 @@ export function ParticipantView() {
         ) : (
           <>
             {pages.length > 0 && (
-              <>
+              <SwipeablePages
+                currentPage={currentPage}
+                total={pages.length}
+                onChange={setCurrentPage}
+              >
                 <InstructionPage page={pages[currentPage]} hexCode={task.hex_code} />
                 <PageNavigator
                   current={currentPage}
@@ -224,7 +229,7 @@ export function ParticipantView() {
                   onNext={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
                   hexCode={task.hex_code}
                 />
-              </>
+              </SwipeablePages>
             )}
 
             {/* Photo clue gallery */}

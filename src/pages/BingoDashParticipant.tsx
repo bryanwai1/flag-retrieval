@@ -7,6 +7,7 @@ import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useBingoScans } from '../hooks/useBingoScans'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
+import { SwipeablePages } from '../components/SwipeablePages'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
 import { normalizeUrl } from '../lib/normalizeUrl'
@@ -453,7 +454,11 @@ export function BingoDashParticipant() {
 
         {/* Instruction pointers */}
         {pages.length > 0 ? (
-          <>
+          <SwipeablePages
+            currentPage={currentPage}
+            total={pages.length}
+            onChange={setCurrentPage}
+          >
             <InstructionPage page={pages[currentPage]} hexCode={task.hex_code} />
             <PageNavigator
               current={currentPage}
@@ -462,7 +467,7 @@ export function BingoDashParticipant() {
               onNext={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
               hexCode={task.hex_code}
             />
-          </>
+          </SwipeablePages>
         ) : (
           <div className="text-center py-12 text-gray-400">
             No instructions available for this challenge yet.
