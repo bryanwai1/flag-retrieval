@@ -621,7 +621,6 @@ export function BingoDashParticipant() {
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         className="hidden"
                         disabled={photoUploading || !scanRecord}
                         onChange={e => {
@@ -768,7 +767,6 @@ export function BingoDashParticipant() {
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       className="hidden"
                       disabled={photoUploading || !scanRecord}
                       onChange={e => {
