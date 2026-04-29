@@ -487,6 +487,12 @@ export function BingoDashAdmin() {
 
   // Team grid viewer modal
   const [viewingTeam, setViewingTeam] = useState<BingoTeam | null>(null)
+  // Per-team "live members link" share modal
+  const [membersLinkTeam, setMembersLinkTeam] = useState<BingoTeam | null>(null)
+  const [membersLinkCopied, setMembersLinkCopied] = useState(false)
+  // Section-wide "live teams link" share modal
+  const [showAllTeamsLink, setShowAllTeamsLink] = useState(false)
+  const [allTeamsLinkCopied, setAllTeamsLinkCopied] = useState(false)
   const [members, setMembers] = useState<BingoMember[]>([])
   const [photoSubmissions, setPhotoSubmissions] = useState<BingoPhotoSubmission[]>([])
   const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<Set<string>>(new Set())
@@ -2655,6 +2661,13 @@ export function BingoDashAdmin() {
                   )}
                   <span className="text-xs text-gray-500 font-medium">{sectionTeams.length} group{sectionTeams.length !== 1 ? 's' : ''}</span>
                   <div className="flex-1 h-px bg-white/10" />
+                  <button
+                    onClick={() => { setShowAllTeamsLink(true); setAllTeamsLinkCopied(false) }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors whitespace-nowrap"
+                    title="Share a single live link showing every group and their members"
+                  >
+                    🔗 Live Teams Link
+                  </button>
                 </div>
 
                 {/* Create group form */}
@@ -2887,6 +2900,13 @@ export function BingoDashAdmin() {
                             {/* Actions */}
                             <td className="px-3 py-2.5 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => { setMembersLinkTeam(team); setMembersLinkCopied(false) }}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors whitespace-nowrap"
+                                  title="Share a live link to this group's member list"
+                                >
+                                  🔗 Members
+                                </button>
                                 <button
                                   onClick={() => setViewingTeam(team)}
                                   className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-violet-400 border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 transition-colors whitespace-nowrap"
@@ -3561,6 +3581,204 @@ export function BingoDashAdmin() {
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" />Completed</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />Bingo</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Section-wide "Live Teams Link" Share Modal ────────────────────── */}
+      {showAllTeamsLink && (() => {
+        const currentSection = sections.find(s => s.id === currentSectionId)
+        const url = currentSection
+          ? `${window.location.origin}/bingo-dash/teams/${currentSection.slug}`
+          : ''
+        const sectionTeamCount = currentSectionId ? teams.filter(t => t.section_id === currentSectionId).length : 0
+        const sectionMemberCount = currentSectionId
+          ? members.filter(m => m.section_id === currentSectionId && m.role === 'member').length
+          : 0
+        const handleCopy = () => {
+          if (!url) return
+          navigator.clipboard.writeText(url).then(() => {
+            setAllTeamsLinkCopied(true)
+            setTimeout(() => setAllTeamsLinkCopied(false), 2000)
+          })
+        }
+        const downloadQR = () => {
+          const svg = document.getElementById('all-teams-qr-svg')
+          if (!svg || !currentSection) return
+          const svgData = new XMLSerializer().serializeToString(svg)
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          const img = new Image()
+          img.onload = () => {
+            canvas.width = 1024
+            canvas.height = 1024
+            if (ctx) {
+              ctx.fillStyle = '#ffffff'
+              ctx.fillRect(0, 0, 1024, 1024)
+              ctx.drawImage(img, 0, 0, 1024, 1024)
+            }
+            const a = document.createElement('a')
+            a.download = `bingo-dash-teams-${currentSection.slug}.png`
+            a.href = canvas.toDataURL('image/png')
+            a.click()
+          }
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+        }
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+            onClick={() => setShowAllTeamsLink(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-bounce-in"
+              onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Live Teams Link</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    For <span className="font-bold text-gray-700">{currentSection?.name ?? 'this board'}</span>
+                    <span className="text-gray-300"> · </span>
+                    <span className="font-bold text-emerald-600">{sectionTeamCount}</span> group{sectionTeamCount !== 1 ? 's' : ''}
+                    <span className="text-gray-300">, </span>
+                    <span className="font-bold text-emerald-600">{sectionMemberCount}</span> member{sectionMemberCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button onClick={() => setShowAllTeamsLink(false)}
+                  className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+              </div>
+
+              {!currentSection ? (
+                <div className="p-8 text-center text-gray-400">
+                  <p className="text-sm">No board selected.</p>
+                </div>
+              ) : (
+                <div className="p-6 flex flex-col items-center gap-5">
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 w-full">
+                    <span>📡</span>
+                    <p className="text-emerald-700 text-xs font-bold">
+                      Anyone with this link can see <span className="font-black">every group</span> and who's inside, in real time. View only — they can't join the game.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                    <QRCodeSVG id="all-teams-qr-svg" value={url} size={260} level="H" />
+                  </div>
+
+                  <div className="w-full flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-xs font-mono text-gray-600 break-all select-all border border-gray-200">
+                      {url}
+                    </div>
+                    <button onClick={handleCopy}
+                      className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                        allTeamsLinkCopied ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}>
+                      {allTeamsLinkCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+
+                  <button onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                    className="w-full py-3 rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-gray-700 transition-colors hover:scale-[1.02] active:scale-95">
+                    Open Live View ↗
+                  </button>
+
+                  <button onClick={downloadQR}
+                    className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors hover:scale-[1.02] active:scale-95">
+                    Download QR as PNG
+                  </button>
+
+                  <p className="text-[11px] text-gray-300 text-center">
+                    Switch boards in the BOARDS panel to share a different live link.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Per-team "Live members link" Share Modal ──────────────────────── */}
+      {membersLinkTeam && (() => {
+        const team = membersLinkTeam
+        const url = `${window.location.origin}/bingo-dash/team/${team.id}/members`
+        const teamMembers = members.filter(m => m.team_id === team.id && m.role === 'member')
+        const handleCopy = () => {
+          navigator.clipboard.writeText(url).then(() => {
+            setMembersLinkCopied(true)
+            setTimeout(() => setMembersLinkCopied(false), 2000)
+          })
+        }
+        const downloadQR = () => {
+          const svg = document.getElementById('team-members-qr-svg')
+          if (!svg) return
+          const svgData = new XMLSerializer().serializeToString(svg)
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          const img = new Image()
+          img.onload = () => {
+            canvas.width = 1024
+            canvas.height = 1024
+            if (ctx) {
+              ctx.fillStyle = '#ffffff'
+              ctx.fillRect(0, 0, 1024, 1024)
+              ctx.drawImage(img, 0, 0, 1024, 1024)
+            }
+            const a = document.createElement('a')
+            a.download = `bingo-dash-members-${team.name.replace(/\s+/g, '-').toLowerCase()}.png`
+            a.href = canvas.toDataURL('image/png')
+            a.click()
+          }
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+        }
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+            onClick={() => setMembersLinkTeam(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-bounce-in"
+              onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Live Members Link</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    For <span className="font-bold text-gray-700">{team.name}</span>
+                    <span className="text-gray-300"> · </span>
+                    <span className="font-bold text-emerald-600">{teamMembers.length}</span> member{teamMembers.length !== 1 ? 's' : ''} now
+                  </p>
+                </div>
+                <button onClick={() => setMembersLinkTeam(null)}
+                  className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+              </div>
+
+              <div className="p-6 flex flex-col items-center gap-5">
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 w-full">
+                  <span>📡</span>
+                  <p className="text-emerald-700 text-xs font-bold">
+                    Anyone with this link can see who's in <span className="font-black">{team.name}</span> in real time. View only — they can't join the game.
+                  </p>
+                </div>
+
+                <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                  <QRCodeSVG id="team-members-qr-svg" value={url} size={260} level="H" />
+                </div>
+
+                <div className="w-full flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-xs font-mono text-gray-600 break-all select-all border border-gray-200">
+                    {url}
+                  </div>
+                  <button onClick={handleCopy}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                      membersLinkCopied ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}>
+                    {membersLinkCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+
+                <button onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                  className="w-full py-3 rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-gray-700 transition-colors hover:scale-[1.02] active:scale-95">
+                  Open Live View ↗
+                </button>
+
+                <button onClick={downloadQR}
+                  className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-colors hover:scale-[1.02] active:scale-95">
+                  Download QR as PNG
+                </button>
               </div>
             </div>
           </div>
