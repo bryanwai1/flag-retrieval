@@ -1,4 +1,8 @@
-node_modules\ndist\n.env
+node_modules
+dist
+.env
+.env.local
+.env.*.local
 
 .vercel
 .claude/worktrees/
