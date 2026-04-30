@@ -827,6 +827,7 @@ function LineupSlide({ slideIdx, teams }: { slideIdx: number; teams: BingoTeam[]
 function ScoreboardSlide({ slideIdx, ranked }: { slideIdx: number; ranked: RankedTeam[] }) {
   const count = ranked.length
   const cols = count <= 8 ? 1 : 2
+  const rows = Math.max(1, Math.ceil(count / cols))
   const rowFontSize = count <= 8 ? '1.6rem' : count <= 16 ? '1.15rem' : '1rem'
   const rowPad = count <= 8 ? 'py-3 px-5' : count <= 16 ? 'py-2 px-4' : 'py-1.5 px-3.5'
   const photoSize = count <= 8 ? 56 : count <= 16 ? 44 : 36
@@ -864,7 +865,11 @@ function ScoreboardSlide({ slideIdx, ranked }: { slideIdx: number; ranked: Ranke
 
       <div
         className="relative z-10 grid gap-x-6 gap-y-2 w-full max-w-[min(94vw,1500px)]"
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${rows}, auto)`,
+          gridAutoFlow: 'column',
+        }}
       >
         {ranked.map((r, i) => {
           const rank = i + 1
