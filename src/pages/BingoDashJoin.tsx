@@ -499,7 +499,8 @@ function BoardScreen({
   const navigate = useNavigate()
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [popupLetters, setPopupLetters] = useState<string | null>(null)
-  const lastBingoCountRef = useRef<number | null>(null)
+  const [popupQueue, setPopupQueue] = useState<string[]>([])
+  const celebratedLinesRef = useRef<Set<number> | null>(null)
 
   const gridTaskIds = new Set(gridTasks.map(t => t.id))
   const completedCount = scans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
@@ -548,13 +549,38 @@ function BoardScreen({
     })
   )
 
+  // Stable dep key so the detection effect only runs when the set of
+  // completed line indices actually changes.
+  const completedLinesKey = [...completedLineIndices].sort((a, b) => a - b).join(',')
+
+  // Detect newly completed bingo lines and queue one popup per line so each
+  // achievement gets its own announcement, even when one tile completes
+  // multiple lines at once.
   useEffect(() => {
-    if (lastBingoCountRef.current === null) { lastBingoCountRef.current = completedBingoCount; return }
-    if (completedBingoCount > lastBingoCountRef.current) {
-      lastBingoCountRef.current = completedBingoCount
-      setPopupLetters(BINGO_WORD.slice(0, Math.min(completedBingoCount, 5)))
+    if (celebratedLinesRef.current === null) {
+      celebratedLinesRef.current = new Set(completedLineIndices)
+      return
     }
-  }, [completedBingoCount])
+    const newLines: number[] = []
+    completedLineIndices.forEach(idx => {
+      if (!celebratedLinesRef.current!.has(idx)) newLines.push(idx)
+    })
+    if (newLines.length === 0) return
+    const baseSize = celebratedLinesRef.current.size
+    newLines.forEach(idx => celebratedLinesRef.current!.add(idx))
+    const queued = newLines.map((_, i) =>
+      BINGO_WORD.slice(0, Math.min(baseSize + i + 1, 5))
+    )
+    setPopupQueue(prev => [...prev, ...queued])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedLinesKey])
+
+  // Drive the popup from the queue: show each item for 4s, then advance.
+  useEffect(() => {
+    if (popupLetters || popupQueue.length === 0) return
+    setPopupLetters(popupQueue[0])
+    setPopupQueue(prev => prev.slice(1))
+  }, [popupLetters, popupQueue])
 
   useEffect(() => {
     if (!popupLetters) return
