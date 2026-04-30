@@ -517,14 +517,12 @@ function AwardSlideRenderer({
   if (descriptor.kind === 'intro') return <IntroSlide slideIdx={slideIdx} />
   if (descriptor.kind === 'holding') return <HoldingSlide slideIdx={slideIdx} />
   if (descriptor.kind === 'lineup') return <LineupSlide slideIdx={slideIdx} teams={teams} />
-  const prizePoints = config?.slide_points?.[descriptor.id] ?? 0
   if (descriptor.kind === 'consolation_group') {
     return (
       <ConsolationGroupSlide
         slideIdx={slideIdx}
         descriptor={descriptor}
         teamsForSlide={teamsForSlide}
-        prizePoints={prizePoints}
       />
     )
   }
@@ -533,7 +531,6 @@ function AwardSlideRenderer({
       slideIdx={slideIdx}
       descriptor={descriptor}
       ranked={teamsForSlide[0] ?? null}
-      prizePoints={prizePoints}
     />
   )
 }
@@ -824,12 +821,11 @@ function LineupSlide({ slideIdx, teams }: { slideIdx: number; teams: BingoTeam[]
 
 // ── Prize slide (consolation/third/second/first) ──────────────────────────
 function PrizeSlide({
-  slideIdx, descriptor, ranked, prizePoints,
+  slideIdx, descriptor, ranked,
 }: {
   slideIdx: number
   descriptor: AwardSlideDescriptor
   ranked: RankedTeam | null
-  prizePoints: number
 }) {
   const kind = descriptor.kind as 'consolation' | 'third' | 'second' | 'first'
   const cfg = TIER[kind]
@@ -936,7 +932,7 @@ function PrizeSlide({
             className="relative z-10 mt-5 flex flex-col items-center"
             style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
           >
-            <p className="text-[10px] uppercase tracking-[0.4em] opacity-60">Prize</p>
+            <p className="text-[10px] uppercase tracking-[0.4em] opacity-60">Overall</p>
             <p
               className="font-black leading-none mt-1"
               style={{
@@ -952,7 +948,7 @@ function PrizeSlide({
                 letterSpacing: '0.02em',
               }}
             >
-              {prizePoints.toLocaleString()} <span className="text-white/70 font-light">pts</span>
+              {ranked!.total.toLocaleString()} <span className="text-white/70 font-light">pts</span>
             </p>
           </div>
         </>
@@ -970,12 +966,11 @@ function PrizeSlide({
 
 // ── Consolation group slide (3 teams revealed together) ──────────────────
 function ConsolationGroupSlide({
-  slideIdx, descriptor, teamsForSlide, prizePoints,
+  slideIdx, descriptor, teamsForSlide,
 }: {
   slideIdx: number
   descriptor: AwardSlideDescriptor
   teamsForSlide: RankedTeam[]
-  prizePoints: number
 }) {
   const cfg = TIER.consolation
   const ranks = descriptor.teamRanks ?? []
@@ -1079,30 +1074,23 @@ function ConsolationGroupSlide({
               >
                 {team?.name ?? 'No team'}
               </p>
+              {entry.team && (
+                <p
+                  className="font-black leading-none mt-3"
+                  style={{
+                    fontSize: 'clamp(1.2rem, 3vw, 2.2rem)',
+                    color: cfg.labelColor,
+                    textShadow: `0 0 24px ${cfg.ringGlow}`,
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {entry.team.total.toLocaleString()} <span className="text-white/70 font-light text-base">pts</span>
+                </p>
+              )}
             </div>
           )
         })}
       </div>
-
-      {prizePoints > 0 && (
-        <div
-          className="relative z-10 mt-10 flex flex-col items-center"
-          style={{ animation: 'slide-up-fade 0.6s ease-out 1.6s both' }}
-        >
-          <p className="text-[10px] uppercase tracking-[0.4em] opacity-60">Prize each</p>
-          <p
-            className="font-black leading-none mt-1"
-            style={{
-              fontSize: 'clamp(1.4rem, 4vw, 3rem)',
-              color: cfg.labelColor,
-              textShadow: `0 0 30px ${cfg.ringGlow}`,
-              letterSpacing: '0.02em',
-            }}
-          >
-            {prizePoints.toLocaleString()} <span className="text-white/70 font-light">pts</span>
-          </p>
-        </div>
-      )}
     </div>
   )
 }
