@@ -59,6 +59,16 @@ export function GameSelector() {
           delay="0.6s"
           primaryLabel="GAME BOARD"
         />
+        <GameCard
+          href="/voting/results"
+          adminHref="/voting"
+          icon="🗳️"
+          title="PHOTO VOTING"
+          description="Upload photos · Voters scan QR · Live tally on screen"
+          accent="#34d399"
+          delay="0.7s"
+          primaryLabel="RESULTS DISPLAY"
+        />
       </div>
     </div>
   )

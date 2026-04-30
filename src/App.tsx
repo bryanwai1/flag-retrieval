@@ -30,6 +30,9 @@ const BingoDashTeamMembers  = lazy(() => import('./pages/BingoDashTeamMembers').
 const BingoDashAllTeamsMembers = lazy(() => import('./pages/BingoDashAllTeamsMembers').then(m => ({ default: m.BingoDashAllTeamsMembers })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
+const VotingAdmin           = lazy(() => import('./pages/VotingAdmin').then(m => ({ default: m.VotingAdmin })))
+const VotingVote            = lazy(() => import('./pages/VotingVote').then(m => ({ default: m.VotingVote })))
+const VotingResults         = lazy(() => import('./pages/VotingResults').then(m => ({ default: m.VotingResults })))
 
 export default function App() {
   return (
@@ -67,6 +70,10 @@ export default function App() {
           <Route path="/bingo-dash/teams/:sectionSlug" element={<BingoDashAllTeamsMembers />} />
           <Route path="/snake-ladder" element={<SnakeLadderBoard />} />
           <Route path="/snake-ladder/admin" element={<SnakeLadderAdmin />} />
+          <Route path="/voting" element={<VotingAdmin />} />
+          <Route path="/voting/vote/:pollId" element={<VotingVote />} />
+          <Route path="/voting/results" element={<VotingResults />} />
+          <Route path="/voting/results/:pollId" element={<VotingResults />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

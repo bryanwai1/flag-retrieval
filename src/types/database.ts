@@ -232,3 +232,31 @@ export interface SnakeSettings {
   id: string
   active_game_id: string | null
 }
+
+// ── Photo Voting ──────────────────────────────────────────────
+
+export interface VotePoll {
+  id: string
+  title: string
+  max_votes_per_voter: number
+  is_open: boolean
+  media_type: 'photo' | 'video'
+  created_at: string
+}
+
+export interface VotePhoto {
+  id: string
+  poll_id: string
+  photo_url: string
+  label: string | null
+  sort_order: number
+  created_at: string
+}
+
+export interface VoteBallot {
+  id: string
+  poll_id: string
+  photo_id: string
+  voter_id: string
+  created_at: string
+}
