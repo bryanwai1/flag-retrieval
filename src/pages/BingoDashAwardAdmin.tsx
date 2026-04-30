@@ -115,6 +115,8 @@ export function BingoDashAwardAdmin() {
   const hasIntro = draft.slide_order.includes('intro')
   const hasHolding = draft.slide_order.includes('holding')
   const hasLineup = draft.slide_order.includes('lineup')
+  const hasScoreboard = draft.slide_order.includes('scoreboard')
+  const hasClosing = draft.slide_order.includes('closing')
 
   const moveSlide = (from: number, dir: -1 | 1) => {
     const to = from + dir
@@ -424,9 +426,13 @@ export function BingoDashAwardAdmin() {
                       ? '“Presenting Awards” reveal'
                       : s.kind === 'lineup'
                         ? `${teams.length} team${teams.length === 1 ? '' : 's'} · grid w/ photos`
-                        : s.kind === 'consolation_group'
-                          ? `Team ranks ${(s.teamRanks ?? []).map(r => `#${r}`).join(', ')} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
-                          : `Team rank #${(s.teamRanks ?? [])[0] ?? '?'} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
+                        : s.kind === 'scoreboard'
+                          ? `${teams.length} team${teams.length === 1 ? '' : 's'} ranked · final totals`
+                          : s.kind === 'closing'
+                            ? `${draft.main_title || 'HSBC KL EXPLORACE 2026'} · Thank You`
+                            : s.kind === 'consolation_group'
+                              ? `Team ranks ${(s.teamRanks ?? []).map(r => `#${r}`).join(', ')} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
+                              : `Team rank #${(s.teamRanks ?? [])[0] ?? '?'} · ${label}${s.rank && s.rank > 1 ? ` #${s.rank}` : ''}`
                 return (
                   <li
                     key={s.id}
@@ -528,6 +534,22 @@ export function BingoDashAwardAdmin() {
                 sublabel={hasLineup ? 'already added' : 'all teams + photos'}
                 accent="#a5f3fc"
                 onClick={() => doAddSlide('lineup')}
+              />
+              <AddButton
+                disabled={hasScoreboard}
+                emoji="📊"
+                label="Scoreboard"
+                sublabel={hasScoreboard ? 'already added' : 'all teams ranked'}
+                accent="#86efac"
+                onClick={() => doAddSlide('scoreboard')}
+              />
+              <AddButton
+                disabled={hasClosing}
+                emoji="🎬"
+                label="Closing"
+                sublabel={hasClosing ? 'already added' : 'HSBC red end card'}
+                accent="#fca5a5"
+                onClick={() => doAddSlide('closing')}
               />
               {(['first', 'second', 'third', 'consolation_group', 'consolation'] as PrizeKind[]).map(kind => {
                 const sublabel = kind === 'consolation_group'

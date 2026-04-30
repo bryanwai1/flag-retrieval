@@ -20,16 +20,23 @@
 // which group reveals worst-first).
 
 export type PrizeKind = 'consolation' | 'consolation_group' | 'third' | 'second' | 'first'
-export type SingletonKind = 'main' | 'intro' | 'holding' | 'lineup'
+export type SingletonKind = 'main' | 'intro' | 'holding' | 'lineup' | 'scoreboard' | 'closing'
 export type AwardSlideKind = SingletonKind | PrizeKind
 
-export const SINGLETON_KINDS: SingletonKind[] = ['main', 'intro', 'holding', 'lineup']
+export const SINGLETON_KINDS: SingletonKind[] = ['main', 'intro', 'holding', 'lineup', 'scoreboard', 'closing']
 
 /** Teams shown on a single consolation_group slide. */
 export const CONSOLATION_GROUP_SIZE = 3
 
 export function isSingletonKind(kind: string): kind is SingletonKind {
-  return kind === 'main' || kind === 'intro' || kind === 'holding' || kind === 'lineup'
+  return (
+    kind === 'main' ||
+    kind === 'intro' ||
+    kind === 'holding' ||
+    kind === 'lineup' ||
+    kind === 'scoreboard' ||
+    kind === 'closing'
+  )
 }
 
 export type AwardSlideId = string
@@ -61,6 +68,8 @@ export const SLIDE_LABELS: Record<AwardSlideKind, { label: string; emoji: string
   intro:             { label: 'Animated opener',    emoji: '✨', accent: '#fde68a' },
   holding:           { label: 'Holding slide',      emoji: '⏳', accent: '#fcd34d' },
   lineup:            { label: 'Team lineup',        emoji: '👥', accent: '#a5f3fc' },
+  scoreboard:        { label: 'Full scoreboard',    emoji: '📊', accent: '#86efac' },
+  closing:           { label: 'HSBC closing',       emoji: '🎬', accent: '#fca5a5' },
   first:             { label: 'Grand Champion',     emoji: '🏆', accent: '#fde047' },
   second:            { label: 'First Runner-Up',    emoji: '🥈', accent: '#e5e7eb' },
   third:             { label: 'Second Runner-Up',   emoji: '🥉', accent: '#f59e0b' },
@@ -112,7 +121,7 @@ export function countsFromOrder(order: AwardSlideId[]): PrizeCounts {
   return c
 }
 
-/** Default factory sequence: main, holding, two consolation-trios, then 3rd→2nd→1st. */
+/** Default factory sequence: main, holding, …consolations…, 3rd→2nd→1st, scoreboard, closing. */
 export function defaultSlideOrder(counts: PrizeCounts): AwardSlideId[] {
   const out: AwardSlideId[] = ['main', 'holding']
   for (let i = 0; i < counts.consolation_count; i++) out.push(`consolation:${i}`)
@@ -120,12 +129,17 @@ export function defaultSlideOrder(counts: PrizeCounts): AwardSlideId[] {
   for (let i = 0; i < counts.third_count; i++) out.push(`third:${i}`)
   for (let i = 0; i < counts.second_count; i++) out.push(`second:${i}`)
   for (let i = 0; i < counts.first_count; i++) out.push(`first:${i}`)
+  out.push('scoreboard', 'closing')
   return out
 }
 
 /**
  * Drop unknown / malformed ids; if nothing remains, seed with default order
  * derived from the provided counts. Safe to call with user-supplied JSON.
+ *
+ * Also auto-injects newer singletons (`scoreboard`, `closing`) into legacy
+ * saved orders that pre-date them, so existing ceremonies pick up the new
+ * end-of-show flow without requiring an admin re-save.
  */
 export function normalizeSlideOrder(
   saved: unknown,
@@ -148,7 +162,23 @@ export function normalizeSlideOrder(
     if (!/^\d+$/.test(suffix)) continue
     out.push(raw); seen.add(raw)
   }
-  return out.length ? out : defaultSlideOrder(counts)
+  if (!out.length) return defaultSlideOrder(counts)
+
+  if (!seen.has('scoreboard')) {
+    let lastFirst = -1
+    for (let i = 0; i < out.length; i++) {
+      const id = out[i]
+      if (!isSingletonKind(id) && id.startsWith('first:')) lastFirst = i
+    }
+    if (lastFirst >= 0) out.splice(lastFirst + 1, 0, 'scoreboard')
+    else out.push('scoreboard')
+    seen.add('scoreboard')
+  }
+  if (!seen.has('closing')) {
+    out.push('closing')
+    seen.add('closing')
+  }
+  return out
 }
 
 /** Next unused numeric suffix for a given prize kind. */
