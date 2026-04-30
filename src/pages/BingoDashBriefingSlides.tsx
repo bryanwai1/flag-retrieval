@@ -101,7 +101,10 @@ type SlideKind =
   | 'roles'
   | 'submissions'
   | 'how-to-submit'
+  | 'preview-clue'
   | 'safety'
+  | 'weather'
+  | 'hsbc-acronym'
   | 'qr-wish'
 
 const SLIDES: SlideKind[] = [
@@ -114,7 +117,10 @@ const SLIDES: SlideKind[] = [
   'roles',
   'submissions',
   'how-to-submit',
+  'preview-clue',
   'safety',
+  'weather',
+  'hsbc-acronym',
   'qr-wish',
 ]
 
@@ -247,7 +253,10 @@ function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName }: {
     case 'roles':          return <RolesSlide slideIdx={slideIdx} />
     case 'submissions':    return <SubmissionTypesSlide slideIdx={slideIdx} />
     case 'how-to-submit':  return <HowToSubmitSlide slideIdx={slideIdx} />
+    case 'preview-clue':   return <PreviewClueSlide slideIdx={slideIdx} />
     case 'safety':         return <SafetySlide slideIdx={slideIdx} />
+    case 'weather':        return <WeatherSlide slideIdx={slideIdx} />
+    case 'hsbc-acronym':   return <HsbcAcronymSlide slideIdx={slideIdx} />
     case 'qr-wish':        return <QrWishSlide slideIdx={slideIdx} sectionSlug={sectionSlug} sectionName={sectionName} />
   }
 }
@@ -840,6 +849,231 @@ function HowToSubmitSlide({ slideIdx }: { slideIdx: number }) {
   )
 }
 
+// ── 7b. Preview a Clue · Interactive demo ────────────────────────────────
+const PREVIEW_TASK = {
+  title: 'The Vanishing Arch',
+  pill: 'Answer Challenge',
+  color: 'Purple',
+  hex: '#a855f7',
+  hexSoft: '#c4b5fd',
+  points: 120,
+  pointers: [
+    { icon: '🚶', text: 'Walk to the eastern plaza of Merdeka Square.' },
+    { icon: '🏛', text: 'Find the white stone arch at the corner.' },
+    { icon: '👀', text: 'Stand underneath and look straight up.' },
+    { icon: '📜', text: 'Read the bronze plaque — it names a structural feature.' },
+    { icon: '⌨', text: 'Type that feature below · 4 letters.' },
+  ],
+  expected: 'ARCH',
+}
+
+function PreviewClueSlide({ slideIdx }: { slideIdx: number }) {
+  const [stage, setStage] = useState<'tile' | 'brief' | 'done'>('tile')
+  const [answer, setAnswer] = useState('')
+  const [shake, setShake] = useState(false)
+  const t = PREVIEW_TASK
+
+  const handleSubmit = () => {
+    if (answer.trim().toUpperCase() === t.expected) {
+      setStage('done')
+      setShake(false)
+    } else {
+      setShake(true)
+      setTimeout(() => setShake(false), 600)
+    }
+  }
+  const reset = () => { setStage('tile'); setAnswer(''); setShake(false) }
+
+  return (
+    <ContentShell slideIdx={slideIdx} pretitle="Live Demo · Try It Now" title="Preview a Clue" beam={t.hexSoft}>
+      <div
+        className="relative z-10 w-full max-w-md mx-auto"
+        onClick={e => e.stopPropagation()}
+        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+      >
+        {stage === 'tile' && (
+          <button
+            onClick={() => setStage('brief')}
+            className="group relative w-full rounded-3xl border-2 px-8 py-10 text-center transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              borderColor: `${t.hex}88`,
+              background: `linear-gradient(160deg, ${t.hex}33 0%, rgba(0,0,0,0.45) 100%)`,
+              boxShadow: `0 0 36px ${t.hex}55`,
+              animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both, preview-tile-pulse 2.4s ease-in-out infinite',
+            }}
+          >
+            <div className="text-6xl mb-3" style={{ filter: `drop-shadow(0 0 14px ${t.hex}cc)` }}>⌨</div>
+            <p className="text-white/65 text-[10px] font-bold uppercase tracking-[0.4em] mb-1">{t.color} · {t.points} pts</p>
+            <p className="text-white text-2xl font-black leading-tight">{t.title}</p>
+            <span
+              className="inline-block mt-5 px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-[0.3em] text-white"
+              style={{ background: t.hex, boxShadow: `0 4px 0 ${t.hex}77` }}
+            >
+              ▶ Tap to play
+            </span>
+          </button>
+        )}
+
+        {stage === 'brief' && (
+          <div
+            className="rounded-3xl overflow-hidden text-left relative"
+            style={{
+              background: `color-mix(in srgb, ${t.hex} 38%, #0a0a0a)`,
+              boxShadow: `0 20px 60px rgba(0,0,0,0.55), 0 0 40px ${t.hex}44`,
+              animation: 'pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both',
+            }}
+          >
+            {/* Header — matches participant header style */}
+            <div
+              className="px-5 py-4 relative overflow-hidden"
+              style={{ background: `${t.hex}66` }}
+            >
+              <div className="absolute inset-0 bg-black/30" />
+              <div className="relative z-10">
+                <p className="text-white/85 text-[10px] font-bold uppercase tracking-[0.3em]">Team: Trailblazers</p>
+                <h3 className="text-white text-2xl font-black leading-tight tracking-tight mt-0.5">{t.title}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-white/85 text-[11px] uppercase tracking-wider font-bold">{t.color} Challenge</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/25 text-white">{t.points} pts</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-5 flex flex-col gap-2.5 relative">
+              <button
+                disabled
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl text-xs font-black text-white/90 border-2 border-white/25 bg-white/10 mb-1"
+              >
+                📍 Open in Maps
+              </button>
+
+              {/* 5 emoji pointer cards — matches InstructionPage format */}
+              {t.pointers.map((p, i) => (
+                <div
+                  key={i}
+                  className="relative"
+                  style={{ animation: `pop-bounce-in 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.15 + i * 0.08}s both` }}
+                >
+                  <div
+                    className="absolute inset-0 rounded-2xl opacity-40 blur-sm translate-y-0.5"
+                    style={{ backgroundColor: t.hex }}
+                  />
+                  <div
+                    className="relative rounded-2xl p-[2px] overflow-hidden"
+                    style={{
+                      background: `linear-gradient(145deg, ${t.hex}, ${t.hex}cc)`,
+                      boxShadow: `0 4px 0 ${t.hex}88, 0 5px 14px ${t.hex}44`,
+                    }}
+                  >
+                    <div
+                      className="relative rounded-[14px] px-3.5 py-2.5 overflow-hidden"
+                      style={{ background: '#fffaf0' }}
+                    >
+                      <div
+                        className="absolute inset-x-0 top-0 h-1/2 rounded-t-[14px] pointer-events-none"
+                        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 100%)' }}
+                      />
+                      <div className="relative flex items-center gap-3">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                          style={{
+                            background: `linear-gradient(145deg, ${t.hex}22, ${t.hex}11)`,
+                            boxShadow: `0 2px 6px ${t.hex}22`,
+                          }}
+                        >
+                          <span className="text-xl">{p.icon}</span>
+                        </div>
+                        <p className="text-gray-800 text-sm leading-snug font-bold flex-1">{p.text}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Answer input · keeps interactivity */}
+              <div
+                className="mt-3 rounded-2xl p-4 border-2"
+                style={{
+                  borderColor: `${t.hex}cc`,
+                  background: `${t.hex}22`,
+                  boxShadow: `0 0 18px ${t.hex}55`,
+                  animation: shake ? 'preview-shake 0.5s ease-in-out' : undefined,
+                }}
+              >
+                <input
+                  type="text"
+                  value={answer}
+                  onChange={e => setAnswer(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+                  placeholder="Type your answer…"
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-xl border-2 text-center text-base font-bold focus:outline-none transition-colors bg-white/10 text-white placeholder-white/30 uppercase tracking-wider"
+                  style={{ borderColor: shake ? '#ef4444' : answer ? t.hex : 'rgba(255,255,255,0.2)' }}
+                />
+                {shake && (
+                  <p className="text-red-400 text-[11px] font-bold text-center mt-2">Not quite — look up at the plaque.</p>
+                )}
+                <button
+                  onClick={handleSubmit}
+                  disabled={!answer.trim()}
+                  className="mt-3 w-full py-2.5 rounded-xl font-black text-sm uppercase tracking-wider text-white disabled:opacity-40 transition-all active:scale-95"
+                  style={{ background: t.hex, boxShadow: `0 4px 0 ${t.hex}88` }}
+                >
+                  Submit Answer
+                </button>
+              </div>
+
+              <button
+                onClick={() => setStage('tile')}
+                className="text-white/40 hover:text-white/70 text-[11px] font-bold uppercase tracking-[0.3em] transition-colors"
+              >
+                ← Back to tile
+              </button>
+            </div>
+          </div>
+        )}
+
+        {stage === 'done' && (
+          <div
+            className="rounded-3xl border-2 px-8 py-10 text-center"
+            style={{
+              borderColor: `${t.hex}99`,
+              background: `linear-gradient(160deg, ${t.hex}33 0%, rgba(0,0,0,0.5) 100%)`,
+              boxShadow: `0 0 50px ${t.hex}66`,
+              animation: 'pop-bounce-in 0.7s cubic-bezier(0.34,1.56,0.64,1) both',
+            }}
+          >
+            <div className="text-7xl mb-3" style={{ animation: 'medal-pulse 1.6s ease-in-out infinite' }}>🎉</div>
+            <p className="text-white/70 text-[11px] font-bold uppercase tracking-[0.4em] mb-1">{t.title}</p>
+            <p className="text-white text-3xl font-black leading-none mb-2">Done!</p>
+            <p
+              className="font-black text-2xl tabular-nums"
+              style={{ color: t.hexSoft, textShadow: `0 0 14px ${t.hex}aa` }}
+            >
+              +{t.points} pts
+            </p>
+            <p className="text-white/55 text-xs mt-4 italic">Tile flips to ✓ on your bingo card.</p>
+            <button
+              onClick={reset}
+              className="mt-6 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] text-white border-2 border-white/30 bg-white/10 hover:bg-white/20 transition-all active:scale-95"
+            >
+              ↻ Try again
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p
+        className="relative z-10 text-white/45 text-[11px] mt-5 italic"
+        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+      >
+        ✦ Clicks inside the demo won't advance the deck · → key continues
+      </p>
+    </ContentShell>
+  )
+}
+
 // ── 8. Safety ────────────────────────────────────────────────────────────
 function SafetySlide({ slideIdx }: { slideIdx: number }) {
   const rules = [
@@ -916,6 +1150,164 @@ function SafetySlide({ slideIdx }: { slideIdx: number }) {
             ))}
           </div>
         </div>
+      </div>
+    </ContentShell>
+  )
+}
+
+// ── 8a. Weather report · animated video drop-in ──────────────────────────
+function WeatherSlide({ slideIdx }: { slideIdx: number }) {
+  return (
+    <ContentShell slideIdx={slideIdx} pretitle="One last thing" title="KL Weather Today" beam="#7dd3fc">
+      <div
+        className="relative z-10 mx-auto"
+        onClick={e => e.stopPropagation()}
+        style={{
+          animation: 'pop-bounce-in 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.4s both',
+        }}
+      >
+        {/* Glow halo behind the video */}
+        <div
+          className="absolute -inset-6 rounded-[2rem] pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(125,211,252,0.45) 0%, transparent 70%)',
+            filter: 'blur(28px)',
+            animation: 'medal-pulse 4s ease-in-out infinite',
+          }}
+        />
+
+        <div
+          className="relative rounded-3xl overflow-hidden border-2"
+          style={{
+            borderColor: 'rgba(125,211,252,0.55)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 0 48px rgba(125,211,252,0.35)',
+            background: '#000',
+          }}
+        >
+          <video
+            src="/weather.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="block"
+            style={{
+              width: 'min(78vw, 920px)',
+              maxHeight: '68vh',
+              height: 'auto',
+              objectFit: 'contain',
+              background: '#000',
+            }}
+          />
+        </div>
+      </div>
+
+      <p
+        className="relative z-10 mt-6 text-sky-200/90 text-sm sm:text-base font-bold uppercase tracking-[0.3em]"
+        style={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          animation: 'slide-up-fade 0.7s ease-out 1.1s both',
+        }}
+      >
+        ☀️ Dress smart · Stay hydrated · Bring a poncho
+      </p>
+    </ContentShell>
+  )
+}
+
+// ── 8b. HSBC, decoded · click-to-reveal acronym ──────────────────────────
+function HsbcAcronymSlide({ slideIdx }: { slideIdx: number }) {
+  const items = [
+    { letter: 'H', word: 'Hen',  chinese: '很',       tint: '#fbbf24' },
+    { letter: 'S', word: 'Shi',  chinese: '湿 / 晒',  tint: '#f97316' },
+    { letter: 'B', word: 'But',  chinese: '',         tint: '#ef4444' },
+    { letter: 'C', word: 'Can',  chinese: '',         tint: '#dc2626' },
+  ]
+  const [revealed, setRevealed] = useState(0)
+  const allShown = revealed >= items.length
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!allShown) {
+      e.stopPropagation()
+      setRevealed(r => Math.min(items.length, r + 1))
+    }
+  }
+
+  return (
+    <ContentShell slideIdx={slideIdx} pretitle="And finally…" title="HSBC, Decoded" beam="#fcd34d">
+      <div
+        className="relative z-10 flex flex-col gap-4 max-w-3xl w-full mx-auto"
+        onClick={handleClick}
+        style={{ cursor: allShown ? 'pointer' : 'pointer' }}
+      >
+        {items.map((it, i) => {
+          const isVisible = i < revealed
+          return (
+            <div
+              key={it.letter}
+              className="flex items-center gap-6 sm:gap-8 px-6 py-5 rounded-2xl border-2 text-left"
+              style={{
+                borderColor: isVisible ? `${it.tint}88` : 'rgba(255,255,255,0.08)',
+                background: isVisible
+                  ? `linear-gradient(160deg, ${it.tint}33 0%, rgba(0,0,0,0.45) 100%)`
+                  : 'rgba(255,255,255,0.03)',
+                boxShadow: isVisible ? `0 0 32px ${it.tint}44` : 'none',
+                opacity: isVisible ? 1 : 0.18,
+                transition: 'opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+                animation: isVisible
+                  ? 'pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both'
+                  : undefined,
+              }}
+            >
+              <span
+                className="font-black tabular-nums flex-shrink-0"
+                style={{
+                  fontSize: 'clamp(3rem, 7vw, 5.5rem)',
+                  color: isVisible ? it.tint : 'rgba(255,255,255,0.18)',
+                  textShadow: isVisible ? `0 0 22px ${it.tint}aa` : 'none',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  lineHeight: 1,
+                  width: '1.1em',
+                  textAlign: 'center',
+                }}
+              >
+                {it.letter}
+              </span>
+              <div className="flex-1">
+                <p
+                  className="text-white font-black leading-tight"
+                  style={{
+                    fontSize: 'clamp(1.8rem, 4vw, 3rem)',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    visibility: isVisible ? 'visible' : 'hidden',
+                  }}
+                >
+                  {it.word}
+                </p>
+                {it.chinese && (
+                  <p
+                    className="text-amber-200 font-bold leading-tight mt-1"
+                    style={{
+                      fontSize: 'clamp(1.4rem, 3vw, 2.2rem)',
+                      visibility: isVisible ? 'visible' : 'hidden',
+                    }}
+                  >
+                    {it.chinese}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        <p
+          className="text-white/60 text-xs sm:text-sm uppercase tracking-[0.35em] mt-3 font-bold text-center"
+          style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+        >
+          {allShown
+            ? '✓ All revealed · tap to continue'
+            : `▶ Tap to reveal · ${revealed} / ${items.length}`}
+        </p>
       </div>
     </ContentShell>
   )
