@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { VotePoll, VotePhoto, VoteBallot } from '../types/database'
 
@@ -11,6 +12,7 @@ export function VotingResults() {
   const [photos, setPhotos] = useState<VotePhoto[]>([])
   const [ballots, setBallots] = useState<VoteBallot[]>([])
   const [loading, setLoading] = useState(true)
+  const [qrFullscreen, setQrFullscreen] = useState(false)
 
   // When no pollId is in the URL, fetch all polls and pick the most recent open one
   // (or the most recent overall as a fallback).
@@ -83,6 +85,9 @@ export function VotingResults() {
   const uniqueVoters = useMemo(() => new Set(ballots.map(b => b.voter_id)).size, [ballots])
   const topVotes = ranked[0]?.votes ?? 0
 
+  const baseUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+  const voteUrl = resolvedPollId ? `${baseUrl}/voting/vote/${resolvedPollId}` : ''
+
   if (loading) {
     return <div className="min-h-screen bg-gray-950 text-gray-400 flex items-center justify-center">Loading…</div>
   }
@@ -105,8 +110,8 @@ export function VotingResults() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
-          <div>
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-6">
+          <div className="flex-1 min-w-[260px]">
             <p className="text-violet-300 text-sm font-bold uppercase tracking-widest">Live Results</p>
             <h1 className="text-5xl font-black mt-1">{poll.title}</h1>
             {showPicker && (
@@ -122,12 +127,28 @@ export function VotingResults() {
                 ))}
               </select>
             )}
+            <div className="flex gap-6 mt-5">
+              <Stat label="Voters" value={uniqueVoters} />
+              <Stat label="Total votes" value={totalVotes} />
+              <Stat label="Per voter" value={`${poll.max_votes_per_voter}`} />
+            </div>
           </div>
-          <div className="flex gap-6 text-right">
-            <Stat label="Voters" value={uniqueVoters} />
-            <Stat label="Total votes" value={totalVotes} />
-            <Stat label="Per voter" value={`${poll.max_votes_per_voter}`} />
-          </div>
+          {voteUrl && poll.is_open && (
+            <button
+              onClick={() => setQrFullscreen(true)}
+              className="group flex items-center gap-4 bg-white rounded-2xl p-4 shadow-2xl hover:scale-[1.02] transition cursor-pointer"
+              title="Click to enlarge"
+            >
+              <div className="bg-white p-1 rounded-xl">
+                <QRCodeSVG value={voteUrl} size={140} level="H" />
+              </div>
+              <div className="text-left pr-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Scan to vote</div>
+                <div className="text-xl font-black text-gray-900 leading-tight mt-0.5">{poll.title}</div>
+                <div className="text-[10px] text-gray-400 mt-1.5 group-hover:text-violet-500 font-bold uppercase tracking-wider">Tap to enlarge ↗</div>
+              </div>
+            </button>
+          )}
         </div>
 
         {ranked.length === 0 ? (
@@ -192,6 +213,31 @@ export function VotingResults() {
           <p className="mt-8 text-center text-rose-300 text-sm">Voting is closed.</p>
         )}
       </div>
+
+      {qrFullscreen && voteUrl && (
+        <div
+          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center cursor-pointer"
+          onClick={() => setQrFullscreen(false)}
+        >
+          <button
+            onClick={() => setQrFullscreen(false)}
+            className="absolute top-6 right-8 text-white/60 hover:text-white text-5xl font-light"
+          >
+            &times;
+          </button>
+          <div
+            className="bg-white rounded-3xl p-12 flex flex-col items-center gap-6 max-w-2xl mx-4 cursor-default"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-violet-600 text-sm font-black uppercase tracking-[0.3em]">Scan to vote</p>
+            <h2 className="text-4xl font-black text-gray-900 text-center -mt-2">{poll.title}</h2>
+            <div className="bg-white p-3 rounded-2xl border-2 border-gray-100">
+              <QRCodeSVG value={voteUrl} size={520} level="H" />
+            </div>
+            <p className="text-xs text-gray-400 break-all text-center">{voteUrl}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
