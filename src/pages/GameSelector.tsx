@@ -69,6 +69,17 @@ export function GameSelector() {
           delay="0.7s"
           primaryLabel="RESULTS DISPLAY"
         />
+        <GameCard
+          href="/disc-quiz.html"
+          adminHref="/disc-admin.html"
+          projectorHref="/disc-projector.html"
+          icon="🧭"
+          title="DISC PERSONALITY"
+          description="40 statements · DISC profile · Live projector chart"
+          accent="#a78bfa"
+          delay="0.8s"
+          primaryLabel="START TEST"
+        />
       </div>
     </div>
   )
@@ -132,6 +143,7 @@ function GameCard({
   adminHref,
   faciHref,
   slidesHref,
+  projectorHref,
   icon,
   title,
   description,
@@ -143,6 +155,7 @@ function GameCard({
   adminHref: string
   faciHref?: string
   slidesHref?: string
+  projectorHref?: string
   icon: string
   title: string
   description: string
@@ -201,6 +214,15 @@ function GameCard({
             style={{ color: accent, border: `1.5px solid ${accent}44` }}
           >
             🎞 Event Slides
+          </a>
+        )}
+        {projectorHref && (
+          <a
+            href={projectorHref}
+            className="w-full py-2.5 rounded-xl font-bold text-center text-sm transition-all hover:bg-white/10"
+            style={{ color: accent, border: `1.5px solid ${accent}44` }}
+          >
+            📺 Projector
           </a>
         )}
       </div>

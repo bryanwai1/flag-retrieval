@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DISC Projector &mdash; Game Hub</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=20260504a">
+</head>
+<body class="disc-projector-body">
+
+  <main class="disc-projector">
+
+    <!-- Loading -->
+    <section class="disc-projector-loading" id="screenLoading">
+      <div class="quiz-loader"></div>
+      <p>Connecting to session&hellip;</p>
+    </section>
+
+    <!-- Error -->
+    <section class="disc-projector-error" id="screenError" hidden>
+      <h1 id="errTitle">Session not found</h1>
+      <p id="errDetail"></p>
+    </section>
+
+    <!-- Live -->
+    <section class="disc-projector-live" id="screenLive" hidden>
+      <header class="disc-projector-header">
+        <div>
+          <span class="disc-projector-eyebrow">DISC Live Map</span>
+          <h1 id="sessionTitle">&mdash;</h1>
+        </div>
+        <div class="disc-projector-stats">
+          <div><strong id="countTotal">0</strong><span>People</span></div>
+          <div class="disc-stat-D"><strong id="countD">0</strong><span>D</span></div>
+          <div class="disc-stat-I"><strong id="countI">0</strong><span>I</span></div>
+          <div class="disc-stat-S"><strong id="countS">0</strong><span>S</span></div>
+          <div class="disc-stat-C"><strong id="countC">0</strong><span>C</span></div>
+        </div>
+      </header>
+
+      <div class="disc-projector-canvas-wrap">
+        <canvas id="projCanvas" width="1100" height="1100"></canvas>
+      </div>
+
+      <footer class="disc-projector-footer">
+        <span>Auto-updating every <strong>5s</strong></span>
+        <span id="lastUpdate"></span>
+        <span>Press <kbd>F</kbd> for fullscreen</span>
+      </footer>
+    </section>
+  </main>
+
+  <script src="js/main.js?v=20260504a"></script>
+  <script src="js/supabase-config.js?v=20260504a"></script>
+  <script type="module" src="js/disc-projector.js?v=20260504a"></script>
+</body>
+</html>

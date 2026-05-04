@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DISC Personality Test &mdash; Game Hub</title>
+  <meta name="description" content="A 40-question DISC personality profile that maps how you naturally show up at work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=20260504a">
+</head>
+<body>
+
+  <!-- ===== Navbar ===== -->
+  <nav class="navbar" id="navbar">
+    <a href="/" class="nav-brand">
+      <div class="nav-brand-icon">&#x1F3AE;</div>
+      <span class="nav-brand-text">Game Hub</span>
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/">Home</a></li>
+      <li><a href="/disc-quiz.html" class="active">DISC Test</a></li>
+      <li><a href="/disc-admin.html">Admin</a></li>
+    </ul>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <main class="quiz-page">
+    <div class="quiz-shell">
+
+      <!-- Loading -->
+      <section class="quiz-screen active" id="screenLoading">
+        <div class="quiz-card">
+          <div class="quiz-loader"></div>
+          <p class="quiz-muted">Loading your session&hellip;</p>
+        </div>
+      </section>
+
+      <!-- Landing -->
+      <section class="quiz-screen" id="screenLanding">
+        <div class="quiz-card">
+          <span class="section-label">&#x1F9ED; DISC Profile</span>
+          <h1 id="quizTitle">DISC Personality Test</h1>
+          <p class="quiz-subtitle" id="quizSubtitle"></p>
+
+          <div class="quiz-session-chip">
+            <span class="quiz-session-label">Session</span>
+            <span class="quiz-session-company" id="sessionCompany"></span>
+            <span class="quiz-session-date" id="sessionDate"></span>
+          </div>
+
+          <ul class="quiz-meta-list">
+            <li><strong><span id="questionCount">40</span></strong> statements</li>
+            <li>~<strong>8 minutes</strong></li>
+            <li>Get a <strong>personalised profile</strong></li>
+          </ul>
+
+          <form id="landingForm" class="quiz-form">
+            <label class="quiz-field">
+              <span>Full Name <em>*</em></span>
+              <input type="text" id="fullName" autocomplete="name" required placeholder="e.g. Jane Tan">
+            </label>
+            <div class="quiz-field-row">
+              <label class="quiz-field">
+                <span>Age <em>*</em></span>
+                <input type="number" id="age" min="14" max="99" required placeholder="32">
+              </label>
+              <label class="quiz-field">
+                <span>Position <em>*</em></span>
+                <input type="text" id="position" required placeholder="Marketing Manager">
+              </label>
+            </div>
+            <label class="quiz-field">
+              <span>Email <em class="quiz-field-optional">optional</em></span>
+              <input type="email" id="email" autocomplete="email" placeholder="jane.tan@company.com">
+            </label>
+            <button type="submit" class="btn btn-primary btn-lg quiz-start-btn">Start the test &#x2192;</button>
+          </form>
+
+          <p class="quiz-fineprint">Your responses are shared with your trainer for the session report. There are no right or wrong answers &mdash; just be honest.</p>
+        </div>
+      </section>
+
+      <!-- Quiz -->
+      <section class="quiz-screen" id="screenQuiz">
+        <div class="quiz-card quiz-card--wide">
+          <div class="quiz-progress">
+            <div class="quiz-progress-row">
+              <span id="qProgressLabel">Statement 1 of 40</span>
+            </div>
+            <div class="quiz-progress-track">
+              <div class="quiz-progress-fill" id="qProgressBar"></div>
+            </div>
+          </div>
+
+          <h2 class="quiz-question-text" id="qText"></h2>
+
+          <div class="disc-scale" id="qScale" role="radiogroup" aria-label="Rate this statement"></div>
+          <div class="disc-scale-axis">
+            <span>Strongly Disagree</span>
+            <span>Strongly Agree</span>
+          </div>
+
+          <div class="quiz-nav">
+            <button type="button" class="btn btn-outline" id="qPrev">&#x2190; Back</button>
+            <button type="button" class="btn btn-primary" id="qNext" disabled>Next &#x2192;</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Submitting -->
+      <section class="quiz-screen" id="screenSubmitting">
+        <div class="quiz-card">
+          <div class="quiz-loader"></div>
+          <p class="quiz-muted">Scoring your profile&hellip;</p>
+        </div>
+      </section>
+
+      <!-- Result (text) -->
+      <section class="quiz-screen" id="screenResult">
+        <div class="quiz-card">
+          <span class="section-label">&#x2728; Your DISC Profile</span>
+          <div class="disc-result-badge" id="resultBadge">D</div>
+          <h1 id="resultLabel">The Driver</h1>
+          <p class="quiz-subtitle" id="resultTagline"></p>
+          <p class="disc-result-summary" id="resultSummary"></p>
+
+          <div class="disc-result-meta">
+            <span>Submitted as <strong id="resultName"></strong></span>
+            <span class="disc-result-scores">
+              D <strong id="scoreD">0</strong>
+              <span class="disc-dot disc-dot--I"></span>I <strong id="scoreI">0</strong>
+              <span class="disc-dot disc-dot--S"></span>S <strong id="scoreS">0</strong>
+              <span class="disc-dot disc-dot--C"></span>C <strong id="scoreC">0</strong>
+            </span>
+          </div>
+
+          <div class="quiz-nav quiz-nav--center">
+            <button type="button" class="btn btn-primary btn-lg" id="toQuadrantBtn">See me on the chart &#x2192;</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quadrant graph -->
+      <section class="quiz-screen" id="screenQuadrant">
+        <div class="quiz-card quiz-card--wide">
+          <span class="section-label">&#x1F4CD; Where you sit</span>
+          <h1>Your position on the DISC quadrant</h1>
+          <p class="quiz-subtitle">Each axis ranges from full task-focus to full people-focus, and from reflective to active. The closer to a corner, the more pronounced that style.</p>
+
+          <div class="disc-quadrant-wrap">
+            <canvas id="quadrantCanvas" width="640" height="640" aria-label="DISC quadrant chart"></canvas>
+          </div>
+
+          <div class="disc-strengths-grid">
+            <div class="disc-block">
+              <h3>Strengths</h3>
+              <ul id="resultStrengths"></ul>
+            </div>
+            <div class="disc-block">
+              <h3>Watch-outs</h3>
+              <ul id="resultWatchouts"></ul>
+            </div>
+            <div class="disc-block">
+              <h3>How others should work with you</h3>
+              <ul id="resultTips"></ul>
+            </div>
+            <div class="disc-block">
+              <h3>Where you shine</h3>
+              <p id="resultBestRoles"></p>
+            </div>
+          </div>
+
+          <div class="quiz-nav quiz-nav--center">
+            <button type="button" class="btn btn-outline" id="downloadPdfBtn">&#x2B07; Download PDF summary</button>
+            <a href="/" class="btn btn-primary">Back to Hub &#x2192;</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Error -->
+      <section class="quiz-screen" id="screenError">
+        <div class="quiz-card">
+          <span class="section-label quiz-error-label">&#x26A0; Hold on</span>
+          <h1 id="errTitle">Something went wrong</h1>
+          <p class="quiz-subtitle" id="errDetail"></p>
+          <a href="/" class="btn btn-outline">Back to home</a>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-brand-icon">&#x1F3AE;</div>
+        <div class="footer-info">
+          <p class="company">Game Hub</p>
+          <p>&copy; 2026 Pixels and Purpose Enterprise. All rights reserved.</p>
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/disc-quiz.html">DISC Test</a>
+        <a href="/disc-admin.html">Admin</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="js/main.js?v=20260504a"></script>
+  <script src="js/supabase-config.js?v=20260504a"></script>
+  <script src="js/disc-quiz-data.js?v=20260504a"></script>
+  <script type="module" src="js/disc-engine.js?v=20260504a"></script>
+</body>
+</html>
