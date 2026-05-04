@@ -6219,6 +6219,13 @@ h1, h2, h3, h4 {
 .disc-projector-stats .disc-stat-S { border-color: rgba(16, 185, 129, 0.6); }
 .disc-projector-stats .disc-stat-C { border-color: rgba(59, 130, 246, 0.6); }
 
+.disc-projector-canvas-row {
+  display: flex;
+  gap: 1.4rem;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
 .disc-projector-canvas-wrap {
   flex: 1;
   display: flex;
@@ -6234,6 +6241,57 @@ h1, h2, h3, h4 {
   max-width: min(92vh, 1100px);
   height: auto;
   display: block;
+}
+.disc-projector-join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.4rem 1.2rem;
+  width: 280px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.disc-projector-join-eyebrow {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.disc-projector-join-qr {
+  width: 220px;
+  height: 220px;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.disc-projector-join-code {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+.disc-projector-join-code strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+.disc-projector-join-url {
+  font-size: 0.72rem;
+  font-family: 'Inter', monospace;
+  color: rgba(255, 255, 255, 0.78);
+  word-break: break-all;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .disc-projector-footer {

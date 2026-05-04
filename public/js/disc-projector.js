@@ -5,7 +5,7 @@
  * URL: disc-projector.html?s=<session-code>
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { drawQuadrant } from './disc-chart.js?v=20260504a';
+import { drawQuadrant } from './disc-chart.js?v=20260505b';
 
 const $ = (id) => document.getElementById(id);
 const qs = new URLSearchParams(window.location.search);
@@ -46,6 +46,12 @@ async function bootstrap() {
   state.session = session;
   $('sessionTitle').textContent =
     `${session.company_name}${session.event_date ? '  ·  ' + session.event_date : ''}`;
+
+  const joinUrl = `${location.origin}/disc-quiz.html?s=${encodeURIComponent(session.code)}`;
+  $('joinQr').src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&bgcolor=ffffff&color=0F172A&data=${encodeURIComponent(joinUrl)}`;
+  $('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
+  $('joinCode').textContent = session.code;
+
   $('screenLoading').hidden = true;
   $('screenLive').hidden = false;
 
