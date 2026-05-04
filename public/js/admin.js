@@ -151,12 +151,12 @@ function slugify(s) {
 }
 
 function shareLinkForSession(sess) {
-  const base = `${location.origin}${location.pathname.replace(/admin\.html$/, '')}`;
+  const base = `${location.origin}${location.pathname.replace(/disc-admin\.html$/, '')}`;
   return `${base}disc-quiz.html?s=${encodeURIComponent(sess.code)}`;
 }
 
 function projectorLinkForSession(sess) {
-  const base = `${location.origin}${location.pathname.replace(/admin\.html$/, '')}`;
+  const base = `${location.origin}${location.pathname.replace(/disc-admin\.html$/, '')}`;
   return `${base}disc-projector.html?s=${encodeURIComponent(sess.code)}`;
 }
 
