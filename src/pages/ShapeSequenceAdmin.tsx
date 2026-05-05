@@ -27,6 +27,8 @@ export function ShapeSequenceAdmin() {
   const [localShapes, setLocalShapes] = useState<Shape[]>(Array(20).fill('circle'))
   const [localNumbers, setLocalNumbers] = useState<number[]>(() => Array.from({ length: 20 }, (_, i) => i + 1))
   const [swapIndex, setSwapIndex] = useState<number | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [localCircleCount, setLocalCircleCount] = useState<20 | 30>(20)
   const [teamName, setTeamName] = useState('')
   const [timeInput, setTimeInput] = useState('')
@@ -107,6 +109,49 @@ export function ShapeSequenceAdmin() {
       next[index] = SHAPE_CYCLE[(cur + 1) % SHAPE_CYCLE.length]
       return next
     })
+  }
+
+  const moveItem = <T,>(arr: T[], from: number, to: number): T[] => {
+    if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+    const next = [...arr]
+    const [item] = next.splice(from, 1)
+    next.splice(to, 0, item)
+    return next
+  }
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDragIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverIndex !== index) setDragOverIndex(index)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    const from = dragIndex ?? parseInt(e.dataTransfer.getData('text/plain'), 10)
+    setDragIndex(null)
+    setDragOverIndex(null)
+    if (Number.isNaN(from) || from === index) return
+    if (localMode === 'shapes') {
+      setLocalShapes(prev => moveItem(prev, from, index))
+    } else {
+      setLocalNumbers(prev => moveItem(prev, from, index))
+    }
+    setSwapIndex(null)
+  }
+
+  const handleDragEnd = () => {
+    setDragIndex(null)
+    setDragOverIndex(null)
   }
 
   const fillAll = (shape: Shape) => setLocalShapes(Array(localCircleCount).fill(shape))
@@ -434,33 +479,59 @@ export function ShapeSequenceAdmin() {
             <div className="rounded-xl p-4 bg-gray-900 overflow-x-auto">
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}>
                 {localMode === 'shapes'
-                  ? localShapes.map((shape, i) => (
-                      <button
-                        key={i}
-                        onClick={() => cycleShape(i)}
-                        className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                        style={{
-                          background: 'rgba(255,255,255,0.08)',
-                          border: `2px solid ${SHAPE_COLORS[shape]}66`,
-                        }}
-                        title={`Circle ${i + 1}: ${shape} — click to change`}
-                      >
-                        <ShapeIcon shape={shape} size={22} />
-                      </button>
-                    ))
-                  : localNumbers.map((n, i) => {
-                      const selected = swapIndex === i
+                  ? localShapes.map((shape, i) => {
+                      const isDragging = dragIndex === i
+                      const isDragOver = dragOverIndex === i && dragIndex !== null && dragIndex !== i
                       return (
                         <button
                           key={i}
-                          onClick={() => cycleNumber(i)}
-                          className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-white font-black tabular-nums"
+                          draggable
+                          onDragStart={e => handleDragStart(e, i)}
+                          onDragOver={e => handleDragOver(e, i)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={e => handleDrop(e, i)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => cycleShape(i)}
+                          className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-grab active:cursor-grabbing"
                           style={{
-                            background: selected ? 'rgba(124,58,237,0.55)' : 'rgba(255,255,255,0.08)',
-                            border: `2px solid ${selected ? '#a78bfa' : 'rgba(255,255,255,0.2)'}`,
-                            fontSize: n >= 10 ? 16 : 18,
+                            background: isDragOver ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.08)',
+                            border: `2px solid ${isDragOver ? '#a78bfa' : `${SHAPE_COLORS[shape]}66`}`,
+                            opacity: isDragging ? 0.35 : 1,
+                            boxShadow: isDragOver ? '0 0 0 3px rgba(167,139,250,0.5)' : undefined,
                           }}
-                          title={`Position ${i + 1}: ${n} — click to swap with another`}
+                          title={`Circle ${i + 1}: ${shape} — drag to reorder, click to change`}
+                        >
+                          <ShapeIcon shape={shape} size={22} />
+                        </button>
+                      )
+                    })
+                  : localNumbers.map((n, i) => {
+                      const selected = swapIndex === i
+                      const isDragging = dragIndex === i
+                      const isDragOver = dragOverIndex === i && dragIndex !== null && dragIndex !== i
+                      return (
+                        <button
+                          key={i}
+                          draggable
+                          onDragStart={e => handleDragStart(e, i)}
+                          onDragOver={e => handleDragOver(e, i)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={e => handleDrop(e, i)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => cycleNumber(i)}
+                          className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-white font-black tabular-nums cursor-grab active:cursor-grabbing"
+                          style={{
+                            background: isDragOver
+                              ? 'rgba(124,58,237,0.65)'
+                              : selected
+                                ? 'rgba(124,58,237,0.55)'
+                                : 'rgba(255,255,255,0.08)',
+                            border: `2px solid ${isDragOver || selected ? '#a78bfa' : 'rgba(255,255,255,0.2)'}`,
+                            fontSize: n >= 10 ? 16 : 18,
+                            opacity: isDragging ? 0.35 : 1,
+                            boxShadow: isDragOver ? '0 0 0 3px rgba(167,139,250,0.5)' : undefined,
+                          }}
+                          title={`Position ${i + 1}: ${n} — drag to reorder, or click to swap`}
                         >
                           {n}
                         </button>
@@ -471,10 +542,10 @@ export function ShapeSequenceAdmin() {
 
             <p className="text-xs text-gray-400">
               {localMode === 'shapes'
-                ? 'Click any circle to cycle: ● → ■ → ★ → ✕ → ●'
+                ? 'Drag any circle to reorder the sequence. Click to cycle: ● → ■ → ★ → ✕ → ●'
                 : swapIndex !== null
-                  ? `Selected position ${swapIndex + 1} (#${localNumbers[swapIndex]}). Click another to swap, or click again to cancel.`
-                  : 'Click a number to select it, then click another to swap their positions.'}
+                  ? `Selected position ${swapIndex + 1} (#${localNumbers[swapIndex]}). Click another to swap, or click again to cancel. (You can also drag to reorder.)`
+                  : 'Drag any number to reorder the sequence — or click one then another to swap two positions.'}
             </p>
 
             <button
