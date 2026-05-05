@@ -167,6 +167,11 @@ export function useShapeSequence() {
     await fetchResults()
   }
 
+  const clearAllResults = async () => {
+    await supabase.from('shape_results').delete().not('id', 'is', null)
+    await fetchResults()
+  }
+
   const setAllResultsVisible = async (visible: boolean) => {
     for (const r of rounds) {
       await supabase.from('shape_rounds').update({ results_visible: visible }).eq('id', r.id)
@@ -215,6 +220,7 @@ export function useShapeSequence() {
     setResultPenalty,
     deleteResult,
     clearRoundResults,
+    clearAllResults,
     addFacilitator,
     renameFacilitator,
     deleteFacilitator,

@@ -21,7 +21,7 @@ export function ShapeSequenceAdmin() {
     rounds, results, facilitators,
     upsertRound, setActiveRound, endRound,
     setAllResultsVisible,
-    addResult, deleteResult, clearRoundResults, setResultPenalty,
+    addResult, deleteResult, clearRoundResults, clearAllResults, setResultPenalty,
     addFacilitator, renameFacilitator, deleteFacilitator,
   } = useShapeSequence()
 
@@ -650,6 +650,20 @@ export function ShapeSequenceAdmin() {
                 style={{ background: '#9f1239', color: '#fff' }}
               >
                 🗑 Reset Round {selectedRound} Results
+              </button>
+
+              <button
+                onClick={() => {
+                  if (results.length === 0) return
+                  if (confirm(`Delete ALL ${results.length} result(s) across every round? This cannot be undone.`)) {
+                    clearAllResults()
+                  }
+                }}
+                disabled={results.length === 0}
+                className="w-full py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40"
+                style={{ background: '#7f1d1d', color: '#fff' }}
+              >
+                💣 Clear ALL Results ({results.length})
               </button>
 
               {isCollecting && (
