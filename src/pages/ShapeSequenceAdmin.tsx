@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { useShapeSequence, type Shape, type ShapeRound } from '../hooks/useShapeSequence'
+import { useShapeSequence, type Shape, type ShapeRound, type RoundMode } from '../hooks/useShapeSequence'
 import {
   ShapeIcon,
   SHAPE_CYCLE,
   SHAPE_COLORS,
   padShapes,
+  padNumbers,
+  shuffleNumbers,
   formatTime,
 } from './ShapeSequenceProjector'
 
@@ -21,7 +23,10 @@ export function ShapeSequenceAdmin() {
   } = useShapeSequence()
 
   const [selectedRound, setSelectedRound] = useState(1)
+  const [localMode, setLocalMode] = useState<RoundMode>('shapes')
   const [localShapes, setLocalShapes] = useState<Shape[]>(Array(20).fill('circle'))
+  const [localNumbers, setLocalNumbers] = useState<number[]>(() => Array.from({ length: 20 }, (_, i) => i + 1))
+  const [swapIndex, setSwapIndex] = useState<number | null>(null)
   const [localCircleCount, setLocalCircleCount] = useState<20 | 30>(20)
   const [teamName, setTeamName] = useState('')
   const [timeInput, setTimeInput] = useState('')
@@ -44,16 +49,55 @@ export function ShapeSequenceAdmin() {
     if (round) {
       const count = (round.circle_count === 30 ? 30 : 20) as 20 | 30
       setLocalCircleCount(count)
+      setLocalMode(round.mode === 'numbers' ? 'numbers' : 'shapes')
       setLocalShapes(padShapes(round.shapes, count))
+      setLocalNumbers(padNumbers(round.numbers, count))
     } else {
       setLocalCircleCount(20)
+      setLocalMode('shapes')
       setLocalShapes(Array(20).fill('circle'))
+      setLocalNumbers(Array.from({ length: 20 }, (_, i) => i + 1))
     }
+    setSwapIndex(null)
   }, [round?.id, selectedRound]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCircleCountChange = (count: 20 | 30) => {
     setLocalCircleCount(count)
     setLocalShapes(prev => padShapes(prev, count))
+    setLocalNumbers(prev => padNumbers(prev, count))
+    setSwapIndex(null)
+  }
+
+  const handleModeChange = (mode: RoundMode) => {
+    setLocalMode(mode)
+    setSwapIndex(null)
+  }
+
+  const cycleNumber = (index: number) => {
+    if (swapIndex === null) {
+      setSwapIndex(index)
+      return
+    }
+    if (swapIndex === index) {
+      setSwapIndex(null)
+      return
+    }
+    setLocalNumbers(prev => {
+      const next = [...prev]
+      ;[next[swapIndex], next[index]] = [next[index], next[swapIndex]]
+      return next
+    })
+    setSwapIndex(null)
+  }
+
+  const sortNumbers = () => {
+    setLocalNumbers(Array.from({ length: localCircleCount }, (_, i) => i + 1))
+    setSwapIndex(null)
+  }
+
+  const shuffleNumbersGrid = () => {
+    setLocalNumbers(shuffleNumbers(localCircleCount))
+    setSwapIndex(null)
   }
 
   const cycleShape = (index: number) => {
@@ -77,7 +121,12 @@ export function ShapeSequenceAdmin() {
 
   const handleSaveConfig = async () => {
     setSaving(true)
-    await upsertRound(selectedRound, { circle_count: localCircleCount, shapes: localShapes })
+    await upsertRound(selectedRound, {
+      circle_count: localCircleCount,
+      mode: localMode,
+      shapes: localShapes,
+      numbers: localNumbers,
+    })
     setSaving(false)
   }
 
@@ -307,9 +356,26 @@ export function ShapeSequenceAdmin() {
 
         <div className="grid grid-cols-[1fr_300px] gap-6 items-start">
 
-          {/* Left: Shape grid editor */}
+          {/* Left: Shape/Number grid editor */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col gap-5">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="font-bold text-gray-700 text-sm">Mode:</span>
+              {(['shapes', 'numbers'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => handleModeChange(m)}
+                  className="px-4 py-1.5 rounded-lg text-sm font-bold transition-all"
+                  style={{
+                    background: localMode === m ? '#7c3aed' : '#f3f4f6',
+                    color: localMode === m ? '#fff' : '#374151',
+                  }}
+                >
+                  {m === 'shapes' ? '◆ Shapes' : '# Numbers'}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-4 flex-wrap">
               <span className="font-bold text-gray-700 text-sm">Circles:</span>
               {([20, 30] as const).map(n => (
                 <button
@@ -326,47 +392,90 @@ export function ShapeSequenceAdmin() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Fill all:</span>
-              {SHAPE_CYCLE.map(shape => (
+            {localMode === 'shapes' ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Fill all:</span>
+                {SHAPE_CYCLE.map(shape => (
+                  <button
+                    key={shape}
+                    onClick={() => fillAll(shape)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:bg-gray-50"
+                    style={{ borderColor: `${SHAPE_COLORS[shape]}66`, color: SHAPE_COLORS[shape] }}
+                  >
+                    <ShapeIcon shape={shape} size={14} />
+                    {shape.charAt(0).toUpperCase() + shape.slice(1)}
+                  </button>
+                ))}
                 <button
-                  key={shape}
-                  onClick={() => fillAll(shape)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:bg-gray-50"
-                  style={{ borderColor: `${SHAPE_COLORS[shape]}66`, color: SHAPE_COLORS[shape] }}
+                  onClick={randomize}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all"
                 >
-                  <ShapeIcon shape={shape} size={14} />
-                  {shape.charAt(0).toUpperCase() + shape.slice(1)}
+                  🎲 Random
                 </button>
-              ))}
-              <button
-                onClick={randomize}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all"
-              >
-                🎲 Random
-              </button>
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Order:</span>
+                <button
+                  onClick={sortNumbers}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                >
+                  ↕ Sort 1→{localCircleCount}
+                </button>
+                <button
+                  onClick={shuffleNumbersGrid}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                >
+                  🎲 Shuffle
+                </button>
+              </div>
+            )}
 
             <div className="rounded-xl p-4 bg-gray-900 overflow-x-auto">
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}>
-                {localShapes.map((shape, i) => (
-                  <button
-                    key={i}
-                    onClick={() => cycleShape(i)}
-                    className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                    style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      border: `2px solid ${SHAPE_COLORS[shape]}66`,
-                    }}
-                    title={`Circle ${i + 1}: ${shape} — click to change`}
-                  >
-                    <ShapeIcon shape={shape} size={22} />
-                  </button>
-                ))}
+                {localMode === 'shapes'
+                  ? localShapes.map((shape, i) => (
+                      <button
+                        key={i}
+                        onClick={() => cycleShape(i)}
+                        className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          border: `2px solid ${SHAPE_COLORS[shape]}66`,
+                        }}
+                        title={`Circle ${i + 1}: ${shape} — click to change`}
+                      >
+                        <ShapeIcon shape={shape} size={22} />
+                      </button>
+                    ))
+                  : localNumbers.map((n, i) => {
+                      const selected = swapIndex === i
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => cycleNumber(i)}
+                          className="w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-white font-black tabular-nums"
+                          style={{
+                            background: selected ? 'rgba(124,58,237,0.55)' : 'rgba(255,255,255,0.08)',
+                            border: `2px solid ${selected ? '#a78bfa' : 'rgba(255,255,255,0.2)'}`,
+                            fontSize: n >= 10 ? 16 : 18,
+                          }}
+                          title={`Position ${i + 1}: ${n} — click to swap with another`}
+                        >
+                          {n}
+                        </button>
+                      )
+                    })}
               </div>
             </div>
 
-            <p className="text-xs text-gray-400">Click any circle to cycle: ● → ■ → ★ → ✕ → ●</p>
+            <p className="text-xs text-gray-400">
+              {localMode === 'shapes'
+                ? 'Click any circle to cycle: ● → ■ → ★ → ✕ → ●'
+                : swapIndex !== null
+                  ? `Selected position ${swapIndex + 1} (#${localNumbers[swapIndex]}). Click another to swap, or click again to cancel.`
+                  : 'Click a number to select it, then click another to swap their positions.'}
+            </p>
 
             <button
               onClick={handleSaveConfig}

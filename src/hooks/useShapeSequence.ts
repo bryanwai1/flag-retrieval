@@ -2,12 +2,15 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 export type Shape = 'circle' | 'square' | 'star' | 'x'
+export type RoundMode = 'shapes' | 'numbers'
 
 export interface ShapeRound {
   id: string
   round_number: number
   circle_count: number
+  mode: RoundMode
   shapes: Shape[]
+  numbers: number[]
   is_active: boolean
   results_visible: boolean
   accepting_submissions: boolean
@@ -42,7 +45,14 @@ export function useShapeSequence() {
       .from('shape_rounds')
       .select('*')
       .order('round_number')
-    if (data) setRounds(data)
+    if (data) {
+      setRounds(data.map((r: ShapeRound) => ({
+        ...r,
+        mode: (r.mode === 'numbers' ? 'numbers' : 'shapes') as RoundMode,
+        numbers: Array.isArray(r.numbers) ? r.numbers : [],
+        shapes: Array.isArray(r.shapes) ? r.shapes : [],
+      })))
+    }
   }, [])
 
   const fetchResults = useCallback(async () => {
@@ -90,7 +100,9 @@ export function useShapeSequence() {
       await supabase.from('shape_rounds').insert({
         round_number: roundNumber,
         circle_count: 20,
+        mode: 'shapes',
         shapes: [],
+        numbers: [],
         is_active: false,
         results_visible: false,
         accepting_submissions: false,

@@ -32,7 +32,7 @@ export function ShapeSequenceProjector() {
         </h1>
         {activeRound && (
           <div className="mt-2 text-blue-400 font-bold text-xl animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            ROUND {activeRound.round_number} &bull; {activeRound.circle_count} CIRCLES
+            ROUND {activeRound.round_number} &bull; {activeRound.circle_count} CIRCLES &bull; {activeRound.mode === 'numbers' ? 'NUMBERS' : 'SHAPES'}
           </div>
         )}
       </div>
@@ -67,7 +67,9 @@ function WaitingState() {
 function ShapeGrid({ round }: { round: ShapeRound }) {
   const cols = round.circle_count === 20 ? 10 : 15
   const cellSize = round.circle_count === 20 ? 88 : 68
+  const isNumbers = round.mode === 'numbers'
   const shapes = padShapes(round.shapes, round.circle_count)
+  const numbers = padNumbers(round.numbers, round.circle_count)
 
   return (
     <div
@@ -82,7 +84,7 @@ function ShapeGrid({ round }: { round: ShapeRound }) {
         className="grid gap-3"
         style={{ gridTemplateColumns: `repeat(${cols}, ${cellSize}px)` }}
       >
-        {shapes.map((shape, i) => (
+        {Array.from({ length: round.circle_count }, (_, i) => (
           <div
             key={i}
             className="animate-bounce-in rounded-full flex items-center justify-center"
@@ -95,7 +97,19 @@ function ShapeGrid({ round }: { round: ShapeRound }) {
               animationFillMode: 'backwards',
             }}
           >
-            <ShapeIcon shape={shape} size={Math.round(cellSize * 0.52)} />
+            {isNumbers ? (
+              <span
+                className="font-black tabular-nums text-white"
+                style={{
+                  fontSize: Math.round(cellSize * 0.46),
+                  textShadow: '0 0 16px rgba(96,165,250,0.6)',
+                }}
+              >
+                {numbers[i]}
+              </span>
+            ) : (
+              <ShapeIcon shape={shapes[i]} size={Math.round(cellSize * 0.52)} />
+            )}
           </div>
         ))}
       </div>
@@ -265,6 +279,28 @@ export function padShapes(shapes: Shape[], count: number): Shape[] {
   const base = shapes.slice(0, count)
   while (base.length < count) base.push('circle')
   return base
+}
+
+export function padNumbers(numbers: number[], count: number): number[] {
+  const valid = (numbers ?? []).filter(n => Number.isInteger(n) && n >= 1 && n <= count)
+  const seen = new Set<number>()
+  const deduped: number[] = []
+  for (const n of valid) {
+    if (!seen.has(n)) { seen.add(n); deduped.push(n) }
+  }
+  for (let n = 1; n <= count; n++) {
+    if (!seen.has(n)) deduped.push(n)
+  }
+  return deduped.slice(0, count)
+}
+
+export function shuffleNumbers(count: number): number[] {
+  const arr = Array.from({ length: count }, (_, i) => i + 1)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
 }
 
 export function formatTime(seconds: number): string {
