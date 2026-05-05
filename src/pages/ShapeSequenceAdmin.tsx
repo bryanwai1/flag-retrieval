@@ -11,7 +11,10 @@ import {
   formatTime,
 } from './ShapeSequenceProjector'
 
-const ROUND_COUNT = 6
+const ROUND_COUNT_KEY = 'ss_admin_round_count'
+const DEFAULT_ROUND_COUNT = 6
+const MIN_ROUND_COUNT = 1
+const MAX_ROUND_COUNT = 20
 
 export function ShapeSequenceAdmin() {
   const {
@@ -23,6 +26,12 @@ export function ShapeSequenceAdmin() {
   } = useShapeSequence()
 
   const [selectedRound, setSelectedRound] = useState(1)
+  const [roundCount, setRoundCount] = useState<number>(() => {
+    const stored = parseInt(localStorage.getItem(ROUND_COUNT_KEY) ?? '', 10)
+    return Number.isFinite(stored) && stored >= MIN_ROUND_COUNT && stored <= MAX_ROUND_COUNT
+      ? stored
+      : DEFAULT_ROUND_COUNT
+  })
   const [localMode, setLocalMode] = useState<RoundMode>('shapes')
   const [localShapes, setLocalShapes] = useState<Shape[]>(Array(20).fill('circle'))
   const [localNumbers, setLocalNumbers] = useState<number[]>(() => Array.from({ length: 20 }, (_, i) => i + 1))
@@ -373,29 +382,64 @@ export function ShapeSequenceAdmin() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
 
-        {/* Round Tabs */}
-        <div className="flex flex-wrap gap-2">
-          {Array.from({ length: ROUND_COUNT }, (_, i) => i + 1).map(n => {
-            const r = rounds.find(r => r.round_number === n)
-            const active = r?.is_active
-            const collecting = r?.accepting_submissions
-            return (
+        {/* Round Tabs + Round-count control */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            {Array.from({ length: roundCount }, (_, i) => i + 1).map(n => {
+              const r = rounds.find(r => r.round_number === n)
+              const active = r?.is_active
+              const collecting = r?.accepting_submissions
+              return (
+                <button
+                  key={n}
+                  onClick={() => setSelectedRound(n)}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all"
+                  style={{
+                    background: selectedRound === n ? '#1e3a8a' : '#fff',
+                    color: selectedRound === n ? '#fff' : '#374151',
+                    border: selectedRound === n ? '2px solid #1e3a8a' : '2px solid #e5e7eb',
+                  }}
+                >
+                  Round {n}
+                  {active && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Active" />}
+                  {collecting && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Collecting" />}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-500 font-bold uppercase tracking-wider">Rounds:</span>
+            <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
               <button
-                key={n}
-                onClick={() => setSelectedRound(n)}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all"
-                style={{
-                  background: selectedRound === n ? '#1e3a8a' : '#fff',
-                  color: selectedRound === n ? '#fff' : '#374151',
-                  border: selectedRound === n ? '2px solid #1e3a8a' : '2px solid #e5e7eb',
+                onClick={() => {
+                  const next = Math.max(MIN_ROUND_COUNT, roundCount - 1)
+                  if (next === roundCount) return
+                  setRoundCount(next)
+                  localStorage.setItem(ROUND_COUNT_KEY, String(next))
+                  if (selectedRound > next) setSelectedRound(next)
                 }}
-              >
-                Round {n}
-                {active && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Active" />}
-                {collecting && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Collecting" />}
-              </button>
-            )
-          })}
+                disabled={roundCount <= MIN_ROUND_COUNT}
+                className="px-3 py-1.5 font-black text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Decrease rounds"
+              >−</button>
+              <span className="px-3 py-1.5 font-black text-gray-800 tabular-nums border-x border-gray-200 min-w-[2.5rem] text-center">
+                {roundCount}
+              </span>
+              <button
+                onClick={() => {
+                  const next = Math.min(MAX_ROUND_COUNT, roundCount + 1)
+                  if (next === roundCount) return
+                  setRoundCount(next)
+                  localStorage.setItem(ROUND_COUNT_KEY, String(next))
+                }}
+                disabled={roundCount >= MAX_ROUND_COUNT}
+                className="px-3 py-1.5 font-black text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Increase rounds"
+              >+</button>
+            </div>
+            <span className="text-gray-400">({MIN_ROUND_COUNT}–{MAX_ROUND_COUNT})</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-[1fr_300px] gap-6 items-start">
