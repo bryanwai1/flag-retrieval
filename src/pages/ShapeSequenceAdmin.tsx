@@ -111,11 +111,10 @@ export function ShapeSequenceAdmin() {
     })
   }
 
-  const moveItem = <T,>(arr: T[], from: number, to: number): T[] => {
-    if (from === to || from < 0 || to < 0 || from >= arr.length || to >= arr.length) return arr
+  const swapItems = <T,>(arr: T[], a: number, b: number): T[] => {
+    if (a === b || a < 0 || b < 0 || a >= arr.length || b >= arr.length) return arr
     const next = [...arr]
-    const [item] = next.splice(from, 1)
-    next.splice(to, 0, item)
+    ;[next[a], next[b]] = [next[b], next[a]]
     return next
   }
 
@@ -142,9 +141,9 @@ export function ShapeSequenceAdmin() {
     setDragOverIndex(null)
     if (Number.isNaN(from) || from === index) return
     if (localMode === 'shapes') {
-      setLocalShapes(prev => moveItem(prev, from, index))
+      setLocalShapes(prev => swapItems(prev, from, index))
     } else {
-      setLocalNumbers(prev => moveItem(prev, from, index))
+      setLocalNumbers(prev => swapItems(prev, from, index))
     }
     setSwapIndex(null)
   }
@@ -499,7 +498,7 @@ export function ShapeSequenceAdmin() {
                             opacity: isDragging ? 0.35 : 1,
                             boxShadow: isDragOver ? '0 0 0 3px rgba(167,139,250,0.5)' : undefined,
                           }}
-                          title={`Circle ${i + 1}: ${shape} — drag to reorder, click to change`}
+                          title={`Circle ${i + 1}: ${shape} — drag to swap, click to change`}
                         >
                           <ShapeIcon shape={shape} size={22} />
                         </button>
@@ -531,7 +530,7 @@ export function ShapeSequenceAdmin() {
                             opacity: isDragging ? 0.35 : 1,
                             boxShadow: isDragOver ? '0 0 0 3px rgba(167,139,250,0.5)' : undefined,
                           }}
-                          title={`Position ${i + 1}: ${n} — drag to reorder, or click to swap`}
+                          title={`Position ${i + 1}: ${n} — drag to swap, or click to swap`}
                         >
                           {n}
                         </button>
@@ -542,10 +541,10 @@ export function ShapeSequenceAdmin() {
 
             <p className="text-xs text-gray-400">
               {localMode === 'shapes'
-                ? 'Drag any circle to reorder the sequence. Click to cycle: ● → ■ → ★ → ✕ → ●'
+                ? 'Drag a circle onto another to swap them. Click to cycle: ● → ■ → ★ → ✕ → ●'
                 : swapIndex !== null
-                  ? `Selected position ${swapIndex + 1} (#${localNumbers[swapIndex]}). Click another to swap, or click again to cancel. (You can also drag to reorder.)`
-                  : 'Drag any number to reorder the sequence — or click one then another to swap two positions.'}
+                  ? `Selected position ${swapIndex + 1} (#${localNumbers[swapIndex]}). Click another to swap, or click again to cancel. (Drag also swaps two cells.)`
+                  : 'Drag a number onto another to swap them — or click one then another to swap.'}
             </p>
 
             <button
