@@ -20,8 +20,33 @@ const state = {
   discTest: null,
   sessions: [],
   submissions: [],
-  activeSessionId: null
+  activeSessionId: null,
+  pollTimer: null
 };
+
+const POLL_MS = 5000;
+
+function startPolling() {
+  if (state.pollTimer) return;
+  state.pollTimer = setInterval(refreshLiveData, POLL_MS);
+}
+
+function stopPolling() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+}
+
+async function refreshLiveData() {
+  if (!state.discTest) return;
+  await Promise.all([loadSessions(), loadSubmissions()]);
+  if (state.activeSessionId) {
+    renderSessionDetail();
+  } else {
+    renderAll();
+  }
+}
 
 // ---------- Screens ----------
 
@@ -72,6 +97,7 @@ $('loginForm').addEventListener('submit', async (e) => {
 });
 
 const onLogout = async () => {
+  stopPolling();
   await sb.auth.signOut();
   state.user = null;
   show('screenLogin');
@@ -93,6 +119,7 @@ async function loadDashboard() {
   await loadDiscTest();
   await Promise.all([loadSessions(), loadSubmissions()]);
   renderAll();
+  startPolling();
 }
 
 async function loadDiscTest() {
