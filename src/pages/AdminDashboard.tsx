@@ -512,7 +512,7 @@ export function AdminDashboard() {
             <span className="ml-2 text-sm font-normal text-gray-400">({teams.length} teams registered)</span>
           </h2>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <TeamProgressTable teams={teams} tasks={tasks} scans={scans} onToggleComplete={toggleComplete} pointsEnabled={pointsEnabled} />
+            <TeamProgressTable teams={teams} tasks={liveTasks} scans={scans} onToggleComplete={toggleComplete} pointsEnabled={pointsEnabled} />
           </div>
           <p className="text-sm text-gray-400 mt-2">
             ◎ = Scanned &nbsp; ✓ = Completed &nbsp; Click to toggle completion
