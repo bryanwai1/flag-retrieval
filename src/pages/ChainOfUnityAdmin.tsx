@@ -126,6 +126,11 @@ export function ChainOfUnityAdmin() {
     setNewSessionTitle('')
     setNewSessionDate('')
     setActiveSessionId(data.id)
+    try {
+      await seedStationsInto(data.id)
+    } catch (err) {
+      alert(`Session created, but seeding stations failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
     await loadSessions()
   }
 
@@ -353,36 +358,40 @@ export function ChainOfUnityAdmin() {
     }
   }
 
+  const seedStationsInto = async (sessionId: string) => {
+    for (const t of STATION_TEMPLATES) {
+      let inserted = false
+      for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+        const code = randomCode(6)
+        const { error } = await supabase.from('chain_stations').insert({
+          session_id: sessionId,
+          code,
+          position: t.position,
+          title: t.title,
+          objective: t.objective,
+          materials: t.materials,
+          marshal_role: t.marshal_role,
+          time_limit_min: t.time_limit_min,
+          pointer_1: t.pointers[0] ?? null,
+          pointer_2: t.pointers[1] ?? null,
+          pointer_3: t.pointers[2] ?? null,
+          pointer_4: t.pointers[3] ?? null,
+          pointer_5: t.pointers[4] ?? null,
+          pointer_6: t.pointers[5] ?? null,
+        })
+        if (!error) { inserted = true; break }
+        if (error.code !== '23505') throw error
+      }
+      if (!inserted) throw new Error(`Could not seed "${t.title}" — code collision.`)
+    }
+  }
+
   const seedStationsFromTemplate = async () => {
     if (!activeSessionId) return
     if (!confirm(`Create ${STATION_TEMPLATES.length} stations from the template (Transfer Balance, Egg Toss, …)? They'll be added to this session — existing stations stay.`)) return
     setStationSaving(true)
     try {
-      for (const t of STATION_TEMPLATES) {
-        let inserted = false
-        for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
-          const code = randomCode(6)
-          const { error } = await supabase.from('chain_stations').insert({
-            session_id: activeSessionId,
-            code,
-            position: t.position,
-            title: t.title,
-            objective: t.objective,
-            materials: t.materials,
-            marshal_role: t.marshal_role,
-            time_limit_min: t.time_limit_min,
-            pointer_1: t.pointers[0] ?? null,
-            pointer_2: t.pointers[1] ?? null,
-            pointer_3: t.pointers[2] ?? null,
-            pointer_4: t.pointers[3] ?? null,
-            pointer_5: t.pointers[4] ?? null,
-            pointer_6: t.pointers[5] ?? null,
-          })
-          if (!error) { inserted = true; break }
-          if (error.code !== '23505') throw error
-        }
-        if (!inserted) throw new Error(`Could not seed "${t.title}" — code collision.`)
-      }
+      await seedStationsInto(activeSessionId)
       await loadStations(activeSessionId)
       setFacilitatorMode(true)
     } catch (err) {
