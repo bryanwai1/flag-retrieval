@@ -2,16 +2,32 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'rea
 import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { STATION_TEMPLATES } from '../lib/chainStationsTemplate'
 import type { ChainSession, ChainGroup, ChainScan, ChainStation } from '../types/database'
 
 interface StationDraft {
   position: number
   title: string
-  body: string
+  objective: string
+  materials: string
+  marshal_role: string
+  time_limit_min: number
+  pointers: string[] // length 6
+  icons: string[]    // length 6
   image_url: string | null
 }
 
-const EMPTY_DRAFT: StationDraft = { position: 1, title: '', body: '', image_url: null }
+const EMPTY_DRAFT: StationDraft = {
+  position: 1,
+  title: '',
+  objective: '',
+  materials: '',
+  marshal_role: '',
+  time_limit_min: 7,
+  pointers: ['', '', '', '', '', ''],
+  icons: ['', '', '', '', '', ''],
+  image_url: null,
+}
 
 const ACCENT = '#fb923c' // chain / rope orange
 
@@ -204,7 +220,26 @@ export function ChainOfUnityAdmin() {
       setStationDraft({
         position: station.position,
         title: station.title,
-        body: station.body ?? '',
+        objective: station.objective ?? '',
+        materials: station.materials ?? '',
+        marshal_role: station.marshal_role ?? '',
+        time_limit_min: station.time_limit_min ?? 7,
+        pointers: [
+          station.pointer_1 ?? '',
+          station.pointer_2 ?? '',
+          station.pointer_3 ?? '',
+          station.pointer_4 ?? '',
+          station.pointer_5 ?? '',
+          station.pointer_6 ?? '',
+        ],
+        icons: [
+          station.icon_1 ?? '',
+          station.icon_2 ?? '',
+          station.icon_3 ?? '',
+          station.icon_4 ?? '',
+          station.icon_5 ?? '',
+          station.icon_6 ?? '',
+        ],
         image_url: station.image_url,
       })
     } else {
@@ -254,10 +289,26 @@ export function ChainOfUnityAdmin() {
 
   const saveStation = async () => {
     if (!activeSessionId) return
-    const { position, title, body } = stationDraft
+    const { position, title, objective, materials, marshal_role, time_limit_min, pointers, icons } = stationDraft
     if (!title.trim() || !Number.isFinite(position)) {
       setStationError('Title and position are required.')
       return
+    }
+    const trim = (s: string) => (s.trim() ? s.trim() : null)
+    const pointerCols = {
+      pointer_1: trim(pointers[0]), pointer_2: trim(pointers[1]), pointer_3: trim(pointers[2]),
+      pointer_4: trim(pointers[3]), pointer_5: trim(pointers[4]), pointer_6: trim(pointers[5]),
+      icon_1: trim(icons[0]), icon_2: trim(icons[1]), icon_3: trim(icons[2]),
+      icon_4: trim(icons[3]), icon_5: trim(icons[4]), icon_6: trim(icons[5]),
+    }
+    const commonFields = {
+      position,
+      title: title.trim(),
+      objective: trim(objective),
+      materials: trim(materials),
+      marshal_role: trim(marshal_role),
+      time_limit_min: Number.isFinite(time_limit_min) ? time_limit_min : 7,
+      ...pointerCols,
     }
     setStationError(null)
     setStationSaving(true)
@@ -271,10 +322,8 @@ export function ChainOfUnityAdmin() {
           const code = randomCode(6)
           const { data, error } = await supabase.from('chain_stations').insert({
             session_id: activeSessionId,
-            position,
-            title: title.trim(),
-            body: body.trim() || null,
             code,
+            ...commonFields,
           }).select().single()
           if (!error) { inserted = data as ChainStation; break }
           if (error.code !== '23505') throw error
@@ -290,9 +339,7 @@ export function ChainOfUnityAdmin() {
           finalImageUrl = await uploadStationImage(stationId, stationImageFile)
         }
         const { error } = await supabase.from('chain_stations').update({
-          position,
-          title: title.trim(),
-          body: body.trim() || null,
+          ...commonFields,
           image_url: finalImageUrl,
         }).eq('id', stationId)
         if (error) throw error
@@ -301,6 +348,44 @@ export function ChainOfUnityAdmin() {
       if (activeSessionId) await loadStations(activeSessionId)
     } catch (err) {
       setStationError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setStationSaving(false)
+    }
+  }
+
+  const seedStationsFromTemplate = async () => {
+    if (!activeSessionId) return
+    if (!confirm(`Create ${STATION_TEMPLATES.length} stations from the template (Transfer Balance, Egg Toss, …)? They'll be added to this session — existing stations stay.`)) return
+    setStationSaving(true)
+    try {
+      for (const t of STATION_TEMPLATES) {
+        let inserted = false
+        for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+          const code = randomCode(6)
+          const { error } = await supabase.from('chain_stations').insert({
+            session_id: activeSessionId,
+            code,
+            position: t.position,
+            title: t.title,
+            objective: t.objective,
+            materials: t.materials,
+            marshal_role: t.marshal_role,
+            time_limit_min: t.time_limit_min,
+            pointer_1: t.pointers[0] ?? null,
+            pointer_2: t.pointers[1] ?? null,
+            pointer_3: t.pointers[2] ?? null,
+            pointer_4: t.pointers[3] ?? null,
+            pointer_5: t.pointers[4] ?? null,
+            pointer_6: t.pointers[5] ?? null,
+          })
+          if (!error) { inserted = true; break }
+          if (error.code !== '23505') throw error
+        }
+        if (!inserted) throw new Error(`Could not seed "${t.title}" — code collision.`)
+      }
+      await loadStations(activeSessionId)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err))
     } finally {
       setStationSaving(false)
     }
@@ -523,14 +608,26 @@ export function ChainOfUnityAdmin() {
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <div>
                   <h2 className="text-lg font-bold">Stations &amp; instructions</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Each station is an activity participants scan into. Title, instructions, optional image — each gets its own QR.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Each station is an activity participants scan into. Title, objective, up to 6 rules — each gets its own QR.</p>
                 </div>
-                <button
-                  onClick={() => openStationModal(null)}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-black rounded-lg font-bold text-sm"
-                >
-                  + Add station
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {stations.length === 0 && (
+                    <button
+                      onClick={seedStationsFromTemplate}
+                      disabled={stationSaving}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm"
+                      title="Pre-fill the 8 stations from the original briefing deck"
+                    >
+                      ✨ Seed 8 stations
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openStationModal(null)}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-400 text-black rounded-lg font-bold text-sm"
+                  >
+                    + Add station
+                  </button>
+                </div>
               </div>
 
               {stations.length === 0 ? (
@@ -551,7 +648,12 @@ export function ChainOfUnityAdmin() {
                       )}
                       <div className="min-w-0">
                         <h3 className="font-black text-white text-base truncate">{st.title}</h3>
-                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{st.body || <span className="italic">No instructions yet.</span>}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
+                          {st.objective || st.body || <span className="italic">No objective yet.</span>}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {[st.pointer_1, st.pointer_2, st.pointer_3, st.pointer_4, st.pointer_5, st.pointer_6].filter(Boolean).length} rules · {st.time_limit_min ?? 7} min
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2 justify-end">
                         <button
@@ -667,7 +769,7 @@ export function ChainOfUnityAdmin() {
               <button onClick={closeStationModal} className="text-white/60 hover:text-white text-3xl font-light">&times;</button>
             </div>
 
-            <div className="grid sm:grid-cols-[100px_1fr] gap-3 mb-3">
+            <div className="grid sm:grid-cols-[80px_1fr_100px] gap-3 mb-3">
               <div>
                 <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Position</label>
                 <input
@@ -684,22 +786,99 @@ export function ChainOfUnityAdmin() {
                   type="text"
                   value={stationDraft.title}
                   onChange={e => setStationDraft(d => ({ ...d, title: e.target.value }))}
-                  placeholder="e.g. Station 1 — The Knot"
+                  placeholder="e.g. TRANSFER BALANCE"
                   className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Min</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={stationDraft.time_limit_min}
+                  onChange={e => setStationDraft(d => ({ ...d, time_limit_min: parseInt(e.target.value, 10) || 7 }))}
+                  className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white"
                 />
               </div>
             </div>
 
             <div className="mb-3">
-              <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Instructions <span className="font-normal text-gray-500 normal-case">— shown to participants who scan this station</span></label>
+              <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Objective <span className="font-normal text-gray-500 normal-case">— one-line goal shown to participants</span></label>
               <textarea
-                rows={7}
-                value={stationDraft.body}
-                onChange={e => setStationDraft(d => ({ ...d, body: e.target.value }))}
-                placeholder="Write the rules of this station here. Plain text — blank line starts a new paragraph."
-                className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 font-mono text-sm"
+                rows={2}
+                value={stationDraft.objective}
+                onChange={e => setStationDraft(d => ({ ...d, objective: e.target.value }))}
+                placeholder="e.g. Move the water bottle from Point A to Point B on a shared canvas — without dropping it."
+                className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm"
               />
             </div>
+
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Rules <span className="font-normal text-gray-500 normal-case">— up to 6 pointers (blank slots are hidden)</span></label>
+              <div className="mt-1 space-y-2">
+                {stationDraft.pointers.map((p, i) => (
+                  <div key={i} className="grid grid-cols-[36px_60px_1fr] gap-2 items-start">
+                    <div className="h-9 rounded-lg bg-orange-500/15 border border-orange-400/30 flex items-center justify-center text-orange-300 font-black text-sm">
+                      {i + 1}
+                    </div>
+                    <input
+                      type="text"
+                      value={stationDraft.icons[i]}
+                      onChange={e => {
+                        const v = e.target.value
+                        setStationDraft(d => {
+                          const icons = [...d.icons]; icons[i] = v
+                          return { ...d, icons }
+                        })
+                      }}
+                      placeholder="icon"
+                      className="h-9 px-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm text-center"
+                    />
+                    <textarea
+                      rows={1}
+                      value={p}
+                      onChange={e => {
+                        const v = e.target.value
+                        setStationDraft(d => {
+                          const pointers = [...d.pointers]; pointers[i] = v
+                          return { ...d, pointers }
+                        })
+                      }}
+                      placeholder={`Rule ${i + 1}…`}
+                      className="px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm resize-y min-h-[36px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <details className="mb-3 rounded-lg border border-white/10 bg-white/5">
+              <summary className="cursor-pointer px-3 py-2 text-xs text-gray-300 uppercase tracking-wider font-bold">
+                Marshal-only notes (not shown to participants)
+              </summary>
+              <div className="p-3 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Materials</label>
+                  <textarea
+                    rows={3}
+                    value={stationDraft.materials}
+                    onChange={e => setStationDraft(d => ({ ...d, materials: e.target.value }))}
+                    placeholder="One item per line"
+                    className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Your role (marshal)</label>
+                  <textarea
+                    rows={4}
+                    value={stationDraft.marshal_role}
+                    onChange={e => setStationDraft(d => ({ ...d, marshal_role: e.target.value }))}
+                    placeholder="What the marshal needs to do at this station"
+                    className="mt-1 w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm"
+                  />
+                </div>
+              </div>
+            </details>
 
             <div className="mb-4">
               <label className="text-xs text-gray-400 uppercase tracking-wider font-bold">Image <span className="font-normal text-gray-500 normal-case">— optional</span></label>

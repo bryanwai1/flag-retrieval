@@ -295,6 +295,22 @@ export interface ChainStation {
   body: string | null
   image_url: string | null
   code: string
+  objective: string | null
+  materials: string | null
+  marshal_role: string | null
+  time_limit_min: number
+  pointer_1: string | null
+  pointer_2: string | null
+  pointer_3: string | null
+  pointer_4: string | null
+  pointer_5: string | null
+  pointer_6: string | null
+  icon_1: string | null
+  icon_2: string | null
+  icon_3: string | null
+  icon_4: string | null
+  icon_5: string | null
+  icon_6: string | null
   created_at: string
   updated_at: string
 }
