@@ -384,6 +384,7 @@ export function ChainOfUnityAdmin() {
         if (!inserted) throw new Error(`Could not seed "${t.title}" — code collision.`)
       }
       await loadStations(activeSessionId)
+      setFacilitatorMode(true)
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err))
     } finally {
@@ -431,8 +432,16 @@ export function ChainOfUnityAdmin() {
           <div>
             <Link to="/" className="text-sm text-gray-400 hover:text-white">&larr; Game Hub</Link>
             <h1 className="text-3xl font-black mt-2">Chain of Unity · Admin</h1>
-            <p className="text-gray-400 text-sm mt-1">Pre-create groups → show each group's QR → participants scan to join and read the rules.</p>
+            <p className="text-gray-400 text-sm mt-1">Build stations, then open <strong className="text-orange-300">Projector view</strong> to throw the QR grid on a screen — participants scan to join their tribe and read each station's rules.</p>
           </div>
+          {activeSessionId && stations.length > 0 && (
+            <button
+              onClick={() => setFacilitatorMode(true)}
+              className="px-5 py-3 bg-orange-500 hover:bg-orange-400 text-black rounded-xl font-black text-base shadow-lg shadow-orange-500/30"
+            >
+              📺 Projector view
+            </button>
+          )}
         </div>
 
         <section className="bg-white/5 rounded-2xl p-6 border border-white/10 mb-6">
@@ -518,9 +527,9 @@ export function ChainOfUnityAdmin() {
                   onClick={() => setFacilitatorMode(true)}
                   disabled={stations.length === 0}
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:bg-white/10 disabled:text-gray-500 text-black rounded-lg font-bold text-sm"
-                  title={stations.length === 0 ? 'Add at least one station first' : 'Open facilitator-mode QR grid'}
+                  title={stations.length === 0 ? 'Add at least one station first' : 'Open the projector QR grid'}
                 >
-                  📺 Facilitator mode
+                  📺 Projector view
                 </button>
                 <button onClick={deleteSession} className="ml-auto px-4 py-2 bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 rounded-lg font-bold text-sm">Delete session</button>
               </div>
@@ -933,7 +942,7 @@ export function ChainOfUnityAdmin() {
           <div className="max-w-6xl mx-auto p-6">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <div>
-                <p className="text-xs text-orange-300 uppercase tracking-wider font-bold">Facilitator mode</p>
+                <p className="text-xs text-orange-300 uppercase tracking-wider font-bold">Projector view</p>
                 <h1 className="text-2xl font-black">{activeSession?.title}</h1>
                 <p className="text-gray-400 text-sm mt-0.5">Tap a station to show its QR fullscreen.</p>
               </div>
