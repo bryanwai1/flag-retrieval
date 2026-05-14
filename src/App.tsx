@@ -35,6 +35,7 @@ const VotingVote            = lazy(() => import('./pages/VotingVote').then(m => 
 const VotingResults         = lazy(() => import('./pages/VotingResults').then(m => ({ default: m.VotingResults })))
 const ChainOfUnityAdmin     = lazy(() => import('./pages/ChainOfUnityAdmin').then(m => ({ default: m.ChainOfUnityAdmin })))
 const ChainOfUnityJoin      = lazy(() => import('./pages/ChainOfUnityJoin').then(m => ({ default: m.ChainOfUnityJoin })))
+const ChainOfUnityStation   = lazy(() => import('./pages/ChainOfUnityStation').then(m => ({ default: m.ChainOfUnityStation })))
 
 export default function App() {
   return (
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/chain-of-unity" element={<ChainOfUnityAdmin />} />
           <Route path="/chain-of-unity/admin" element={<ChainOfUnityAdmin />} />
           <Route path="/chain-of-unity/join/:code" element={<ChainOfUnityJoin />} />
+          <Route path="/chain-of-unity/station/:code" element={<ChainOfUnityStation />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
