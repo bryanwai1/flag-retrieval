@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSetting } from '../hooks/useSettings'
 import { useTasks } from '../hooks/useTasks'
@@ -16,7 +16,18 @@ import type { Task } from '../types/database'
 export function AdminDashboard() {
   const navigate = useNavigate()
   const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks()
-  const { teams, createTeam, renameTeam, deleteTeam } = useTeams()
+  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, seedDefaultTeams } = useTeams()
+
+  // On first load: if the admin has zero tribes, auto-seed "Group 1" .. "Group 17"
+  // with random 4-digit codes. The seed only fires once per page load; admin can
+  // still delete groups later without them respawning.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (teamsLoading || seededRef.current) return
+    if (teams.length > 0) { seededRef.current = true; return }
+    seededRef.current = true
+    seedDefaultTeams()
+  }, [teamsLoading, teams.length, seedDefaultTeams])
   const { members, renameMember, removeMember, moveMember } = useTeamMembers()
   const { scans, toggleComplete, resetTeamScans, resetAllScans } = useTeamScans()
   const [showForm, setShowForm] = useState(false)

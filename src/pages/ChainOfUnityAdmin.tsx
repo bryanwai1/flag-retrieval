@@ -87,25 +87,6 @@ export function ChainOfUnityAdmin() {
       .select()
       .single()
     if (error || !data) { alert(error?.message ?? 'Failed to create session'); return }
-
-    // Auto-create 17 default groups (Group 1 … Group 17). Names are editable via Rename.
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const codes = new Set<string>()
-      while (codes.size < 17) codes.add(randomCode(6))
-      const groupRows = Array.from(codes).map((code, i) => ({
-        session_id: data.id,
-        name: `Group ${i + 1}`,
-        code,
-      }))
-      const { error: groupsError } = await supabase.from('chain_groups').insert(groupRows)
-      if (!groupsError) break
-      if (groupsError.code !== '23505') {
-        alert(`Session created, but failed to seed default groups: ${groupsError.message}`)
-        break
-      }
-      // Code collision against another session — retry with fresh codes.
-    }
-
     setNewSessionTitle('')
     setNewSessionDate('')
     setActiveSessionId(data.id)

@@ -66,6 +66,26 @@ export function useTeams() {
     }
   }, [fetchTeams])
 
+  // Seed 17 default tribes ("Group 1" .. "Group 17") with random 4-digit codes.
+  // Each name that already exists is skipped so this is safe to call against a
+  // partially-populated list. Returns the number of tribes actually inserted.
+  const seedDefaultTeams = useCallback(async (): Promise<number> => {
+    const { data: existing } = await supabase.from('teams').select('name')
+    const taken = new Set((existing ?? []).map(r => r.name.trim().toLowerCase()))
+    const rows = Array.from({ length: 17 }, (_, i) => ({
+      name: `Group ${i + 1}`,
+      password: String(Math.floor(1000 + Math.random() * 9000)),
+    })).filter(r => !taken.has(r.name.toLowerCase()))
+    if (rows.length === 0) return 0
+    const { error } = await supabase.from('teams').insert(rows)
+    if (error) {
+      alert(`Failed to seed default tribes: ${error.message}`)
+      return 0
+    }
+    await fetchTeams()
+    return rows.length
+  }, [fetchTeams])
+
   const deleteTeam = useCallback(async (id: string) => {
     setTeams(prev => prev.filter(t => t.id !== id))
     await supabase.from('team_members').delete().eq('team_id', id)
@@ -79,5 +99,5 @@ export function useTeams() {
     }
   }, [fetchTeams])
 
-  return { teams, loading, refetch: fetchTeams, createTeam, renameTeam, deleteTeam }
+  return { teams, loading, refetch: fetchTeams, createTeam, renameTeam, deleteTeam, seedDefaultTeams }
 }
