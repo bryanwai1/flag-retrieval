@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
@@ -385,6 +385,32 @@ export function ChainOfUnityAdmin() {
       if (!inserted) throw new Error(`Could not seed "${t.title}" — code collision.`)
     }
   }
+
+  // On first admin load with no sessions, auto-create a default "Chain of Unity"
+  // session and seed it with the 8 stations so the activity is immediately usable.
+  const autoBootstrappedRef = useRef(false)
+  useEffect(() => {
+    if (loading) return
+    if (autoBootstrappedRef.current) return
+    if (!isSupabaseConfigured) return
+    autoBootstrappedRef.current = true
+    if (sessions.length > 0) return
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('chain_sessions')
+        .insert({ title: 'Chain of Unity' })
+        .select()
+        .single()
+      if (error || !data) return
+      try {
+        await seedStationsInto(data.id)
+      } catch (err) {
+        console.warn('Auto-seed failed:', err)
+      }
+      setActiveSessionId(data.id)
+      await loadSessions()
+    })()
+  }, [loading, sessions.length, loadSessions])
 
   const seedStationsFromTemplate = async () => {
     if (!activeSessionId) return
