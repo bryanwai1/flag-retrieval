@@ -13,11 +13,9 @@ interface TeamRegistrationProps {
 
 type Step =
   | 'list'         // default — pick a tribe to join
-  | 'password'     // enter 4-digit code for selected tribe
-  | 'join-name'    // enter your name → join
+  | 'password'     // enter 4-digit code for selected tribe → auto-joins
   | 'create-tribe' // (settings path) name your new tribe
-  | 'created'      // show auto-generated code
-  | 'create-name'  // enter creator's name → create
+  | 'created'      // show auto-generated code → auto-creates
 
 export function TeamRegistration({
   onCreateTribe,
@@ -27,7 +25,6 @@ export function TeamRegistration({
   taskTitle,
 }: TeamRegistrationProps) {
   const [step, setStep] = useState<Step>('list')
-  const [memberName, setMemberName] = useState('')
   const [tribeName, setTribeName] = useState('')
   const [createdPassword, setCreatedPassword] = useState('')
   const [selectedTribe, setSelectedTribe] = useState<TribeResult | null>(null)
@@ -39,7 +36,6 @@ export function TeamRegistration({
   const [error, setError] = useState('')
   const [tribeNameTaken, setTribeNameTaken] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const yourNamePlaceholder = useT('Your name...')
   const tribeNamePlaceholder = useT('Tribe name...')
   const searchTribesPlaceholder = useT('Search tribes...')
   const wrongCodeMsg = useT('Wrong code — ask your tribe creator for the right one')
@@ -79,25 +75,18 @@ export function TeamRegistration({
     setStep('password')
   }
 
-  const handleSubmitPassword = (e: React.FormEvent) => {
+  // Password submit auto-joins with an empty name — the hook auto-generates
+  // "Member N" so we don't ask participants to type one.
+  const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedTribe || passwordInput.length !== 4) return
-    setError('')
-    setMemberName('')
-    setStep('join-name')
-  }
-
-  const handleSubmitJoinName = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedTribe || !memberName.trim()) return
     setSubmitting(true)
     setError('')
     try {
-      await onJoinTribe(selectedTribe.id, memberName.trim(), passwordInput)
+      await onJoinTribe(selectedTribe.id, '', passwordInput)
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'WRONG_PASSWORD') {
         setError(wrongCodeMsg)
-        setStep('password')
       } else if (err instanceof Error && err.message === 'TRIBE_FULL') {
         setError(tribeFullMsg)
         setStep('list')
@@ -120,19 +109,13 @@ export function TeamRegistration({
     setStep('created')
   }
 
-  const handleConfirmCreatedCode = () => {
-    setMemberName('')
-    setError('')
-    setStep('create-name')
-  }
-
-  const handleSubmitCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!memberName.trim()) return
+  // Confirming the generated code auto-creates the tribe with an empty creator
+  // name — the hook auto-fills "Member 1" for the creator.
+  const handleConfirmCreatedCode = async () => {
     setSubmitting(true)
     setError('')
     try {
-      await onCreateTribe(tribeName.trim(), memberName.trim(), createdPassword)
+      await onCreateTribe(tribeName.trim(), '', createdPassword)
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'TRIBE_NAME_TAKEN') {
         setTribeNameTaken(true)
@@ -209,15 +192,16 @@ export function TeamRegistration({
             )}
           </div>
 
-          {/* Settings: start a new tribe */}
-          <div className="mt-5 pt-4 border-t border-gray-100">
+          {/* Settings: start a new tribe — kept available but de-emphasised so
+              participants aren't tempted to create their own when tribes are
+              already pre-set by the admin. */}
+          <div className="mt-3 text-center">
             <button
               type="button"
               onClick={() => { setTribeName(''); setTribeNameTaken(false); setError(''); setStep('create-tribe') }}
-              className="w-full flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors py-2"
+              className="text-[11px] text-gray-300 hover:text-gray-500 transition-colors py-1 px-2"
             >
-              <span>⚙️</span>
-              <T>Settings — Start a new tribe</T>
+              <T>Start a new tribe</T>
             </button>
           </div>
         </div>
@@ -258,44 +242,11 @@ export function TeamRegistration({
                 <p className="text-red-600 font-bold text-sm">{error}</p>
               </div>
             )}
-            <PrimaryButton hexCode={hexCode} disabled={passwordInput.length !== 4}>
-              <T>Next →</T>
-            </PrimaryButton>
-          </form>
-          <BackButton onClick={() => { setStep('list'); setPasswordInput(''); setError('') }} />
-        </div>
-      </Wrapper>
-    )
-  }
-
-  // ── Step: enter member name → join ───────────────────────────────
-  if (step === 'join-name') {
-    return (
-      <Wrapper hexCode={hexCode}>
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full animate-bounce-in">
-          <Flag hexCode={hexCode} />
-          <p className="text-xs font-bold text-center uppercase tracking-widest mb-1" style={{ color: hexCode }}>
-            <T>Joining</T> · {selectedTribe?.name}
-          </p>
-          <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>What's your name?</T></h1>
-          <p className="text-gray-400 text-center text-sm mb-7"><T>Shown to your tribe and on the leaderboard</T></p>
-          <form onSubmit={handleSubmitJoinName} className="flex flex-col gap-4">
-            <input
-              type="text"
-              value={memberName}
-              onChange={(e) => setMemberName(e.target.value)}
-              placeholder={yourNamePlaceholder}
-              className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-              style={{ borderColor: memberName ? hexCode : '#e5e7eb' }}
-              autoFocus
-              maxLength={40}
-            />
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-            <PrimaryButton hexCode={hexCode} disabled={!memberName.trim()} loading={submitting}>
+            <PrimaryButton hexCode={hexCode} disabled={passwordInput.length !== 4} loading={submitting}>
               <T>{submitting ? 'Joining...' : 'Join Tribe 🏴'}</T>
             </PrimaryButton>
           </form>
-          <BackButton onClick={() => setStep('password')} />
+          <BackButton onClick={() => { setStep('list'); setPasswordInput(''); setError('') }} />
         </div>
       </Wrapper>
     )
@@ -376,8 +327,10 @@ export function TeamRegistration({
             <T>Members need this code to join</T>
           </div>
 
-          <PrimaryButton hexCode={hexCode} onClick={handleConfirmCreatedCode}>
-            <T>Next →</T>
+          {error && <p className="text-red-500 text-sm text-center mb-3">{error}</p>}
+
+          <PrimaryButton hexCode={hexCode} onClick={handleConfirmCreatedCode} loading={submitting}>
+            <T>{submitting ? 'Creating...' : 'Create Tribe & Start →'}</T>
           </PrimaryButton>
           <BackButton onClick={() => setStep('create-tribe')} />
         </div>
@@ -385,36 +338,7 @@ export function TeamRegistration({
     )
   }
 
-  // ── Step: creator's name → create tribe ──────────────────────────
-  return (
-    <Wrapper hexCode={hexCode}>
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full animate-bounce-in">
-        <Flag hexCode={hexCode} />
-        <p className="text-xs font-bold text-center uppercase tracking-widest mb-1" style={{ color: hexCode }}>
-          <T>Creating</T> · {tribeName}
-        </p>
-        <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>What's your name?</T></h1>
-        <p className="text-gray-400 text-center text-sm mb-7"><T>As the creator, you'll appear first in the tribe</T></p>
-        <form onSubmit={handleSubmitCreate} className="flex flex-col gap-4">
-          <input
-            type="text"
-            value={memberName}
-            onChange={(e) => setMemberName(e.target.value)}
-            placeholder={yourNamePlaceholder}
-            className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
-            style={{ borderColor: memberName ? hexCode : '#e5e7eb' }}
-            autoFocus
-            maxLength={40}
-          />
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          <PrimaryButton hexCode={hexCode} disabled={!memberName.trim()} loading={submitting}>
-            <T>{submitting ? 'Creating...' : 'Create Tribe & Start →'}</T>
-          </PrimaryButton>
-        </form>
-        <BackButton onClick={() => setStep('created')} />
-      </div>
-    </Wrapper>
-  )
+  return null
 }
 
 // ── Shared sub-components ────────────────────────────────────────────

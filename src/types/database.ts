@@ -260,3 +260,29 @@ export interface VoteBallot {
   voter_id: string
   created_at: string
 }
+
+// ── Chain of Unity ────────────────────────────────────────────
+
+export interface ChainSession {
+  id: string
+  title: string
+  event_date: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface ChainGroup {
+  id: string
+  session_id: string
+  name: string
+  code: string
+  created_at: string
+}
+
+export interface ChainScan {
+  id: string
+  group_id: string
+  scanner_id: string | null
+  scanned_at: string
+}

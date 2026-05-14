@@ -80,6 +80,16 @@ export function GameSelector() {
           delay="0.8s"
           primaryLabel="START TEST"
         />
+        <GameCard
+          href="/chain-of-unity"
+          adminHref="/chain-of-unity"
+          icon="⛓️"
+          title="CHAIN OF UNITY"
+          description="Pre-create groups · Show QR · Live scan counts"
+          accent="#fb923c"
+          delay="0.9s"
+          primaryLabel="ADMIN DASHBOARD"
+        />
       </div>
     </div>
   )

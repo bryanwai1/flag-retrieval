@@ -84,9 +84,13 @@ export function useCurrentTeam() {
       .single()
     if (error) throw error
 
+    // If the caller didn't supply a name, auto-generate one. The creator is the
+    // first member, so "Member 1".
+    const memberDisplayName = name.trim() || 'Member 1'
+
     const { data: memberData, error: memberError } = await supabase.from('team_members').insert({
       team_id: newTeam.id,
-      name,
+      name: memberDisplayName,
       is_creator: true,
     }).select().single()
     if (memberError || !memberData) {
@@ -95,11 +99,11 @@ export function useCurrentTeam() {
     }
 
     localStorage.setItem(TEAM_ID_KEY, newTeam.id)
-    localStorage.setItem(MEMBER_NAME_KEY, name)
+    localStorage.setItem(MEMBER_NAME_KEY, memberDisplayName)
     localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(newTeam))
     if (memberData) localStorage.setItem(MEMBER_ID_KEY, memberData.id)
     setTeam(newTeam)
-    setMemberName(name)
+    setMemberName(memberDisplayName)
     return newTeam
   }
 
@@ -116,11 +120,16 @@ export function useCurrentTeam() {
       .from('team_members')
       .select('*', { count: 'exact', head: true })
       .eq('team_id', teamId)
-    if ((count ?? 0) >= 20) throw new Error('TRIBE_FULL')
+    const currentCount = count ?? 0
+    if (currentCount >= 20) throw new Error('TRIBE_FULL')
+
+    // If the caller didn't supply a name, auto-generate "Member N" based on
+    // current member count (current + 1 is the joiner's slot).
+    const memberDisplayName = name.trim() || `Member ${currentCount + 1}`
 
     const { data: memberData, error: memberError } = await supabase.from('team_members').insert({
       team_id: teamId,
-      name,
+      name: memberDisplayName,
       is_creator: false,
     }).select().single()
     if (memberError || !memberData) {
@@ -128,11 +137,11 @@ export function useCurrentTeam() {
     }
 
     localStorage.setItem(TEAM_ID_KEY, teamId)
-    localStorage.setItem(MEMBER_NAME_KEY, name)
+    localStorage.setItem(MEMBER_NAME_KEY, memberDisplayName)
     localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(teamData))
     if (memberData) localStorage.setItem(MEMBER_ID_KEY, memberData.id)
     setTeam(teamData)
-    setMemberName(name)
+    setMemberName(memberDisplayName)
     return teamData
   }
 
