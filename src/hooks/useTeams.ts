@@ -30,6 +30,29 @@ export function useTeams() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchTeams])
 
+  const createTeam = useCallback(async (name: string): Promise<{ team: Team; password: string }> => {
+    const trimmed = name.trim()
+    if (!trimmed) throw new Error('NAME_REQUIRED')
+    const { data: existing } = await supabase
+      .from('teams')
+      .select('id')
+      .ilike('name', trimmed)
+      .maybeSingle()
+    if (existing) throw new Error('TRIBE_NAME_TAKEN')
+    const password = String(Math.floor(1000 + Math.random() * 9000))
+    const { data, error } = await supabase
+      .from('teams')
+      .insert({ name: trimmed, password })
+      .select()
+      .single()
+    if (error || !data) {
+      await fetchTeams()
+      throw error ?? new Error('Insert failed')
+    }
+    await fetchTeams()
+    return { team: data, password }
+  }, [fetchTeams])
+
   const renameTeam = useCallback(async (id: string, name: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
@@ -56,5 +79,5 @@ export function useTeams() {
     }
   }, [fetchTeams])
 
-  return { teams, loading, refetch: fetchTeams, renameTeam, deleteTeam }
+  return { teams, loading, refetch: fetchTeams, createTeam, renameTeam, deleteTeam }
 }
