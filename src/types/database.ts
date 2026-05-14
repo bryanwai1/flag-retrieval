@@ -286,3 +286,23 @@ export interface ChainScan {
   scanner_id: string | null
   scanned_at: string
 }
+
+export interface ChainStation {
+  id: string
+  session_id: string
+  position: number
+  title: string
+  body: string | null
+  image_url: string | null
+  code: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ChainStationScan {
+  id: string
+  station_id: string
+  group_id: string | null
+  scanner_id: string | null
+  scanned_at: string
+}
