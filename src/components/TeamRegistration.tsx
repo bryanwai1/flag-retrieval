@@ -13,7 +13,8 @@ interface TeamRegistrationProps {
 
 type Step =
   | 'list'         // default — pick a tribe to join
-  | 'password'     // enter 4-digit code for selected tribe → auto-joins
+  | 'enter-name'   // enter your name after picking a tribe
+  | 'password'     // enter 4-digit code for selected tribe → joins with name
   | 'create-tribe' // (settings path) name your new tribe
   | 'created'      // show auto-generated code → auto-creates
 
@@ -28,6 +29,7 @@ export function TeamRegistration({
   const [tribeName, setTribeName] = useState('')
   const [createdPassword, setCreatedPassword] = useState('')
   const [selectedTribe, setSelectedTribe] = useState<TribeResult | null>(null)
+  const [memberNameInput, setMemberNameInput] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [tribes, setTribes] = useState<TribeResult[]>([])
@@ -70,20 +72,20 @@ export function TeamRegistration({
   // ── Join: pick tribe → enter password → enter name ───────────────
   const handleSelectTribe = (tribe: TribeResult) => {
     setSelectedTribe(tribe)
+    setMemberNameInput('')
     setPasswordInput('')
     setError('')
-    setStep('password')
+    setStep('enter-name')
   }
 
-  // Password submit auto-joins with an empty name — the hook auto-generates
-  // "Member N" so we don't ask participants to type one.
+  // Password submit joins with the name the participant entered on the previous step.
   const handleSubmitPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedTribe || passwordInput.length !== 4) return
     setSubmitting(true)
     setError('')
     try {
-      await onJoinTribe(selectedTribe.id, '', passwordInput)
+      await onJoinTribe(selectedTribe.id, memberNameInput.trim(), passwordInput)
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'WRONG_PASSWORD') {
         setError(wrongCodeMsg)
@@ -204,6 +206,46 @@ export function TeamRegistration({
               <T>Start a new tribe</T>
             </button>
           </div>
+        </div>
+      </Wrapper>
+    )
+  }
+
+  // ── Step: enter name (join flow) ────────────────────────────────
+  if (step === 'enter-name') {
+    return (
+      <Wrapper hexCode={hexCode}>
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full animate-bounce-in">
+          <Flag hexCode={hexCode} />
+          <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>What's your name?</T></h1>
+          <p className="font-bold text-center text-lg mb-5" style={{ color: hexCode }}>{selectedTribe?.name}</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!memberNameInput.trim()) return
+              setError('')
+              setStep('password')
+            }}
+            className="flex flex-col gap-4"
+          >
+            <input
+              type="text"
+              value={memberNameInput}
+              onChange={(e) => setMemberNameInput(e.target.value)}
+              placeholder="Your name"
+              className="w-full px-5 py-4 rounded-2xl border-2 text-xl font-medium focus:outline-none transition-colors text-center"
+              style={{ borderColor: memberNameInput.trim() ? hexCode : '#e5e7eb' }}
+              autoFocus
+              maxLength={40}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <PrimaryButton hexCode={hexCode} disabled={!memberNameInput.trim()}>
+              <T>Next →</T>
+            </PrimaryButton>
+          </form>
+          <BackButton onClick={() => { setStep('list'); setMemberNameInput('') }} />
         </div>
       </Wrapper>
     )
