@@ -71,7 +71,6 @@ export function TeamRegistration({
   const handleSelectTribe = (tribe: TribeResult) => {
     setSelectedTribe(tribe)
     setMemberNameInput('')
-    setPasswordInput('')
     setError('')
     setStep('enter-name')
   }
