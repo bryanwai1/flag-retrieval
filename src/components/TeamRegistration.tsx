@@ -12,11 +12,11 @@ interface TeamRegistrationProps {
 }
 
 type Step =
-  | 'list'         // default — pick a tribe to join
-  | 'enter-name'   // enter your name after picking a tribe
-  | 'password'     // enter 4-digit code for selected tribe → joins with name
-  | 'create-tribe' // (settings path) name your new tribe
-  | 'created'      // show auto-generated code → auto-creates
+  | 'list'             // pick a tribe
+  | 'enter-name'       // type your name
+  | 'reveal-password'  // show tribe code to memorise → auto-joins on confirm
+  | 'create-tribe'     // (settings path) name a new tribe
+  | 'created'          // show generated code → auto-creates
 
 export function TeamRegistration({
   onCreateTribe,
@@ -30,7 +30,6 @@ export function TeamRegistration({
   const [createdPassword, setCreatedPassword] = useState('')
   const [selectedTribe, setSelectedTribe] = useState<TribeResult | null>(null)
   const [memberNameInput, setMemberNameInput] = useState('')
-  const [passwordInput, setPasswordInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [tribes, setTribes] = useState<TribeResult[]>([])
   const [tribesLoading, setTribesLoading] = useState(false)
@@ -40,7 +39,6 @@ export function TeamRegistration({
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tribeNamePlaceholder = useT('Tribe name...')
   const searchTribesPlaceholder = useT('Search tribes...')
-  const wrongCodeMsg = useT('Wrong code — ask your tribe creator for the right one')
   const tribeFullMsg = useT('That tribe is already full. Pick another one.')
   const joinFailedMsg = useT('Failed to join tribe')
 
@@ -78,18 +76,15 @@ export function TeamRegistration({
     setStep('enter-name')
   }
 
-  // Password submit joins with the name the participant entered on the previous step.
-  const handleSubmitPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedTribe || passwordInput.length !== 4) return
+  // Auto-join using the tribe's own password — participant never types it.
+  const handleEnterGame = async () => {
+    if (!selectedTribe) return
     setSubmitting(true)
     setError('')
     try {
-      await onJoinTribe(selectedTribe.id, memberNameInput.trim(), passwordInput)
+      await onJoinTribe(selectedTribe.id, memberNameInput.trim(), selectedTribe.password)
     } catch (err: unknown) {
-      if (err instanceof Error && err.message === 'WRONG_PASSWORD') {
-        setError(wrongCodeMsg)
-      } else if (err instanceof Error && err.message === 'TRIBE_FULL') {
+      if (err instanceof Error && err.message === 'TRIBE_FULL') {
         setError(tribeFullMsg)
         setStep('list')
       } else {
@@ -183,22 +178,12 @@ export function TeamRegistration({
                       {tribe.memberCount} <T>members</T>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {tribe.password && (
-                      <span
-                        className="px-3 py-1 rounded-xl text-sm font-black tracking-widest"
-                        style={{ backgroundColor: `${hexCode}18`, color: hexCode }}
-                      >
-                        {tribe.password}
-                      </span>
-                    )}
-                    <span
-                      className="px-4 py-2 rounded-xl text-white text-sm font-black"
-                      style={{ backgroundColor: hexCode }}
-                    >
-                      <T>Join</T>
-                    </span>
-                  </div>
+                  <span
+                    className="px-4 py-2 rounded-xl text-white text-sm font-black shrink-0"
+                    style={{ backgroundColor: hexCode }}
+                  >
+                    <T>Join</T>
+                  </span>
                 </button>
               ))
             )}
@@ -234,7 +219,7 @@ export function TeamRegistration({
               e.preventDefault()
               if (!memberNameInput.trim()) return
               setError('')
-              setStep('password')
+              setStep('reveal-password')
             }}
             className="flex flex-col gap-4"
           >
@@ -261,48 +246,56 @@ export function TeamRegistration({
     )
   }
 
-  // ── Step: enter password ─────────────────────────────────────────
-  if (step === 'password') {
+  // ── Step: reveal password ────────────────────────────────────────
+  if (step === 'reveal-password') {
+    const pw = selectedTribe?.password ?? ''
     return (
       <Wrapper hexCode={hexCode}>
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full animate-bounce-in">
           <Flag hexCode={hexCode} />
-          <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>Enter Tribe Code</T></h1>
-          <p className="font-bold text-center text-lg mb-1" style={{ color: hexCode }}>{selectedTribe?.name}</p>
-          <p className="text-gray-400 text-center text-sm mb-4">
-            <T>Enter the 4-digit code shown next to your tribe</T>
-          </p>
-          <div className="flex items-start gap-2 rounded-2xl px-4 py-3 mb-4 text-sm font-bold" style={{ backgroundColor: `${hexCode}15`, color: hexCode }}>
-            <span className="text-lg leading-none mt-0.5">⚠️</span>
-            <p><T>REMEMBER THIS CODE — you'll need it every time you open this page on a new device.</T></p>
-          </div>
-          <form onSubmit={handleSubmitPassword} className="flex flex-col gap-4">
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={passwordInput}
-              onChange={(e) => {
-                setPasswordInput(e.target.value.replace(/\D/g, '').slice(0, 4))
-                setError('')
-              }}
-              placeholder="• • • •"
-              className="w-full px-5 py-4 rounded-2xl border-2 text-4xl font-black focus:outline-none transition-colors text-center tracking-[0.6em]"
-              style={{ borderColor: passwordInput.length === 4 ? hexCode : '#e5e7eb' }}
-              autoFocus
-              maxLength={4}
-            />
-            {error && (
-              <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                <span>🚫</span>
-                <p className="text-red-600 font-bold text-sm">{error}</p>
+          <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>Your Tribe Code</T></h1>
+          <p className="font-bold text-center text-lg mb-5" style={{ color: hexCode }}>{selectedTribe?.name}</p>
+
+          {/* Big code digits */}
+          <div className="flex justify-center gap-3 mb-5">
+            {pw.split('').map((digit, i) => (
+              <div
+                key={i}
+                className="w-16 h-20 rounded-2xl flex items-center justify-center text-4xl font-black text-white select-all"
+                style={{ backgroundColor: hexCode, boxShadow: `0 6px 20px ${hexCode}55` }}
+              >
+                {digit}
               </div>
-            )}
-            <PrimaryButton hexCode={hexCode} disabled={passwordInput.length !== 4} loading={submitting}>
-              <T>{submitting ? 'Joining...' : 'Join Tribe 🏴'}</T>
-            </PrimaryButton>
-          </form>
-          <BackButton onClick={() => { setStep('list'); setPasswordInput(''); setError('') }} />
+            ))}
+          </div>
+
+          {/* Remember banner */}
+          <div
+            className="flex items-start gap-3 rounded-2xl px-4 py-4 mb-6"
+            style={{ backgroundColor: `${hexCode}15` }}
+          >
+            <span className="text-2xl leading-none">⚠️</span>
+            <div>
+              <p className="font-black text-gray-900 text-sm uppercase tracking-wide mb-1">
+                <T>Remember this code!</T>
+              </p>
+              <p className="text-gray-500 text-sm leading-snug">
+                <T>You'll need it to log back in if you open this page on a new device.</T>
+              </p>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+              <span>🚫</span>
+              <p className="text-red-600 font-bold text-sm">{error}</p>
+            </div>
+          )}
+
+          <PrimaryButton hexCode={hexCode} onClick={handleEnterGame} loading={submitting}>
+            <T>{submitting ? 'Joining...' : "I've noted it — Enter Game 🏴"}</T>
+          </PrimaryButton>
+          <BackButton onClick={() => { setStep('enter-name'); setError('') }} />
         </div>
       </Wrapper>
     )
