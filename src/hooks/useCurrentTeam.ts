@@ -11,6 +11,7 @@ export interface TribeResult {
   id: string
   name: string
   memberCount: number
+  password: string
 }
 
 export function useCurrentTeam() {
@@ -56,14 +57,15 @@ export function useCurrentTeam() {
   const searchTribes = async (query: string): Promise<TribeResult[]> => {
     const { data } = await supabase
       .from('teams')
-      .select('id, name, team_members(id)')
+      .select('id, name, password, team_members(id)')
       .ilike('name', `%${query}%`)
       .order('name')
       .limit(20)
     return (data || [])
-      .map((t: { id: string; name: string; team_members: { id: string }[] }) => ({
+      .map((t: { id: string; name: string; password: string; team_members: { id: string }[] }) => ({
         id: t.id,
         name: t.name,
+        password: t.password ?? '',
         memberCount: t.team_members?.length ?? 0,
       }))
       .filter((t) => t.memberCount < 20)

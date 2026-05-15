@@ -183,12 +183,22 @@ export function TeamRegistration({
                       {tribe.memberCount} <T>members</T>
                     </p>
                   </div>
-                  <span
-                    className="px-4 py-2 rounded-xl text-white text-sm font-black"
-                    style={{ backgroundColor: hexCode }}
-                  >
-                    <T>Join</T>
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {tribe.password && (
+                      <span
+                        className="px-3 py-1 rounded-xl text-sm font-black tracking-widest"
+                        style={{ backgroundColor: `${hexCode}18`, color: hexCode }}
+                      >
+                        {tribe.password}
+                      </span>
+                    )}
+                    <span
+                      className="px-4 py-2 rounded-xl text-white text-sm font-black"
+                      style={{ backgroundColor: hexCode }}
+                    >
+                      <T>Join</T>
+                    </span>
+                  </div>
                 </button>
               ))
             )}
@@ -259,9 +269,13 @@ export function TeamRegistration({
           <Flag hexCode={hexCode} />
           <h1 className="text-2xl font-black text-center text-gray-900 mb-1"><T>Enter Tribe Code</T></h1>
           <p className="font-bold text-center text-lg mb-1" style={{ color: hexCode }}>{selectedTribe?.name}</p>
-          <p className="text-gray-400 text-center text-sm mb-6">
-            <T>Ask your tribe creator for their 4-digit code</T>
+          <p className="text-gray-400 text-center text-sm mb-4">
+            <T>Enter the 4-digit code shown next to your tribe</T>
           </p>
+          <div className="flex items-start gap-2 rounded-2xl px-4 py-3 mb-4 text-sm font-bold" style={{ backgroundColor: `${hexCode}15`, color: hexCode }}>
+            <span className="text-lg leading-none mt-0.5">⚠️</span>
+            <p><T>REMEMBER THIS CODE — you'll need it every time you open this page on a new device.</T></p>
+          </div>
           <form onSubmit={handleSubmitPassword} className="flex flex-col gap-4">
             <input
               type="text"
