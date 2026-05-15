@@ -67,6 +67,7 @@ export function useCurrentTeam() {
         memberCount: t.team_members?.length ?? 0,
       }))
       .filter((t) => t.memberCount < 20)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
   }
 
   const createTribe = async (tribeName: string, name: string, password: string): Promise<Team> => {
