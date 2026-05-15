@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSetting } from '../hooks/useSettings'
 import { useTasks } from '../hooks/useTasks'
@@ -16,7 +16,18 @@ import type { Task } from '../types/database'
 export function AdminDashboard() {
   const navigate = useNavigate()
   const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks()
-  const { teams, renameTeam, deleteTeam } = useTeams()
+  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, seedDefaultTeams } = useTeams()
+
+  // On first load: if the admin has zero tribes, auto-seed "Group 1" .. "Group 17"
+  // with random 4-digit codes. The seed only fires once per page load; admin can
+  // still delete groups later without them respawning.
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (teamsLoading || seededRef.current) return
+    if (teams.length > 0) { seededRef.current = true; return }
+    seededRef.current = true
+    seedDefaultTeams()
+  }, [teamsLoading, teams.length, seedDefaultTeams])
   const { members, renameMember, removeMember, moveMember } = useTeamMembers()
   const { scans, toggleComplete, resetTeamScans, resetAllScans } = useTeamScans()
   const [showForm, setShowForm] = useState(false)
@@ -25,6 +36,11 @@ export function AdminDashboard() {
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [editingMemberName, setEditingMemberName] = useState('')
   const [movingMemberId, setMovingMemberId] = useState<string | null>(null)
+  const [showCreateTeam, setShowCreateTeam] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [creatingTeam, setCreatingTeam] = useState(false)
+  const [createTeamError, setCreateTeamError] = useState('')
+  const [createdTeamFlash, setCreatedTeamFlash] = useState<{ name: string; password: string } | null>(null)
   const [showUpload, setShowUpload] = useState(false)
   const [showConverter, setShowConverter] = useState(false)
   const [qrTask, setQrTask] = useState<Task | null>(null)
@@ -180,12 +196,76 @@ export function AdminDashboard() {
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Teams & Members</h2>
-            <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-              {teams.length} {teams.length === 1 ? 'team' : 'teams'} · {members.length} members
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                {teams.length} {teams.length === 1 ? 'team' : 'teams'} · {members.length} members
+              </span>
+              <button
+                onClick={() => { setShowCreateTeam(v => !v); setNewTeamName(''); setCreateTeamError(''); setCreatedTeamFlash(null) }}
+                className="px-3 py-1 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+              >
+                {showCreateTeam ? 'Cancel' : '+ Pre-create tribe'}
+              </button>
+            </div>
           </div>
+
+          {showCreateTeam && (
+            <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+              <form
+                onSubmit={async e => {
+                  e.preventDefault()
+                  if (!newTeamName.trim() || creatingTeam) return
+                  setCreatingTeam(true)
+                  setCreateTeamError('')
+                  try {
+                    const result = await createTeam(newTeamName)
+                    setCreatedTeamFlash({ name: result.team.name, password: result.password })
+                    setNewTeamName('')
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to create tribe'
+                    setCreateTeamError(msg === 'TRIBE_NAME_TAKEN' ? 'That tribe name is already taken.' : msg)
+                  } finally {
+                    setCreatingTeam(false)
+                  }
+                }}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <input
+                  autoFocus
+                  type="text"
+                  value={newTeamName}
+                  onChange={e => { setNewTeamName(e.target.value); setCreateTeamError('') }}
+                  placeholder="Tribe name…"
+                  maxLength={40}
+                  className="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!newTeamName.trim() || creatingTeam}
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                >
+                  {creatingTeam ? 'Creating…' : 'Generate code & create'}
+                </button>
+              </form>
+              {createTeamError && (
+                <p className="mt-2 text-xs font-bold text-red-600">🚫 {createTeamError}</p>
+              )}
+              {createdTeamFlash && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="font-bold text-green-700">✓ Created "{createdTeamFlash.name}"</span>
+                  <span className="text-gray-500">code:</span>
+                  <span className="font-mono font-black bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">{createdTeamFlash.password}</span>
+                  <span className="text-gray-400">— share this with the team to join.</span>
+                </div>
+              )}
+              <p className="mt-2 text-xs text-gray-500">
+                A 4-digit code will be auto-generated. Players see this tribe in the join list and use the code to enter.
+              </p>
+            </div>
+          )}
+
           {teams.length === 0 ? (
-            <p className="text-gray-400 text-sm">No teams registered yet. Teams join by scanning a QR code.</p>
+            <p className="text-gray-400 text-sm">No teams registered yet. Pre-create a tribe above, or wait for players to self-register.</p>
           ) : (
             <div className="flex flex-col gap-3">
               {teams.map((team) => {

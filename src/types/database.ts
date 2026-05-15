@@ -260,3 +260,65 @@ export interface VoteBallot {
   voter_id: string
   created_at: string
 }
+
+// ── Chain of Unity ────────────────────────────────────────────
+
+export interface ChainSession {
+  id: string
+  title: string
+  event_date: string | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface ChainGroup {
+  id: string
+  session_id: string
+  name: string
+  code: string
+  created_at: string
+}
+
+export interface ChainScan {
+  id: string
+  group_id: string
+  scanner_id: string | null
+  scanned_at: string
+}
+
+export interface ChainStation {
+  id: string
+  session_id: string
+  position: number
+  title: string
+  body: string | null
+  image_url: string | null
+  code: string
+  objective: string | null
+  materials: string | null
+  marshal_role: string | null
+  time_limit_min: number
+  pointer_1: string | null
+  pointer_2: string | null
+  pointer_3: string | null
+  pointer_4: string | null
+  pointer_5: string | null
+  pointer_6: string | null
+  icon_1: string | null
+  icon_2: string | null
+  icon_3: string | null
+  icon_4: string | null
+  icon_5: string | null
+  icon_6: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ChainStationScan {
+  id: string
+  station_id: string
+  group_id: string | null
+  scanner_id: string | null
+  scanned_at: string
+}
