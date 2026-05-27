@@ -1227,10 +1227,12 @@ export function BingoDashAdmin() {
     const sectionTeams = teams.filter(t => t.section_id === currentSectionId)
     const sectionScans = scans.filter(s => sectionTeams.some(t => t.id === s.team_id))
     const sectionSubs = photoSubmissions.filter(s => sectionTeams.some(t => t.id === s.team_id))
+    const sectionMembers = members.filter(m => sectionTeams.some(t => t.id === m.team_id))
 
     if (!confirm(
       `Reset game for "${section?.name ?? 'this board'}"?\n\n` +
       `This will permanently clear:\n` +
+      `  • ${sectionMembers.length} player${sectionMembers.length !== 1 ? 's' : ''}\n` +
       `  • ${sectionScans.length} scan record${sectionScans.length !== 1 ? 's' : ''}\n` +
       `  • ${sectionSubs.length} photo submission${sectionSubs.length !== 1 ? 's' : ''}\n` +
       `  • Bonus points for all ${sectionTeams.length} team${sectionTeams.length !== 1 ? 's' : ''}\n\n` +
@@ -1242,12 +1244,12 @@ export function BingoDashAdmin() {
       const teamIds = sectionTeams.map(t => t.id)
       const subIds = sectionSubs.map(s => s.id)
       const photoPaths = sectionSubs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
-      // Optimistic UI
       setScans(prev => prev.filter(s => !teamIds.includes(s.team_id)))
       setPhotoSubmissions(prev => prev.filter(s => !teamIds.includes(s.team_id)))
+      setMembers(prev => prev.filter(m => !teamIds.includes(m.team_id)))
       setTeams(prev => prev.map(t => teamIds.includes(t.id) ? { ...t, bonus_points: 0 } : t))
-      // Persist
       await Promise.all([
+        teamIds.length > 0 ? supabase.from('bingo_members').delete().in('team_id', teamIds) : Promise.resolve(),
         teamIds.length > 0 ? supabase.from('bingo_scans').delete().in('team_id', teamIds) : Promise.resolve(),
         subIds.length > 0 ? supabase.from('bingo_photo_submissions').delete().in('id', subIds) : Promise.resolve(),
         teamIds.length > 0 ? supabase.from('bingo_teams').update({ bonus_points: 0 }).in('id', teamIds) : Promise.resolve(),
