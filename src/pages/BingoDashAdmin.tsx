@@ -500,6 +500,7 @@ export function BingoDashAdmin() {
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupPassword, setNewGroupPassword] = useState('')
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState<string | null>(null)
+  const [resettingGame, setResettingGame] = useState(false)
 
   // Library: compartment filter
   const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
@@ -814,8 +815,20 @@ export function BingoDashAdmin() {
   }
 
   const toggleSectionGameStarted = async (sectionId: string, started: boolean) => {
-    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: started } : s))
-    await supabase.from('bingo_sections').update({ game_started: started }).eq('id', sectionId)
+    if (started) {
+      // Lock every other board and make this one the live board for players
+      setSections(prev => prev.map(s => ({ ...s, game_started: s.id === sectionId })))
+      setSettings(prev => prev ? { ...prev, active_section_id: sectionId } : prev)
+      const otherIds = sections.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
+      await Promise.all([
+        supabase.from('bingo_sections').update({ game_started: true }).eq('id', sectionId),
+        otherIds.length > 0 ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds) : Promise.resolve(),
+        supabase.from('bingo_settings').update({ active_section_id: sectionId }).eq('id', 'main'),
+      ])
+    } else {
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: false } : s))
+      await supabase.from('bingo_sections').update({ game_started: false }).eq('id', sectionId)
+    }
   }
 
   const fetchSettings = useCallback(async () => {
@@ -1206,6 +1219,43 @@ export function BingoDashAdmin() {
     ])
     if (photoPaths.length > 0) await supabase.storage.from('media').remove(photoPaths)
     await fetchAll()
+  }
+
+  // ── Reset Game (whole board) ───────────────────────────────────────────────
+  const resetGame = async () => {
+    const section = sections.find(s => s.id === currentSectionId)
+    const sectionTeams = teams.filter(t => t.section_id === currentSectionId)
+    const sectionScans = scans.filter(s => sectionTeams.some(t => t.id === s.team_id))
+    const sectionSubs = photoSubmissions.filter(s => sectionTeams.some(t => t.id === s.team_id))
+
+    if (!confirm(
+      `Reset game for "${section?.name ?? 'this board'}"?\n\n` +
+      `This will permanently clear:\n` +
+      `  • ${sectionScans.length} scan record${sectionScans.length !== 1 ? 's' : ''}\n` +
+      `  • ${sectionSubs.length} photo submission${sectionSubs.length !== 1 ? 's' : ''}\n` +
+      `  • Bonus points for all ${sectionTeams.length} team${sectionTeams.length !== 1 ? 's' : ''}\n\n` +
+      `Teams and their passwords are kept. This cannot be undone.`
+    )) return
+
+    setResettingGame(true)
+    try {
+      const teamIds = sectionTeams.map(t => t.id)
+      const subIds = sectionSubs.map(s => s.id)
+      const photoPaths = sectionSubs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
+      // Optimistic UI
+      setScans(prev => prev.filter(s => !teamIds.includes(s.team_id)))
+      setPhotoSubmissions(prev => prev.filter(s => !teamIds.includes(s.team_id)))
+      setTeams(prev => prev.map(t => teamIds.includes(t.id) ? { ...t, bonus_points: 0 } : t))
+      // Persist
+      await Promise.all([
+        teamIds.length > 0 ? supabase.from('bingo_scans').delete().in('team_id', teamIds) : Promise.resolve(),
+        subIds.length > 0 ? supabase.from('bingo_photo_submissions').delete().in('id', subIds) : Promise.resolve(),
+        teamIds.length > 0 ? supabase.from('bingo_teams').update({ bonus_points: 0 }).in('id', teamIds) : Promise.resolve(),
+      ])
+      if (photoPaths.length > 0) await supabase.storage.from('media').remove(photoPaths)
+    } finally {
+      setResettingGame(false)
+    }
   }
 
   const removeMember = async (memberId: string, memberName: string, teamName: string) => {
@@ -1676,17 +1726,27 @@ export function BingoDashAdmin() {
                       : `Participants in "${currentSection?.name}" see a waiting screen.`}
                   </p>
                 </div>
-                <button
-                  onClick={() => currentSectionId && toggleSectionGameStarted(currentSectionId, !isStarted)}
-                  disabled={!currentSectionId}
-                  className={`px-6 py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40 flex-shrink-0 ${
-                    isStarted
-                      ? 'bg-red-500 text-white hover:bg-red-600'
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
-                >
-                  {isStarted ? 'Lock Game' : 'Start Game'}
-                </button>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <button
+                    onClick={() => currentSectionId && toggleSectionGameStarted(currentSectionId, !isStarted)}
+                    disabled={!currentSectionId}
+                    className={`px-6 py-3 rounded-xl font-black text-sm transition-all disabled:opacity-40 ${
+                      isStarted
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    {isStarted ? 'Lock Game' : 'Start Game'}
+                  </button>
+                  <button
+                    onClick={resetGame}
+                    disabled={resettingGame}
+                    className="px-5 py-3 rounded-xl font-black text-sm transition-all border border-red-500/40 text-red-400 hover:bg-red-950/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Clear all scans, submissions, and bonus points for this board"
+                  >
+                    {resettingGame ? 'Resetting…' : '↺ Reset Game'}
+                  </button>
+                </div>
               </div>
             )
           })()}
