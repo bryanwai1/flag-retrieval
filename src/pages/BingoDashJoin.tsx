@@ -925,6 +925,17 @@ export function BingoDashJoin() {
     return () => clearInterval(id)
   }, [section?.id, section?.game_started])
 
+  // 3. While the game is live, poll this team's scans as a socket fallback (iOS),
+  //    so teammates' completions still show up if the realtime socket has dropped.
+  useEffect(() => {
+    if (!team || !section?.game_started) return
+    const id = setInterval(() => {
+      supabase.from('bingo_scans').select('*').eq('team_id', team.id)
+        .then(({ data }) => { if (data) setScans(data) })
+    }, 7000)
+    return () => clearInterval(id)
+  }, [team?.id, section?.game_started])
+
   // Join a group: create or find the member record, then enter the board
   const joinGroup = async (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => {
     if (!section || !sectionSlug) throw new Error('Section not found')
