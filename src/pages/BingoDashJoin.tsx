@@ -886,6 +886,45 @@ export function BingoDashJoin() {
     return () => { supabase.removeChannel(channel) }
   }, [section?.id])
 
+  // iOS Safari suspends realtime WebSockets when the tab is backgrounded or the
+  // screen locks, so participants miss the "game started" UPDATE and appear stuck
+  // until they refresh. These two effects make the page self-heal without a refresh.
+
+  // 1. Re-sync whenever the page becomes visible / regains focus (e.g. after unlock).
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState !== 'visible') return
+      if (section?.id) {
+        supabase.from('bingo_sections').select('*').eq('id', section.id).single()
+          .then(({ data }) => { if (data) setSection(prev => prev ? { ...prev, ...data } as typeof prev : data) })
+      }
+      supabase.from('bingo_settings').select('*').eq('id', 'main').single()
+        .then(({ data }) => { if (data) setSettings(data) })
+      if (team?.id) {
+        supabase.from('bingo_scans').select('*').eq('team_id', team.id)
+          .then(({ data }) => { if (data) setScans(data) })
+      }
+    }
+    document.addEventListener('visibilitychange', resync)
+    window.addEventListener('focus', resync)
+    return () => {
+      document.removeEventListener('visibilitychange', resync)
+      window.removeEventListener('focus', resync)
+    }
+  }, [section?.id, team?.id])
+
+  // 2. While the game hasn't started, poll for the start as a fallback for a dead socket.
+  useEffect(() => {
+    if (!section || section.game_started) return
+    const id = setInterval(() => {
+      supabase.from('bingo_sections').select('game_started').eq('id', section.id).single()
+        .then(({ data }) => {
+          if (data?.game_started) setSection(prev => prev ? { ...prev, game_started: true } : prev)
+        })
+    }, 4000)
+    return () => clearInterval(id)
+  }, [section?.id, section?.game_started])
+
   // Join a group: create or find the member record, then enter the board
   const joinGroup = async (memberName: string, password: string, teamId: string, role: 'member' | 'observer') => {
     if (!section || !sectionSlug) throw new Error('Section not found')
