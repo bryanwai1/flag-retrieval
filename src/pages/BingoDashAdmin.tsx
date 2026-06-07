@@ -501,13 +501,16 @@ export function BingoDashAdmin() {
   const [newGroupPassword, setNewGroupPassword] = useState('')
   const [uploadingTeamPhoto, setUploadingTeamPhoto] = useState<string | null>(null)
   const [resettingGame, setResettingGame] = useState(false)
+  const [resettingTeams, setResettingTeams] = useState(false)
 
   // Library: compartment filter
   const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const scopedTasks = currentSectionId ? tasks.filter(t => t.section_id === currentSectionId) : []
-  const scopedTeams = currentSectionId ? teams.filter(t => t.section_id === currentSectionId) : []
+  const scopedTeams = currentSectionId
+    ? teams.filter(t => t.section_id === currentSectionId).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    : []
   const gridTasks = scopedTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
 
   // Sparse 25-slot layout: each in-grid task sits at slot = sort_order (0-24).
@@ -1221,7 +1224,30 @@ export function BingoDashAdmin() {
     await fetchAll()
   }
 
-  // ── Reset Game (whole board) ───────────────────────────────────────────────
+  // Delete every team on the CURRENT board, cascading their members, scans and
+  // photo submissions (FK ON DELETE CASCADE) and cleaning up storage photos.
+  // Strictly scoped to currentSectionId, so other boards are never touched.
+  // Returns false if the delete failed. Callers handle the confirm + busy state.
+  const wipeSectionTeams = async (): Promise<boolean> => {
+    const sectionTeams = teams.filter(t => t.section_id === currentSectionId)
+    const teamIds = sectionTeams.map(t => t.id)
+    if (teamIds.length === 0) return true
+    const sectionSubs = photoSubmissions.filter(s => teamIds.includes(s.team_id))
+    const teamPhotoPaths = sectionTeams.map(t => t.photo_url ? extractStoragePath(t.photo_url) : null).filter((p): p is string => !!p)
+    const subPhotoPaths = sectionSubs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
+    // Optimistic UI — remove the teams and everything tied to them.
+    setScans(prev => prev.filter(s => !teamIds.includes(s.team_id)))
+    setPhotoSubmissions(prev => prev.filter(s => !teamIds.includes(s.team_id)))
+    setMembers(prev => prev.filter(m => !teamIds.includes(m.team_id)))
+    setTeams(prev => prev.filter(t => !teamIds.includes(t.id)))
+    const { error } = await supabase.from('bingo_teams').delete().in('id', teamIds)
+    if (error) { alert('Failed to remove teams: ' + error.message); await fetchAll(); return false }
+    const allPhotoPaths = [...teamPhotoPaths, ...subPhotoPaths]
+    if (allPhotoPaths.length > 0) await supabase.storage.from('media').remove(allPhotoPaths)
+    return true
+  }
+
+  // ── Reset Game (whole board) — clears progress AND removes all teams ───────
   const resetGame = async () => {
     const section = sections.find(s => s.id === currentSectionId)
     const sectionTeams = teams.filter(t => t.section_id === currentSectionId)
@@ -1231,32 +1257,43 @@ export function BingoDashAdmin() {
 
     if (!confirm(
       `Reset game for "${section?.name ?? 'this board'}"?\n\n` +
-      `This will permanently clear:\n` +
+      `This will permanently remove ALL ${sectionTeams.length} team${sectionTeams.length !== 1 ? 's' : ''} from this board, along with:\n` +
       `  • ${sectionMembers.length} player${sectionMembers.length !== 1 ? 's' : ''}\n` +
       `  • ${sectionScans.length} scan record${sectionScans.length !== 1 ? 's' : ''}\n` +
       `  • ${sectionSubs.length} photo submission${sectionSubs.length !== 1 ? 's' : ''}\n` +
-      `  • Bonus points for all ${sectionTeams.length} team${sectionTeams.length !== 1 ? 's' : ''}\n\n` +
-      `Teams and their passwords are kept. This cannot be undone.`
+      `  • all bonus points and photos\n\n` +
+      `The board will be left with 0 teams. Other boards are NOT affected. This cannot be undone.`
     )) return
 
     setResettingGame(true)
     try {
-      const teamIds = sectionTeams.map(t => t.id)
-      const subIds = sectionSubs.map(s => s.id)
-      const photoPaths = sectionSubs.map(s => extractStoragePath(s.photo_url)).filter((p): p is string => !!p)
-      setScans(prev => prev.filter(s => !teamIds.includes(s.team_id)))
-      setPhotoSubmissions(prev => prev.filter(s => !teamIds.includes(s.team_id)))
-      setMembers(prev => prev.filter(m => !teamIds.includes(m.team_id)))
-      setTeams(prev => prev.map(t => teamIds.includes(t.id) ? { ...t, bonus_points: 0 } : t))
-      await Promise.all([
-        teamIds.length > 0 ? supabase.from('bingo_members').delete().in('team_id', teamIds) : Promise.resolve(),
-        teamIds.length > 0 ? supabase.from('bingo_scans').delete().in('team_id', teamIds) : Promise.resolve(),
-        subIds.length > 0 ? supabase.from('bingo_photo_submissions').delete().in('id', subIds) : Promise.resolve(),
-        teamIds.length > 0 ? supabase.from('bingo_teams').update({ bonus_points: 0 }).in('id', teamIds) : Promise.resolve(),
-      ])
-      if (photoPaths.length > 0) await supabase.storage.from('media').remove(photoPaths)
+      await wipeSectionTeams()
     } finally {
       setResettingGame(false)
+    }
+  }
+
+  // ── Reset Teams (remove ALL groups from THIS board → "no team") ─────────────
+  // Scoped strictly to currentSectionId, so other boards are never touched.
+  const resetTeams = async () => {
+    const section = sections.find(s => s.id === currentSectionId)
+    const sectionTeams = teams.filter(t => t.section_id === currentSectionId)
+    if (sectionTeams.length === 0) return
+    const sectionMembers = members.filter(m => sectionTeams.some(t => t.id === m.team_id))
+
+    if (!confirm(
+      `Remove ALL ${sectionTeams.length} group${sectionTeams.length !== 1 ? 's' : ''} from "${section?.name ?? 'this board'}"?\n\n` +
+      `This permanently deletes every group on this board, plus:\n` +
+      `  • ${sectionMembers.length} player${sectionMembers.length !== 1 ? 's' : ''}\n` +
+      `  • all their scans, photo submissions, bonus points and photos\n\n` +
+      `Other boards are NOT affected. This cannot be undone.`
+    )) return
+
+    setResettingTeams(true)
+    try {
+      await wipeSectionTeams()
+    } finally {
+      setResettingTeams(false)
     }
   }
 
@@ -1744,7 +1781,7 @@ export function BingoDashAdmin() {
                     onClick={resetGame}
                     disabled={resettingGame}
                     className="px-5 py-3 rounded-xl font-black text-sm transition-all border border-red-500/40 text-red-400 hover:bg-red-950/60 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Clear all scans, submissions, and bonus points for this board"
+                    title="Remove all teams from this board and clear their scans, submissions and points (this board only)"
                   >
                     {resettingGame ? 'Resetting…' : '↺ Reset Game'}
                   </button>
@@ -2831,6 +2868,16 @@ export function BingoDashAdmin() {
                   >
                     Bulk Create
                   </button>
+                  {sectionTeams.length > 0 && (
+                    <button
+                      onClick={resetTeams}
+                      disabled={resettingTeams}
+                      className="px-4 py-2 rounded-lg text-sm font-bold text-red-300 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-40 transition-colors"
+                      title="Delete every group on this board, leaving it with no teams. Other boards are unaffected."
+                    >
+                      {resettingTeams ? 'Resetting…' : '↺ Reset Teams'}
+                    </button>
+                  )}
                 </div>
                 {sectionTeams.length > 0 && (<div className="rounded-xl border border-white/10 overflow-hidden">
                   <table className="w-full text-sm">
