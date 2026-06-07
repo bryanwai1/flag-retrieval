@@ -1719,7 +1719,7 @@ export function BingoDashAdmin() {
             return ([
               { key: 'board', label: 'Board' },
               { key: 'library', label: 'Card Library' },
-              { key: 'teams', label: `Teams${teams.length > 0 ? ` (${teams.length})` : ''}` },
+              { key: 'teams', label: `Teams${scopedTeams.length > 0 ? ` (${scopedTeams.length})` : ''}` },
               { key: 'submissions', label: 'Submissions', badge: pendingCount },
             ] as const).map(tab => (
               <button
