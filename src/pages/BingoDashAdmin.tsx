@@ -262,6 +262,7 @@ function CategoryGroupBlock({
   categories, scans, copiedId,
   navigate,
   saveCategoryInline, setBulkCategoryColor, setBulkCategoryPoints,
+  renameCategoryByLabel,
   setQrTask, copyLink, duplicateTask, openTileEdit, deleteTask,
 }: {
   group: { label: string; key: string; tasks: BingoTask[] }
@@ -274,17 +275,42 @@ function CategoryGroupBlock({
   saveCategoryInline: (taskId: string, cat: string) => void
   setBulkCategoryColor: (key: string, hex: string) => void
   setBulkCategoryPoints: (key: string, pts: number) => void
+  renameCategoryByLabel: (label: string, newName: string) => void
   setQrTask: (t: BingoTask) => void
   copyLink: (id: string) => void
   duplicateTask: (t: BingoTask) => void
   openTileEdit: (t: BingoTask) => void
   deleteTask: (id: string, title: string) => void
 }) {
+  const [renaming, setRenaming] = useState(false)
   return (
     <div>
       {/* Category header */}
       <div className="flex items-center gap-3 mb-3">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.label}</h3>
+        {renaming ? (
+          <input
+            type="text"
+            autoFocus
+            defaultValue={group.label}
+            onBlur={e => { renameCategoryByLabel(group.label, e.target.value); setRenaming(false) }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              if (e.key === 'Escape') { (e.target as HTMLInputElement).value = group.label; (e.target as HTMLInputElement).blur() }
+            }}
+            className="text-xs font-black uppercase tracking-widest bg-gray-800 text-white border border-violet-500 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"
+          />
+        ) : (
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.label}</h3>
+        )}
+        {group.key !== '__none__' && !renaming && (
+          <button
+            onClick={() => setRenaming(true)}
+            className="text-xs text-gray-600 hover:text-violet-400 transition-colors flex-shrink-0"
+            title={`Rename "${group.label}"`}
+          >
+            ✏️
+          </button>
+        )}
         <span className="text-xs text-gray-500 font-medium">{group.tasks.length}</span>
         <div className="flex-1 h-px bg-white/10" />
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -755,6 +781,19 @@ export function BingoDashAdmin() {
       .update({ category: trimmed })
       .eq('section_id', sectionId)
       .eq('category', old.name)
+  }
+
+  // Rename a category from the Board tab gallery header (resolves name → id)
+  const renameCategoryByLabel = async (label: string, newName: string) => {
+    if (!currentSectionId) return
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === label) return
+    const cat = categories.find(c => c.section_id === currentSectionId && c.name === label)
+    if (!cat) return
+    await renameCategory(cat.id, currentSectionId, trimmed)
+    // Keep the active category filter pointing at the renamed category
+    if (categoryFilter === label) setCategoryFilter(trimmed)
+    if (offGridCategoryFilter === label) setOffGridCategoryFilter(trimmed)
   }
 
   const deleteCategory = async (id: string, sectionId: string) => {
@@ -2742,6 +2781,7 @@ export function BingoDashAdmin() {
                   saveCategoryInline={saveCategoryInline}
                   setBulkCategoryColor={setBulkCategoryColor}
                   setBulkCategoryPoints={setBulkCategoryPoints}
+                  renameCategoryByLabel={renameCategoryByLabel}
                   setQrTask={setQrTask}
                   copyLink={copyLink}
                   duplicateTask={duplicateTask}
@@ -2787,6 +2827,7 @@ export function BingoDashAdmin() {
                             saveCategoryInline={saveCategoryInline}
                             setBulkCategoryColor={setBulkCategoryColor}
                             setBulkCategoryPoints={setBulkCategoryPoints}
+                            renameCategoryByLabel={renameCategoryByLabel}
                             setQrTask={setQrTask}
                             copyLink={copyLink}
                             duplicateTask={duplicateTask}
