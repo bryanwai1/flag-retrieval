@@ -485,6 +485,8 @@ function BoardScreen({
   gridTasks,
   scans,
   settings,
+  boardNote,
+  boardNoteEvery,
   onLeave,
 }: {
   team: { id: string; name: string }
@@ -494,6 +496,8 @@ function BoardScreen({
   gridTasks: BingoTask[]
   scans: BingoScan[]
   settings: BingoSettings | null
+  boardNote: string
+  boardNoteEvery: number
   onLeave: () => void
 }) {
   const navigate = useNavigate()
@@ -699,35 +703,33 @@ function BoardScreen({
         </div>
       )}
 
-      <div className="relative z-10 px-4 pb-8">
-        <div className="max-w-md mx-auto">
-          <div className="rounded-2xl overflow-hidden border border-red-800/40 bg-red-950/30">
-            <div className="px-4 py-3 flex items-center gap-2 border-b border-red-800/30">
-              <span className="text-base">🆘</span>
-              <span className="text-red-400 text-xs font-black uppercase tracking-widest">Emergency Contacts</span>
-            </div>
-            <div className="divide-y divide-red-900/30">
-              {[
-                { name: 'Bryan Ng', phone: '012-661 1043', role: 'Facilitator' },
-                { name: 'Susan Yap', phone: '012-370 3732', role: 'InStep' },
-                { name: 'Ariel Lai', phone: '016-939 1957', role: 'HSBC' },
-              ].map(c => (
-                <a
-                  key={c.phone}
-                  href={`tel:${c.phone.replace(/[-\s]/g, '')}`}
-                  className="flex items-center justify-between px-4 py-3 gap-3 hover:bg-red-900/20 transition-colors"
-                >
-                  <div>
-                    <div className="text-white text-sm font-bold leading-tight">{c.name}</div>
-                    <div className="text-red-400/70 text-[11px] font-semibold">{c.role}</div>
+      {/* Facilitator note below the board (e.g. Bonsai Project item collection) */}
+      {boardNote.trim() !== '' && gridTasks.length > 0 && (
+        <div className="relative z-10 px-4 pb-8">
+          <div className="max-w-md mx-auto">
+            <div className="rounded-2xl overflow-hidden border border-emerald-800/40 bg-emerald-950/30">
+              <div className="px-4 py-3 flex items-center gap-2 border-b border-emerald-800/30">
+                <span className="text-base">🌱</span>
+                <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">Note from Facilitator</span>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-white text-sm font-medium whitespace-pre-wrap leading-relaxed">{boardNote}</p>
+                {boardNoteEvery > 0 && (
+                  <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-emerald-300 text-xs font-black uppercase tracking-wider">Items to collect</p>
+                      <p className="text-emerald-500/70 text-[11px] font-semibold">1 item per {boardNoteEvery} completed boxes · {completedCount} done</p>
+                    </div>
+                    <div className="text-emerald-300 text-3xl font-black tabular-nums">
+                      {Math.floor(completedCount / boardNoteEvery)}
+                    </div>
                   </div>
-                  <div className="text-red-300 text-sm font-black tracking-wide">{c.phone}</div>
-                </a>
-              ))}
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -1112,6 +1114,8 @@ export function BingoDashJoin() {
           gridTasks={gridTasks}
           scans={scans}
           settings={settings}
+          boardNote={section.board_note ?? ''}
+          boardNoteEvery={section.board_note_every ?? 0}
           onLeave={leaveTeam}
         />
         {timeUpOverlay}

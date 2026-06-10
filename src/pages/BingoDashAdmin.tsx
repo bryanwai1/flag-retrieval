@@ -856,6 +856,16 @@ export function BingoDashAdmin() {
     await supabase.from('bingo_settings').update({ active_section_id: id }).eq('id', 'main')
   }
 
+  // Save the per-board note shown below the bingo board on the player page
+  const saveBoardNote = async () => {
+    const sec = sections.find(s => s.id === currentSectionId)
+    if (!sec) return
+    const { error } = await supabase.from('bingo_sections')
+      .update({ board_note: sec.board_note ?? '', board_note_every: sec.board_note_every ?? 2 })
+      .eq('id', sec.id)
+    if (error) alert('Failed to save note — has the board_note migration been run in Supabase?')
+  }
+
   const toggleSectionGameStarted = async (sectionId: string, started: boolean) => {
     if (started) {
       // Lock every other board and make this one the live board for players
@@ -2010,6 +2020,53 @@ export function BingoDashAdmin() {
               />
             </button>
           </div>
+        </section>
+
+        {/* ── Board Note (shown below the bingo board on the player page) ──── */}
+        <section>
+          <h2 className="text-xl font-bold text-white mb-2">Board Note</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Shown in a box below the bingo board on the player page for this board — e.g. a reminder to
+            collect an item for the Bonsai Project. Leave the note empty to hide the box.
+          </p>
+          {(() => {
+            const sec = sections.find(s => s.id === currentSectionId)
+            if (!sec) return null
+            return (
+              <div className="p-4 rounded-lg border border-white/10 bg-gray-900/50">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Note</label>
+                <textarea
+                  value={sec.board_note ?? ''}
+                  onChange={e => setSections(prev => prev.map(s => s.id === sec.id ? { ...s, board_note: e.target.value } : s))}
+                  placeholder="e.g. 🌱 Collect one item for the Bonsai Project after every 2 completed boxes!"
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500 resize-none"
+                />
+                <div className="mt-3 flex items-end justify-between gap-4 flex-wrap">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Item counter</label>
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <span>Collect 1 item per</span>
+                      <input
+                        type="number" min={0}
+                        value={sec.board_note_every ?? 2}
+                        onChange={e => setSections(prev => prev.map(s => s.id === sec.id ? { ...s, board_note_every: Math.max(0, parseInt(e.target.value) || 0) } : s))}
+                        className="w-16 px-2 py-1.5 rounded-lg border border-white/15 bg-gray-950 text-white text-center font-bold focus:outline-none focus:border-violet-500"
+                      />
+                      <span>completed boxes</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 mt-1">Players see a live tally of items to collect. Set to 0 to hide the counter.</p>
+                  </div>
+                  <button
+                    onClick={saveBoardNote}
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 transition-colors"
+                  >
+                    Save note
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
         </section>
 
         {/* ── Board Editor ──────────────────────────────────────────────────── */}

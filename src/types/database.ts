@@ -80,6 +80,8 @@ export interface BingoSection {
   slug: string
   sort_order: number
   game_started: boolean
+  board_note: string
+  board_note_every: number
   created_at: string
 }
 
