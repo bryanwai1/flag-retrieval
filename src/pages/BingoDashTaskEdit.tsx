@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
+import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { BingoAdminPhotoUpload } from '../components/BingoAdminPhotoUpload'
 import { PageForm } from '../components/PageForm'
 import { InstructionPage } from '../components/InstructionPage'
@@ -19,6 +20,7 @@ export function BingoDashTaskEdit() {
   const [titleSaving, setTitleSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   const [previewPage, setPreviewPage] = useState(0)
+  const [carouselIdx, setCarouselIdx] = useState(0)
   const [activeTab, setActiveTab] = useState<'instructions' | 'answer'>('instructions')
   // Answer tab state
   const [taskType, setTaskType] = useState<'standard' | 'answer' | 'photo'>('standard')
@@ -31,6 +33,7 @@ export function BingoDashTaskEdit() {
   const [mapsLabel, setMapsLabel] = useState('')
   const [mapsUrlSaving, setMapsUrlSaving] = useState(false)
   const { pages, createPage, updatePage, deletePage, reorderPages } = useBingoTaskPages(taskId)
+  const { photos, reload: reloadPhotos } = useBingoTaskPhotos(taskId)
 
   useEffect(() => {
     if (!taskId) return
@@ -154,6 +157,46 @@ export function BingoDashTaskEdit() {
         </header>
 
         <main className="max-w-lg mx-auto px-6 py-8 relative z-10">
+          {/* Photo carousel — mirrors the participant page */}
+          {photos.length > 0 && (
+            <div className="rounded-2xl overflow-hidden mb-6 shadow-xl animate-slide-up">
+              <div className="relative">
+                <img
+                  src={photos[carouselIdx]?.photo_url}
+                  alt={`${task.title} ${carouselIdx + 1}`}
+                  className="w-full max-h-72 object-cover"
+                  style={{ objectPosition: `${photos[carouselIdx]?.position_x ?? 50}% ${photos[carouselIdx]?.position_y ?? 50}%` }}
+                />
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setCarouselIdx(i => (i - 1 + photos.length) % photos.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm active:scale-90 transition-transform"
+                    >‹</button>
+                    <button
+                      onClick={() => setCarouselIdx(i => (i + 1) % photos.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center text-lg font-bold backdrop-blur-sm active:scale-90 transition-transform"
+                    >›</button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {photos.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setCarouselIdx(i)}
+                          className={`w-2 h-2 rounded-full transition-all ${i === carouselIdx ? 'bg-white scale-125' : 'bg-white/50'}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {photos[carouselIdx]?.caption && (
+                <div className="px-4 py-2 text-xs text-white/70 font-medium" style={{ backgroundColor: `${task.hex_code}cc` }}>
+                  {photos[carouselIdx].caption}
+                </div>
+              )}
+            </div>
+          )}
+
           {pages.length > 0 ? (
             <>
               <InstructionPage page={pages[previewPage]} hexCode={task.hex_code} />
@@ -233,7 +276,7 @@ export function BingoDashTaskEdit() {
             <span className="text-sm text-gray-400">{task.color}</span>
           </div>
           <button
-            onClick={() => { setPreviewMode(true); setPreviewPage(0) }}
+            onClick={() => { setPreviewMode(true); setPreviewPage(0); setCarouselIdx(0); reloadPhotos() }}
             className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 text-sm transition-colors"
           >
             Preview
