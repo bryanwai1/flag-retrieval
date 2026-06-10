@@ -417,6 +417,9 @@ function CategoryGroupBlock({
   )
 }
 
+// Remember which board the admin was editing across navigations (e.g. Preview → back)
+const ADMIN_SECTION_KEY = 'bingo-dash-admin-section-id'
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export function BingoDashAdmin() {
   const navigate = useNavigate()
@@ -426,7 +429,7 @@ export function BingoDashAdmin() {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [categories, setCategories] = useState<BingoCategory[]>([])
   const [challengeSections, setChallengeSections] = useState<BingoChallengeSection[]>([])
-  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null)
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(() => localStorage.getItem(ADMIN_SECTION_KEY))
   const [showSectionManager, setShowSectionManager] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
   const [showInlineBoardCreate, setShowInlineBoardCreate] = useState(false)
@@ -681,7 +684,10 @@ export function BingoDashAdmin() {
     if (scansRes.data) setScans(scansRes.data)
     if (sectionsRes.data) {
       setSections(sectionsRes.data)
-      setCurrentSectionId(prev => prev ?? sectionsRes.data[0]?.id ?? null)
+      // Keep the remembered board if it still exists; otherwise fall back to the first
+      setCurrentSectionId(prev =>
+        prev && sectionsRes.data.some(s => s.id === prev) ? prev : sectionsRes.data[0]?.id ?? null
+      )
     }
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (challengeSectionsRes.data) setChallengeSections(challengeSectionsRes.data)
@@ -689,6 +695,11 @@ export function BingoDashAdmin() {
     if (subsRes.data) setPhotoSubmissions(subsRes.data)
     setLoading(false)
   }, [])
+
+  // Persist the selected board so returning from Preview / task edit restores it
+  useEffect(() => {
+    if (currentSectionId) localStorage.setItem(ADMIN_SECTION_KEY, currentSectionId)
+  }, [currentSectionId])
 
   // ── Section CRUD ──────────────────────────────────────────────────────────
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
