@@ -395,12 +395,16 @@ function BoardScreen({
   gridTasks,
   scans,
   settings,
+  boardNote,
+  boardNoteEvery,
   onLeave,
 }: {
   team: { id: string; name: string }
   gridTasks: BingoTask[]
   scans: BingoScan[]
   settings: BingoSettings | null
+  boardNote: string
+  boardNoteEvery: number
   onLeave: () => void
 }) {
   const navigate = useNavigate()
@@ -622,6 +626,34 @@ function BoardScreen({
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-white" />Done</span>
         </div>
       )}
+
+      {/* Facilitator note below the board (e.g. Bonsai Project item collection) */}
+      {boardNote.trim() !== '' && gridTasks.length > 0 && (
+        <div className="relative z-10 px-4 pb-8">
+          <div className="max-w-md mx-auto">
+            <div className="rounded-2xl overflow-hidden border border-emerald-800/40 bg-emerald-950/30">
+              <div className="px-4 py-3 flex items-center gap-2 border-b border-emerald-800/30">
+                <span className="text-base">🌱</span>
+                <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">Note from Facilitator</span>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-white text-sm font-medium whitespace-pre-wrap leading-relaxed">{boardNote}</p>
+                {boardNoteEvery > 0 && (
+                  <div className="mt-3 pt-3 border-t border-emerald-900/40 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-emerald-300 text-xs font-black uppercase tracking-wider">Items to collect</p>
+                      <p className="text-emerald-500/70 text-[11px] font-semibold">1 item per {boardNoteEvery} completed boxes · {completedCount} done</p>
+                    </div>
+                    <div className="text-emerald-300 text-3xl font-black tabular-nums">
+                      {Math.floor(completedCount / boardNoteEvery)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -633,6 +665,9 @@ export function BingoDashHome() {
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [settings, setSettings] = useState<BingoSettings | null>(null)
+  const [sectionId, setSectionId] = useState<string | null>(null)
+  const [boardNote, setBoardNote] = useState('')
+  const [boardNoteEvery, setBoardNoteEvery] = useState(0)
   const [dataLoading, setDataLoading] = useState(true)
 
   // Load grid tasks for the active section + timer settings
@@ -642,6 +677,7 @@ export function BingoDashHome() {
         if (settingsData) setSettings(settingsData)
         const sectionId = settingsData?.active_section_id
         if (!sectionId) { setGridTasks([]); setDataLoading(false); return }
+        setSectionId(sectionId)
         const { data: taskData } = await supabase
           .from('bingo_tasks')
           .select('*')
@@ -650,9 +686,32 @@ export function BingoDashHome() {
           .order('sort_order')
           .limit(GRID_SIZE)
         if (taskData) setGridTasks(taskData)
+        const { data: sectionData } = await supabase
+          .from('bingo_sections')
+          .select('board_note, board_note_every')
+          .eq('id', sectionId)
+          .single()
+        if (sectionData) {
+          setBoardNote(sectionData.board_note ?? '')
+          setBoardNoteEvery(sectionData.board_note_every ?? 0)
+        }
         setDataLoading(false)
       })
   }, [])
+
+  // Live: board note updates from the admin
+  useEffect(() => {
+    if (!sectionId) return
+    const channel = supabase
+      .channel(`bingo-home-section-${sectionId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `id=eq.${sectionId}` }, ({ new: updated }) => {
+        const sec = updated as { board_note?: string; board_note_every?: number }
+        setBoardNote(sec.board_note ?? '')
+        setBoardNoteEvery(sec.board_note_every ?? 0)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [sectionId])
 
   // Load this team's scans
   useEffect(() => {
@@ -720,6 +779,8 @@ export function BingoDashHome() {
         gridTasks={gridTasks}
         scans={scans}
         settings={settings}
+        boardNote={boardNote}
+        boardNoteEvery={boardNoteEvery}
         onLeave={leaveTeam}
       />
       <TimeUpAlarm settings={settings} />
