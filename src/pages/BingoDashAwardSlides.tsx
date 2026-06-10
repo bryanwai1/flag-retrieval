@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchBoardTasks } from '../lib/boardCards'
 import { useFullscreen } from '../hooks/useFullscreen'
 import { ParticleBackground } from '../components/ParticleBackground'
 import {
@@ -152,16 +153,16 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
       const { data: sec } = await supabase.from('bingo_sections').select('*').eq('slug', sectionSlug).maybeSingle()
       if (!sec || cancelled) { setLoaded(true); return }
       setSection(sec)
-      const [{ data: t }, { data: s }, { data: gt }, { data: cfg }] = await Promise.all([
+      const [{ data: t }, { data: s }, gt, { data: cfg }] = await Promise.all([
         supabase.from('bingo_teams').select('*').eq('section_id', sec.id).order('name'),
         supabase.from('bingo_scans').select('*'),
-        supabase.from('bingo_tasks').select('*').eq('section_id', sec.id).eq('in_grid', true).order('sort_order'),
+        fetchBoardTasks(sec.id),
         supabase.from('bingo_award_configs').select('*').eq('section_id', sec.id).maybeSingle(),
       ])
       if (cancelled) return
       setTeams(t ?? [])
       setScans(s ?? [])
-      setGridTasks(gt ?? [])
+      setGridTasks(gt)
       setConfig(cfg ?? null)
       setLoaded(true)
     })()

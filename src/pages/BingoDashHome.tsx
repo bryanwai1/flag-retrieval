@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchBoardTasks } from '../lib/boardCards'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
@@ -678,14 +679,8 @@ export function BingoDashHome() {
         const sectionId = settingsData?.active_section_id
         if (!sectionId) { setGridTasks([]); setDataLoading(false); return }
         setSectionId(sectionId)
-        const { data: taskData } = await supabase
-          .from('bingo_tasks')
-          .select('*')
-          .eq('section_id', sectionId)
-          .eq('in_grid', true)
-          .order('sort_order')
-          .limit(GRID_SIZE)
-        if (taskData) setGridTasks(taskData)
+        const taskData = await fetchBoardTasks(sectionId)
+        setGridTasks(taskData)
         const { data: sectionData } = await supabase
           .from('bingo_sections')
           .select('board_note, board_note_every')

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchBoardTasks } from '../lib/boardCards'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import type { BingoTask, BingoScan, BingoSection, BingoSettings, BingoTeam, BingoMember } from '../types/database'
@@ -830,15 +831,8 @@ export function BingoDashJoin() {
             setMemberCounts(counts)
           })
 
-        // Load grid tasks for this section
-        supabase
-          .from('bingo_tasks')
-          .select('*')
-          .eq('section_id', data.id)
-          .eq('in_grid', true)
-          .order('sort_order')
-          .limit(GRID_SIZE)
-          .then(({ data: tasks }) => { if (tasks) setGridTasks(tasks) })
+        // Load grid tasks for this section (cards are placed via bingo_board_cards)
+        fetchBoardTasks(data.id).then(tasks => setGridTasks(tasks))
 
         // Load settings
         supabase.from('bingo_settings').select('*').eq('id', 'main').single()

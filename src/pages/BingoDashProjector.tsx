@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoBoardCard } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
@@ -20,6 +20,7 @@ type Row = {
 
 export function BingoDashProjector() {
   const [tasks, setTasks] = useState<BingoTask[]>([])
+  const [boardCards, setBoardCards] = useState<BingoBoardCard[]>([])
   const [teams, setTeams] = useState<BingoTeam[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [settings, setSettings] = useState<BingoSettings | null>(null)
@@ -30,14 +31,16 @@ export function BingoDashProjector() {
   // Initial load
   useEffect(() => {
     const load = async () => {
-      const [tasksRes, teamsRes, scansRes, sectionsRes, settingsRes] = await Promise.all([
+      const [tasksRes, boardCardsRes, teamsRes, scansRes, sectionsRes, settingsRes] = await Promise.all([
         supabase.from('bingo_tasks').select('*'),
+        supabase.from('bingo_board_cards').select('*').order('slot'),
         supabase.from('bingo_teams').select('*').order('created_at'),
         supabase.from('bingo_scans').select('*'),
         supabase.from('bingo_sections').select('*').order('sort_order'),
         supabase.from('bingo_settings').select('*').eq('id', 'main').single(),
       ])
       if (tasksRes.data) setTasks(tasksRes.data)
+      if (boardCardsRes.data) setBoardCards(boardCardsRes.data)
       if (teamsRes.data) setTeams(teamsRes.data)
       if (scansRes.data) setScans(scansRes.data)
       if (sectionsRes.data) setSections(sectionsRes.data)
@@ -61,6 +64,10 @@ export function BingoDashProjector() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_tasks' }, async () => {
         const { data } = await supabase.from('bingo_tasks').select('*')
         if (data) setTasks(data)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_board_cards' }, async () => {
+        const { data } = await supabase.from('bingo_board_cards').select('*').order('slot')
+        if (data) setBoardCards(data)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_settings' }, async () => {
         const { data } = await supabase.from('bingo_settings').select('*').eq('id', 'main').single()
@@ -90,8 +97,14 @@ export function BingoDashProjector() {
   const activeSection = sections.find(s => s.id === activeSectionId) ?? null
 
   const sectionTeams = activeSectionId ? teams.filter(t => t.section_id === activeSectionId) : teams
-  const sectionTasks = activeSectionId ? tasks.filter(t => t.section_id === activeSectionId) : tasks
-  const gridTasks = sectionTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+  // Grid membership lives in bingo_board_cards (cards are shared across boards).
+  const gridTasks = (activeSectionId ? boardCards.filter(bc => bc.section_id === activeSectionId) : boardCards)
+    .map(bc => {
+      const t = tasks.find(x => x.id === bc.task_id)
+      return t ? { ...t, sort_order: bc.slot, in_grid: true } : null
+    })
+    .filter((t): t is BingoTask => t !== null)
+    .sort((a, b) => a.sort_order - b.sort_order)
   const slots = buildBingoSlots(gridTasks)
 
   const rows: Row[] = sectionTeams.map(team => {

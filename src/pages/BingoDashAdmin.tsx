@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { supabase } from '../lib/supabase'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 
 // Sanitize a string into a filesystem-safe filename component.
@@ -260,6 +260,7 @@ function CategoryGroupBlock({
   group,
   editingCategoryId, setEditingCategoryId,
   categories, scans, copiedId,
+  boardCountByTask,
   navigate,
   saveCategoryInline, setBulkCategoryColor, setBulkCategoryPoints,
   renameCategoryByLabel,
@@ -271,6 +272,7 @@ function CategoryGroupBlock({
   categories: BingoCategory[]
   scans: BingoScan[]
   copiedId: string | null
+  boardCountByTask: Map<string, number>
   navigate: (path: string) => void
   saveCategoryInline: (taskId: string, cat: string) => void
   setBulkCategoryColor: (key: string, hex: string) => void
@@ -380,7 +382,12 @@ function CategoryGroupBlock({
                   </span>
                 )}
               </div>
-              <p className="text-white/40 text-xs mt-0.5">{task.in_grid ? '✓ In grid' : 'Off grid'}</p>
+              <p className="text-white/40 text-xs mt-0.5">
+                {(() => {
+                  const n = boardCountByTask.get(task.id) ?? 0
+                  return n > 0 ? `✓ On ${n} board${n > 1 ? 's' : ''}` : 'Not on any board'
+                })()}
+              </p>
             </div>
             <div className="px-3 pb-3 flex flex-wrap gap-1.5">
               <button onClick={() => navigate(`/bingo-dash/admin/task/${task.id}`)}
@@ -424,6 +431,7 @@ const ADMIN_SECTION_KEY = 'bingo-dash-admin-section-id'
 export function BingoDashAdmin() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState<BingoTask[]>([])
+  const [boardCards, setBoardCards] = useState<BingoBoardCard[]>([])
   const [teams, setTeams] = useState<BingoTeam[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
   const [sections, setSections] = useState<BingoSection[]>([])
@@ -540,10 +548,31 @@ export function BingoDashAdmin() {
   const scopedTeams = currentSectionId
     ? teams.filter(t => t.section_id === currentSectionId).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
     : []
-  const gridTasks = scopedTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+  // Cards are universal: grid membership lives in bingo_board_cards (one
+  // placement row per board the card sits on), not on the task itself.
+  const taskById = new Map(tasks.map(t => [t.id, t]))
+  const boardTasksForSection = (sectionId: string): BingoTask[] =>
+    boardCards
+      .filter(bc => bc.section_id === sectionId)
+      .map(bc => {
+        const t = taskById.get(bc.task_id)
+        return t ? { ...t, sort_order: bc.slot, in_grid: true } : null
+      })
+      .filter((t): t is BingoTask => t !== null)
+      .sort((a, b) => a.sort_order - b.sort_order)
+  const gridTasks = currentSectionId ? boardTasksForSection(currentSectionId) : []
+  const placedTaskIds = new Set(
+    currentSectionId ? boardCards.filter(bc => bc.section_id === currentSectionId).map(bc => bc.task_id) : [],
+  )
+  // How many boards each card sits on (for the "On N boards" labels).
+  const boardCountByTask = (() => {
+    const m = new Map<string, number>()
+    for (const bc of boardCards) m.set(bc.task_id, (m.get(bc.task_id) ?? 0) + 1)
+    return m
+  })()
 
-  // Sparse 25-slot layout: each in-grid task sits at slot = sort_order (0-24).
-  // Any legacy task whose sort_order is out of range or colliding is placed in
+  // Sparse 25-slot layout: each placed task sits at slot = sort_order (0-24).
+  // Any legacy placement whose slot is out of range or colliding is placed in
   // the next available slot so existing data migrates gracefully.
   const gridSlots: (BingoTask | null)[] = (() => {
     const slots: (BingoTask | null)[] = Array(25).fill(null)
@@ -563,13 +592,30 @@ export function BingoDashAdmin() {
   const isTimerRunning = !!settings?.timer_end_at && new Date(settings.timer_end_at) > new Date()
 
   // Library view: candidates for "Add to Grid" across sections.
-  // A card is a candidate when it is NOT already on the current section's grid.
-  // Cross-section cards get duplicated into the current section on add.
+  // Cards are universal — adding places the existing card on this board, no
+  // copying. A card is a candidate when it is NOT already on this board.
+  // In the "All sections" view, legacy duplicates from the old copy-per-board
+  // flow (same title) are collapsed to one entry: prefer this section's copy,
+  // otherwise the oldest (the original).
   const addListTasks = (() => {
     const search = addListSearch.trim().toLowerCase()
-    let list = tasks.filter(t => !(t.section_id === currentSectionId && t.in_grid))
+    let list = tasks.filter(t => !placedTaskIds.has(t.id))
     if (addListSectionFilter === 'current') list = list.filter(t => t.section_id === currentSectionId)
     else if (addListSectionFilter !== 'all') list = list.filter(t => t.section_id === addListSectionFilter)
+    else {
+      const byTitle = new Map<string, BingoTask>()
+      for (const t of list) {
+        const key = t.title.trim().toLowerCase()
+        const kept = byTitle.get(key)
+        if (!kept) { byTitle.set(key, t); continue }
+        const tCurrent = t.section_id === currentSectionId
+        const keptCurrent = kept.section_id === currentSectionId
+        if ((tCurrent && !keptCurrent) || (tCurrent === keptCurrent && t.created_at < kept.created_at)) {
+          byTitle.set(key, t)
+        }
+      }
+      list = [...byTitle.values()]
+    }
     if (offGridCategoryFilter !== 'all') list = list.filter(t => t.category === offGridCategoryFilter)
     if (search) list = list.filter(t =>
       t.title.toLowerCase().includes(search) ||
@@ -580,7 +626,7 @@ export function BingoDashAdmin() {
   })()
 
   const addListCategories = (() => {
-    let base = tasks.filter(t => !(t.section_id === currentSectionId && t.in_grid))
+    let base = tasks.filter(t => !placedTaskIds.has(t.id))
     if (addListSectionFilter === 'current') base = base.filter(t => t.section_id === currentSectionId)
     else if (addListSectionFilter !== 'all') base = base.filter(t => t.section_id === addListSectionFilter)
     return [...new Set(base.map(t => t.category).filter(Boolean))].sort() as string[]
@@ -669,8 +715,9 @@ export function BingoDashAdmin() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
-    const [tasksRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes, subsRes] = await Promise.all([
+    const [tasksRes, boardCardsRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes, subsRes] = await Promise.all([
       supabase.from('bingo_tasks').select('*').order('sort_order'),
+      supabase.from('bingo_board_cards').select('*').order('slot'),
       supabase.from('bingo_teams').select('*').order('created_at'),
       supabase.from('bingo_scans').select('*'),
       supabase.from('bingo_sections').select('*').order('sort_order'),
@@ -680,6 +727,7 @@ export function BingoDashAdmin() {
       supabase.from('bingo_photo_submissions').select('*').order('created_at', { ascending: false }),
     ])
     if (tasksRes.data) setTasks(tasksRes.data)
+    if (boardCardsRes.data) setBoardCards(boardCardsRes.data)
     if (teamsRes.data) setTeams(teamsRes.data)
     if (scansRes.data) setScans(scansRes.data)
     if (sectionsRes.data) {
@@ -999,23 +1047,23 @@ export function BingoDashAdmin() {
   const resetTimer = () => updateSettings({ timer_end_at: null })
 
   // ── Board grid actions ─────────────────────────────────────────────────────
+  // Grid membership lives in bingo_board_cards: one placement row per
+  // (board, card). The card itself is never copied or mutated.
 
-  // Persist a 25-slot layout. Each in-grid task is stored with sort_order = slot index.
-  const applySlots = async (
-    slots: (BingoTask | null)[],
-    extraUpdates?: Array<{ id: string; in_grid: boolean }>,
-  ) => {
-    const sortUpdates: { id: string; sort_order: number }[] = []
-    slots.forEach((t, i) => { if (t) sortUpdates.push({ id: t.id, sort_order: i }) })
-    setTasks(prev => prev.map(t => {
-      const sortU = sortUpdates.find(u => u.id === t.id)
-      const inGridU = extraUpdates?.find(u => u.id === t.id)
-      return { ...t, ...(sortU ? { sort_order: sortU.sort_order } : {}), ...(inGridU ? { in_grid: inGridU.in_grid } : {}) }
+  // Persist a 25-slot layout for the current board: placement.slot = slot index.
+  const applySlots = async (slots: (BingoTask | null)[]) => {
+    if (!currentSectionId) return
+    const updates: { task_id: string; slot: number }[] = []
+    slots.forEach((t, i) => { if (t) updates.push({ task_id: t.id, slot: i }) })
+    setBoardCards(prev => prev.map(bc => {
+      if (bc.section_id !== currentSectionId) return bc
+      const u = updates.find(x => x.task_id === bc.task_id)
+      return u ? { ...bc, slot: u.slot } : bc
     }))
-    await Promise.all([
-      ...sortUpdates.map(u => supabase.from('bingo_tasks').update({ sort_order: u.sort_order }).eq('id', u.id)),
-      ...(extraUpdates ?? []).map(u => supabase.from('bingo_tasks').update({ in_grid: u.in_grid }).eq('id', u.id)),
-    ])
+    await Promise.all(updates.map(u =>
+      supabase.from('bingo_board_cards').update({ slot: u.slot })
+        .eq('section_id', currentSectionId).eq('task_id', u.task_id),
+    ))
   }
 
   // Swap (or move-to-empty) between two slot indices. Leaves all other tiles untouched.
@@ -1026,24 +1074,27 @@ export function BingoDashAdmin() {
     await applySlots(slots)
   }
 
-  // Place an off-grid task at the exact slot the user chose. If that slot is
-  // taken, fall back to the first empty slot so we never silently overwrite.
+  // Place a card at the exact slot the user chose. If that slot is taken,
+  // fall back to the first empty slot so we never silently overwrite.
   const insertIntoGrid = async (taskId: string, atIndex: number) => {
-    const taskToAdd = tasks.find(t => t.id === taskId)
-    if (!taskToAdd || taskToAdd.in_grid) return
-    const slots = [...gridSlots]
+    if (!currentSectionId || placedTaskIds.has(taskId)) return
     let target = atIndex
-    if (target < 0 || target >= 25 || slots[target] !== null) {
-      target = slots.findIndex(s => s === null)
+    if (target < 0 || target >= 25 || gridSlots[target] !== null) {
+      target = gridSlots.findIndex(s => s === null)
       if (target === -1) return
     }
-    slots[target] = { ...taskToAdd, in_grid: true }
-    await applySlots(slots, [{ id: taskId, in_grid: true }])
+    const { data: created, error } = await supabase.from('bingo_board_cards')
+      .insert({ section_id: currentSectionId, task_id: taskId, slot: target })
+      .select().single()
+    if (error || !created) { alert('Failed to add card to board'); return }
+    setBoardCards(prev => [...prev, created])
   }
 
   const removeTile = async (taskId: string) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, in_grid: false } : t))
-    await supabase.from('bingo_tasks').update({ in_grid: false }).eq('id', taskId)
+    if (!currentSectionId) return
+    setBoardCards(prev => prev.filter(bc => !(bc.section_id === currentSectionId && bc.task_id === taskId)))
+    await supabase.from('bingo_board_cards').delete()
+      .eq('section_id', currentSectionId).eq('task_id', taskId)
   }
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
@@ -1108,12 +1159,10 @@ export function BingoDashAdmin() {
           ? tileAnswerText.split('\n').map(l => l.trim()).filter(Boolean).join('\n') || null
           : null,
       }
-      // Moving a tile to another section: drop it off the grid in the source
-      // section so we don't leave a dangling slot reference behind.
+      // Moving a tile to another compartment only changes where it lives in
+      // the library — board placements are separate rows and stay intact.
       if (tileSectionId !== editingTile.section_id) {
         updates.section_id = tileSectionId
-        updates.in_grid = false
-        updates.sort_order = 100
       }
       await supabase.from('bingo_tasks').update(updates).eq('id', editingTile.id)
       setTasks(prev => prev.map(t => t.id === editingTile.id ? { ...t, ...updates } : t))
@@ -1123,54 +1172,13 @@ export function BingoDashAdmin() {
     } finally { setTileSaving(false) }
   }
 
-  // Clone a task (pages + photos) into the current section as a new off-grid card.
-  // Used when placing a card that is already on the grid, or adding a cross-section card.
-  const cloneTask = async (task: BingoTask): Promise<BingoTask | null> => {
-    const [{ data: pages }, { data: photos }] = await Promise.all([
-      supabase.from('bingo_task_pages').select('*').eq('task_id', task.id).order('page_order'),
-      supabase.from('bingo_task_photos').select('*').eq('task_id', task.id).order('photo_order'),
-    ])
-    const { data: created, error } = await supabase.from('bingo_tasks').insert({
-      section_id: currentSectionId,
-      title: task.title, color: task.color, hex_code: task.hex_code,
-      category: task.category, points: task.points,
-      in_grid: false,
-      sort_order: Math.max(25, scopedTasks.length + 25),
-    }).select().single()
-    if (error || !created) { alert('Failed to add card'); return null }
-    if (pages && pages.length > 0) {
-      const copies = pages.map(p => {
-        const { id, task_id, created_at, ...rest } = p
-        void id; void task_id; void created_at
-        return { ...rest, task_id: created.id }
-      })
-      await supabase.from('bingo_task_pages').insert(copies)
-    }
-    if (photos && photos.length > 0) {
-      const copies = photos.map(p => {
-        const { id, task_id, created_at, ...rest } = p
-        void id; void task_id; void created_at
-        return { ...rest, task_id: created.id }
-      })
-      await supabase.from('bingo_task_photos').insert(copies)
-    }
-    setTasks(prev => [...prev, created])
-    return created
-  }
-
-  // Add a card from any section onto the current section's grid.
-  // Same-section + off-grid: place directly. Otherwise (cross-section OR already
-  // in-grid): clone the task row first so the original is untouched.
+  // Add a card from any section onto the current board's grid. Cards are
+  // universal — this just creates a placement row, never a copy.
   const addCardFromLibrary = async (task: BingoTask) => {
     if (!currentSectionId || gridTasks.length >= 25) return
     const firstEmpty = gridSlots.findIndex(s => s === null)
     if (firstEmpty === -1) return
-    if (task.section_id === currentSectionId && !task.in_grid) {
-      await insertIntoGrid(task.id, firstEmpty)
-      return
-    }
-    const created = await cloneTask(task)
-    if (created) await insertIntoGrid(created.id, firstEmpty)
+    await insertIntoGrid(task.id, firstEmpty)
   }
 
   const duplicateTask = async (task: BingoTask) => {
@@ -2163,9 +2171,12 @@ export function BingoDashAdmin() {
 
             {/* Card library — pick any card from any section, filter & search */}
             <div className="flex-1 min-w-0 w-full lg:w-auto">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
                 Add to Grid
                 {gridTasks.length >= 25 && <span className="ml-2 text-red-400 normal-case font-normal">Grid full</span>}
+              </p>
+              <p className="text-[11px] text-gray-600 mb-2">
+                Cards are shared across boards — adding never makes a copy. Editing a card updates it on every board that uses it.
               </p>
               {/* Section + search row */}
               <div className="flex gap-2 mb-2">
@@ -2218,15 +2229,16 @@ export function BingoDashAdmin() {
                   {addListTasks.map(task => {
                     const isSameSection = task.section_id === currentSectionId
                     const sectionName = sections.find(s => s.id === task.section_id)?.name ?? ''
+                    const boardCount = boardCountByTask.get(task.id) ?? 0
                     return (
                       <div
                         key={task.id}
-                        draggable={isSameSection}
-                        onDragStart={isSameSection ? (e => onListDragStart(e, task.id)) : undefined}
-                        onDragEnd={isSameSection ? onDragEnd : undefined}
-                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors select-none ${
-                          isSameSection ? 'cursor-grab active:cursor-grabbing' : ''
-                        } ${dragState?.id === task.id ? 'opacity-40' : ''}`}
+                        draggable
+                        onDragStart={e => onListDragStart(e, task.id)}
+                        onDragEnd={onDragEnd}
+                        className={`flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors select-none cursor-grab active:cursor-grabbing ${
+                          dragState?.id === task.id ? 'opacity-40' : ''
+                        }`}
                       >
                         <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: task.hex_code }} />
                         <div className="flex-1 min-w-0">
@@ -2234,18 +2246,21 @@ export function BingoDashAdmin() {
                           <div className="flex items-center gap-2 text-xs text-gray-500 truncate">
                             {task.category && <span>{task.category}</span>}
                             {!isSameSection && (
-                              <span className="text-[10px] font-bold bg-amber-900/40 text-amber-400 border border-amber-800 rounded px-1.5 py-0.5">
-                                {sectionName} · copy
+                              <span className="text-[10px] font-bold bg-white/10 text-gray-400 border border-white/15 rounded px-1.5 py-0.5">
+                                {sectionName}
                               </span>
                             )}
-                            {isSameSection && task.in_grid && (
-                              <span className="text-[10px] font-bold bg-white/10 text-gray-400 rounded px-1.5 py-0.5">on grid</span>
+                            {boardCount > 0 && (
+                              <span className="text-[10px] font-bold bg-violet-900/40 text-violet-300 border border-violet-800 rounded px-1.5 py-0.5"
+                                title="This card is shared — it already sits on other boards. Edits apply everywhere.">
+                                on {boardCount} board{boardCount > 1 ? 's' : ''}
+                              </span>
                             )}
                           </div>
                         </div>
                         <button
                           onClick={() => addCardFromLibrary(task)}
-                          disabled={gridTasks.length >= 25 || (isSameSection && task.in_grid)}
+                          disabled={gridTasks.length >= 25}
                           className="px-3 py-1 bg-violet-900/50 text-violet-400 border border-violet-700 rounded-lg text-xs font-bold hover:bg-violet-800/50 disabled:opacity-40 transition-colors flex-shrink-0"
                         >
                           + Add
@@ -2541,7 +2556,12 @@ export function BingoDashAdmin() {
                                       <span className="bg-black/30 text-white/80 text-[10px] font-black rounded px-1.5 py-0.5">{task.points} pts</span>
                                     )}
                                   </div>
-                                  <p className="text-white/40 text-xs mt-0.5">{task.in_grid ? '✓ In grid' : 'Off grid'}</p>
+                                  <p className="text-white/40 text-xs mt-0.5">
+                                    {(() => {
+                                      const n = boardCountByTask.get(task.id) ?? 0
+                                      return n > 0 ? `✓ On ${n} board${n > 1 ? 's' : ''}` : 'Not on any board'
+                                    })()}
+                                  </p>
                                   <button
                                     onClick={async () => {
                                       const newVal = !task.require_marshal
@@ -2845,6 +2865,7 @@ export function BingoDashAdmin() {
                   categories={categories}
                   scans={scans}
                   copiedId={copiedId}
+                  boardCountByTask={boardCountByTask}
                   navigate={navigate}
                   saveCategoryInline={saveCategoryInline}
                   setBulkCategoryColor={setBulkCategoryColor}
@@ -2891,6 +2912,7 @@ export function BingoDashAdmin() {
                             categories={categories}
                             scans={scans}
                             copiedId={copiedId}
+                            boardCountByTask={boardCountByTask}
                             navigate={navigate}
                             saveCategoryInline={saveCategoryInline}
                             setBulkCategoryColor={setBulkCategoryColor}
@@ -2920,7 +2942,6 @@ export function BingoDashAdmin() {
             const section = sections.find(s => s.id === currentSectionId)
             if (!section) return null
             const sectionTeams = scopedTeams
-            const sectionTasks = scopedTasks
             return (
               <div key={section.id} className="mb-10">
                 {/* Board header */}
@@ -3005,7 +3026,7 @@ export function BingoDashAdmin() {
                     <tbody className="divide-y divide-white/5">
                       {sectionTeams.map(team => {
                         const teamScans = scans.filter(s => s.team_id === team.id)
-                        const sectionGridTasks = sectionTasks.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+                        const sectionGridTasks = boardTasksForSection(section.id)
                         const gridTaskIds = new Set(sectionGridTasks.map(t => t.id))
                         const completedCount = teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
                         const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
@@ -3464,16 +3485,13 @@ export function BingoDashAdmin() {
               </div>
             )}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-100 py-2">
-              {(slotPickerFilter === 'all' ? scopedTasks : scopedTasks.filter(t => t.category === slotPickerFilter)).map(task => (
+              {(slotPickerFilter === 'all' ? scopedTasks : scopedTasks.filter(t => t.category === slotPickerFilter))
+                .filter(t => !placedTaskIds.has(t.id))
+                .map(task => (
                 <button
                   key={task.id}
                   onClick={async () => {
-                    if (task.in_grid) {
-                      const created = await cloneTask(task)
-                      if (created) await insertIntoGrid(created.id, slotPickerIndex)
-                    } else {
-                      await insertIntoGrid(task.id, slotPickerIndex)
-                    }
+                    await insertIntoGrid(task.id, slotPickerIndex)
                     setSlotPickerIndex(null)
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-violet-50 transition-colors text-left"
@@ -3483,9 +3501,6 @@ export function BingoDashAdmin() {
                     <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
                     {task.category && <p className="text-xs text-gray-400 truncate">{task.category}</p>}
                   </div>
-                  {task.in_grid && (
-                    <span className="text-xs font-bold text-amber-500 flex-shrink-0 bg-amber-50 px-1.5 py-0.5 rounded">Dup</span>
-                  )}
                   {(task.points ?? 0) > 0 && (
                     <span className="text-xs font-bold text-violet-500 flex-shrink-0">{task.points} pts</span>
                   )}
@@ -3775,8 +3790,7 @@ export function BingoDashAdmin() {
         const teamScans = scans.filter(s => s.team_id === team.id)
         const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
         const scannedIds = new Set(teamScans.map(s => s.task_id))
-        const sectionTasksForTeam = tasks.filter(t => t.section_id === team.section_id)
-        const gridTasksForTeam = sectionTasksForTeam.filter(t => t.in_grid).sort((a, b) => a.sort_order - b.sort_order)
+        const gridTasksForTeam = boardTasksForSection(team.section_id)
         const slots = buildBingoSlots(gridTasksForTeam)
         const completedLineIdx = completedBingoLines(slots, completedIds)
         const bingoSlotSet = new Set<number>()

@@ -122,6 +122,16 @@ export interface BingoTask {
   created_at: string
 }
 
+// A card placed on a board's 5x5 grid. Cards are universal: the same task
+// can be placed on any number of boards via one placement row per board.
+export interface BingoBoardCard {
+  id: string
+  section_id: string
+  task_id: string
+  slot: number
+  created_at: string
+}
+
 export interface BingoSettings {
   id: string
   timer_seconds: number
