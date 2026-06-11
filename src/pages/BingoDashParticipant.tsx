@@ -5,6 +5,8 @@ import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useBingoScans } from '../hooks/useBingoScans'
+import { useTaskLinks } from '../hooks/useTaskLinks'
+import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { InstructionPage } from '../components/InstructionPage'
 import { PageNavigator } from '../components/PageNavigator'
 import { SwipeablePages } from '../components/SwipeablePages'
@@ -69,6 +71,7 @@ export function BingoDashParticipant() {
   const isObserver = !isSnakeLadder && localStorage.getItem('bingo-dash-member-role') === 'observer'
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
   const { photos, loading: photosLoading } = useBingoTaskPhotos(taskId)
+  const { links } = useTaskLinks(taskId, 'bingo_task_links')
   const { recordScan, toggleComplete } = useBingoScans()
 
   const [task, setTask] = useState<BingoTask | null>(null)
@@ -489,6 +492,13 @@ export function BingoDashParticipant() {
         ) : (
           <div className="text-center py-12 text-gray-400">
             No instructions available for this challenge yet.
+          </div>
+        )}
+
+        {/* Helpful links */}
+        {links.length > 0 && (
+          <div className="mt-8 animate-slide-up">
+            <TaskLinkButtons links={links} hexCode={task.hex_code} heading="Use these links to complete your tasks" />
           </div>
         )}
 

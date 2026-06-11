@@ -3,9 +3,12 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
+import { useTaskLinks } from '../hooks/useTaskLinks'
 import { BingoAdminPhotoUpload } from '../components/BingoAdminPhotoUpload'
 import { PageForm } from '../components/PageForm'
 import { InstructionPage } from '../components/InstructionPage'
+import { TaskLinksEditor } from '../components/TaskLinksEditor'
+import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { ParticleBackground } from '../components/ParticleBackground'
 import type { BingoTask, BingoTaskPage } from '../types/database'
 
@@ -34,6 +37,7 @@ export function BingoDashTaskEdit() {
   const [mapsUrlSaving, setMapsUrlSaving] = useState(false)
   const { pages, createPage, updatePage, deletePage, reorderPages } = useBingoTaskPages(taskId)
   const { photos, reload: reloadPhotos } = useBingoTaskPhotos(taskId)
+  const { links } = useTaskLinks(taskId, 'bingo_task_links')
 
   useEffect(() => {
     if (!taskId) return
@@ -223,6 +227,13 @@ export function BingoDashTaskEdit() {
           ) : (
             <div className="text-center py-12 text-gray-400">
               No instruction pages yet.
+            </div>
+          )}
+
+          {/* Helpful links — mirrors the participant page */}
+          {links.length > 0 && (
+            <div className="mt-8">
+              <TaskLinkButtons links={links} hexCode={task.hex_code} heading="Use these links to complete your tasks" />
             </div>
           )}
 
@@ -525,6 +536,17 @@ export function BingoDashTaskEdit() {
           >
             {mapsUrlSaving ? 'Saving...' : 'Save Maps Link'}
           </button>
+        </div>
+
+        {/* Helpful links */}
+        <div className="mt-6">
+          <TaskLinksEditor
+            taskId={task.id}
+            hexCode={task.hex_code}
+            table="bingo_task_links"
+            title="Helpful Links"
+            description='Shown to participants below the instructions as "Use these links to complete your tasks". Each link opens in a new tab.'
+          />
         </div>
       </main>
     </div>

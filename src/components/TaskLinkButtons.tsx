@@ -5,15 +5,16 @@ import { T } from './T'
 interface Props {
   links: TaskLink[]
   hexCode: string
+  heading?: string
 }
 
-export function TaskLinkButtons({ links, hexCode }: Props) {
+export function TaskLinkButtons({ links, hexCode, heading = 'Links for this task' }: Props) {
   if (links.length === 0) return null
 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs font-black uppercase tracking-[0.15em] text-white/60">
-        🔗 <T>Links for this task</T>
+        🔗 <T>{heading}</T>
       </p>
       <div className="flex flex-col gap-2.5">
         {links.map((link) => (

@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { TaskLink } from '../types/database'
 
-export function useTaskLinks(taskId: string | undefined) {
+export type TaskLinksTable = 'task_links' | 'bingo_task_links'
+
+export function useTaskLinks(taskId: string | undefined, table: TaskLinksTable = 'task_links') {
   const [links, setLinks] = useState<TaskLink[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -10,7 +12,7 @@ export function useTaskLinks(taskId: string | undefined) {
     if (!taskId || !isSupabaseConfigured) { setLoading(false); return }
     try {
       const { data, error } = await supabase
-        .from('task_links')
+        .from(table)
         .select('*')
         .eq('task_id', taskId)
         .order('sort_order', { ascending: true })
@@ -24,23 +26,23 @@ export function useTaskLinks(taskId: string | undefined) {
       setLinks([])
     }
     setLoading(false)
-  }, [taskId])
+  }, [taskId, table])
 
   useEffect(() => {
     fetchLinks()
     if (!taskId || !isSupabaseConfigured) return
     try {
       const channel = supabase
-        .channel(`task-links-${taskId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'task_links', filter: `task_id=eq.${taskId}` }, fetchLinks)
+        .channel(`${table}-${taskId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table, filter: `task_id=eq.${taskId}` }, fetchLinks)
         .subscribe()
       return () => { supabase.removeChannel(channel) }
     } catch { /* realtime unavailable — ignore */ }
-  }, [fetchLinks, taskId])
+  }, [fetchLinks, taskId, table])
 
   const createLink = async (label: string, url: string) => {
     if (!taskId) return
-    const { error } = await supabase.from('task_links').insert({
+    const { error } = await supabase.from(table).insert({
       task_id: taskId,
       label: label.trim(),
       url: url.trim(),
@@ -51,20 +53,20 @@ export function useTaskLinks(taskId: string | undefined) {
   }
 
   const updateLink = async (id: string, updates: Partial<Pick<TaskLink, 'label' | 'url'>>) => {
-    const { error } = await supabase.from('task_links').update(updates).eq('id', id)
+    const { error } = await supabase.from(table).update(updates).eq('id', id)
     if (error) throw error
     await fetchLinks()
   }
 
   const deleteLink = async (id: string) => {
-    const { error } = await supabase.from('task_links').delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) throw error
     await fetchLinks()
   }
 
   const reorderLinks = async (reordered: TaskLink[]) => {
     for (let i = 0; i < reordered.length; i++) {
-      await supabase.from('task_links').update({ sort_order: i }).eq('id', reordered[i].id)
+      await supabase.from(table).update({ sort_order: i }).eq('id', reordered[i].id)
     }
     await fetchLinks()
   }

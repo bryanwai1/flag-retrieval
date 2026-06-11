@@ -1,14 +1,23 @@
 import { useState } from 'react'
-import { useTaskLinks } from '../hooks/useTaskLinks'
+import { useTaskLinks, type TaskLinksTable } from '../hooks/useTaskLinks'
 import type { TaskLink } from '../types/database'
 
 interface Props {
   taskId: string
   hexCode: string
+  table?: TaskLinksTable
+  title?: string
+  description?: string
 }
 
-export function TaskLinksEditor({ taskId, hexCode }: Props) {
-  const { links, createLink, updateLink, deleteLink, reorderLinks } = useTaskLinks(taskId)
+export function TaskLinksEditor({
+  taskId,
+  hexCode,
+  table = 'task_links',
+  title = 'Task Links',
+  description = 'Add URLs players can tap to open external tools or resources while doing this task. Each link appears as a button.',
+}: Props) {
+  const { links, createLink, updateLink, deleteLink, reorderLinks } = useTaskLinks(taskId, table)
   const [newLabel, setNewLabel] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [adding, setAdding] = useState(false)
@@ -43,12 +52,10 @@ export function TaskLinksEditor({ taskId, hexCode }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-bold text-gray-900">Task Links</h3>
+        <h3 className="font-bold text-gray-900">{title}</h3>
         <span className="text-xs text-gray-400">{links.length} {links.length === 1 ? 'link' : 'links'}</span>
       </div>
-      <p className="text-xs text-gray-500 mb-4">
-        Add URLs players can tap to open external tools or resources while doing this task. Each link appears as a button.
-      </p>
+      <p className="text-xs text-gray-500 mb-4">{description}</p>
 
       {links.length > 0 && (
         <div className="flex flex-col gap-2 mb-4">
