@@ -102,7 +102,6 @@ type SlideKind =
   | 'submissions'
   | 'how-to-submit'
   | 'preview-clue'
-  | 'safety'
   | 'qr-wish'
 
 const SLIDES: SlideKind[] = [
@@ -116,7 +115,6 @@ const SLIDES: SlideKind[] = [
   'submissions',
   'how-to-submit',
   'preview-clue',
-  'safety',
   'qr-wish',
 ]
 
@@ -240,7 +238,7 @@ function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName, timerSeconds 
   kind: SlideKind; slideIdx: number; sectionSlug: string; sectionName: string; timerSeconds: number
 }) {
   switch (kind) {
-    case 'main':           return <MainSlide slideIdx={slideIdx} sectionName={sectionName} />
+    case 'main':           return <MainSlide slideIdx={slideIdx} sectionName={sectionName} sectionSlug={sectionSlug} />
     case 'holding':        return <HoldingSlide slideIdx={slideIdx} />
     case 'step1-roam':     return <Step1RoamSlide slideIdx={slideIdx} />
     case 'step2-card':     return <Step2CardSlide slideIdx={slideIdx} />
@@ -250,13 +248,18 @@ function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName, timerSeconds 
     case 'submissions':    return <SubmissionTypesSlide slideIdx={slideIdx} />
     case 'how-to-submit':  return <HowToSubmitSlide slideIdx={slideIdx} />
     case 'preview-clue':   return <PreviewClueSlide slideIdx={slideIdx} />
-    case 'safety':         return <SafetySlide slideIdx={slideIdx} />
     case 'qr-wish':        return <QrWishSlide slideIdx={slideIdx} sectionSlug={sectionSlug} sectionName={sectionName} />
   }
 }
 
 // ── 1. Main slide (opener) ───────────────────────────────────────────────
-function MainSlide({ slideIdx, sectionName }: { slideIdx: number; sectionName: string }) {
+// Boards with a client logo in public/logos get it on the opener; others 🎯.
+const SECTION_LOGOS: Record<string, string> = {
+  dexcom: '/logos/dexcom.png',
+}
+
+function MainSlide({ slideIdx, sectionName, sectionSlug }: { slideIdx: number; sectionName: string; sectionSlug: string }) {
+  const logo = SECTION_LOGOS[sectionSlug]
   return (
     <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
       {/* Soft animated blobs */}
@@ -271,12 +274,21 @@ function MainSlide({ slideIdx, sectionName }: { slideIdx: number; sectionName: s
         filter: 'blur(48px)', animation: 'medal-pulse 8s ease-in-out 1s infinite',
       }} />
 
-      <div className="relative z-10 mb-6 text-8xl" style={{
-        animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both',
-        filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.55))',
-      }}>
-        🎯
-      </div>
+      {logo ? (
+        <div className="relative z-10 mb-8 bg-white rounded-3xl px-10 py-7 shadow-2xl" style={{
+          animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+        }}>
+          <img src={logo} alt={sectionName} style={{ width: 'min(60vw, 420px)', height: 'auto', display: 'block' }} />
+        </div>
+      ) : (
+        <div className="relative z-10 mb-6 text-8xl" style={{
+          animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both',
+          filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.55))',
+        }}>
+          🎯
+        </div>
+      )}
 
       <h1 className="relative z-10 font-black leading-[0.92] text-white" style={{
         fontSize: 'clamp(2.4rem, 8.5vw, 7rem)',
@@ -287,13 +299,15 @@ function MainSlide({ slideIdx, sectionName }: { slideIdx: number; sectionName: s
         BINGO DASH
       </h1>
 
-      <p className="relative z-10 mt-6 text-white/95 font-black uppercase" style={{
-        fontSize: 'clamp(1.4rem, 3.4vw, 2.6rem)',
-        letterSpacing: '0.35em',
-        animation: 'slide-up-fade 0.7s ease-out 0.85s both',
-      }}>
-        {sectionName}
-      </p>
+      {!logo && (
+        <p className="relative z-10 mt-6 text-white/95 font-black uppercase" style={{
+          fontSize: 'clamp(1.4rem, 3.4vw, 2.6rem)',
+          letterSpacing: '0.35em',
+          animation: 'slide-up-fade 0.7s ease-out 0.85s both',
+        }}>
+          {sectionName}
+        </p>
+      )}
 
       <div className="relative z-10 mt-6 mx-auto" style={{
         width: 60, height: 2, background: 'rgba(255,255,255,0.65)',
@@ -1076,87 +1090,7 @@ function PreviewClueSlide({ slideIdx }: { slideIdx: number }) {
   )
 }
 
-// ── 8. Safety ────────────────────────────────────────────────────────────
-function SafetySlide({ slideIdx }: { slideIdx: number }) {
-  const rules = [
-    { icon: '🚦', text: 'Cross roads only at marked crossings.' },
-    { icon: '👫', text: 'Stay together — no teammate left behind.' },
-    { icon: '💧', text: 'Hydrate often. The heat is no joke.' },
-    { icon: '🚫', text: 'Respect locals, signage, and private property.' },
-    { icon: '📱', text: 'Keep your phone charged — it\'s your bingo card.' },
-  ]
-  const contacts = [
-    { name: 'Bryan Ng',  phone: '012-661 1043', role: 'Facilitator' },
-    { name: 'Susan Yap', phone: '012-370 3732', role: 'InStep' },
-  ]
-  return (
-    <ContentShell slideIdx={slideIdx} pretitle="Stay Safe Out There" title="Safety First" beam="#fca5a5">
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl w-full mx-auto items-stretch">
-        {/* Rules — bigger tiles, icon pulse */}
-        <div className="flex flex-col gap-3.5">
-          {rules.map((r, i) => (
-            <div key={i} className="flex items-center gap-5 p-5 rounded-2xl bg-white/5 border-2 border-white/15"
-                 style={{
-                   animation: `pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) ${0.4 + i * 0.1}s both`,
-                   boxShadow: '0 0 24px rgba(252,165,165,0.08)',
-                 }}>
-              <div className="text-5xl sm:text-6xl flex-shrink-0"
-                   style={{
-                     animation: `safety-icon-pulse 2.4s ease-in-out ${i * 0.25}s infinite`,
-                     filter: 'drop-shadow(0 0 12px rgba(252,165,165,0.55))',
-                   }}>
-                {r.icon}
-              </div>
-              <p className="text-white text-lg sm:text-2xl font-black leading-snug text-left"
-                 style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                {r.text}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Emergency contacts — pulsing border + bigger numbers */}
-        <div className="rounded-3xl border-2 border-red-400/55 bg-red-950/45 overflow-hidden relative"
-             style={{
-               animation: `pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.55s both, safety-card-glow 3s ease-in-out infinite`,
-             }}>
-          <div className="px-6 py-4 flex items-center gap-3 border-b border-red-400/30 bg-red-900/50">
-            <span className="text-3xl"
-                  style={{ animation: 'safety-sos-shake 1.6s ease-in-out infinite',
-                           filter: 'drop-shadow(0 0 10px #fca5a5cc)' }}>
-              🆘
-            </span>
-            <span className="text-red-100 text-sm sm:text-base font-black uppercase tracking-[0.35em]"
-                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              Emergency Contacts
-            </span>
-          </div>
-          <div className="divide-y divide-red-400/25">
-            {contacts.map((c, i) => (
-              <div key={c.phone}
-                   className="flex items-center justify-between px-6 py-5 gap-3 text-left"
-                   style={{ animation: `slide-up-fade 0.5s ease-out ${0.85 + i * 0.12}s both` }}>
-                <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                  <div className="text-white text-xl sm:text-2xl font-black leading-tight">{c.name}</div>
-                  <div className="text-red-300/85 text-sm font-bold uppercase tracking-wider mt-1">{c.role}</div>
-                </div>
-                <div className="text-red-100 text-2xl sm:text-3xl font-black tracking-wide tabular-nums"
-                     style={{
-                       fontFamily: 'system-ui, -apple-system, sans-serif',
-                       textShadow: '0 0 14px rgba(252,165,165,0.55)',
-                     }}>
-                  {c.phone}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </ContentShell>
-  )
-}
-
-// ── 9. QR + safety wish (closer) ─────────────────────────────────────────
+// ── 9. QR + wish (closer) ───────────────────────────────────────────────
 function QrWishSlide({ slideIdx, sectionSlug, sectionName }: {
   slideIdx: number; sectionSlug: string; sectionName: string
 }) {
