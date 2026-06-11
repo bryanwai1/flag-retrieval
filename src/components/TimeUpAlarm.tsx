@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { normalizeUrl } from '../lib/normalizeUrl'
-import type { BingoSettings } from '../types/database'
+import type { BoardTimer } from '../types/database'
 
-// Returns true when the bingo timer was running (timer_end_at set) and that
+// Returns true when the board's timer was running (timer_end_at set) and that
 // moment has now passed. Re-evaluates on a 1s tick so the alarm appears as
 // soon as the timer hits zero, even without a settings update.
-function useTimerExpired(settings: BingoSettings | null): boolean {
+function useTimerExpired(settings: BoardTimer | null): boolean {
   const [, tick] = useState(0)
   useEffect(() => {
     if (!settings?.timer_end_at) return
@@ -17,27 +17,28 @@ function useTimerExpired(settings: BingoSettings | null): boolean {
   return new Date(settings.timer_end_at).getTime() <= Date.now()
 }
 
-// Subscribes to bingo_settings 'main' so the alarm + message stay live for
-// every connected player without prop drilling. Pages that already load
-// settings can pass them via `settings` to skip the extra fetch.
-export function TimeUpAlarm({ settings: settingsProp }: { settings?: BingoSettings | null } = {}) {
-  const [settings, setSettings] = useState<BingoSettings | null>(settingsProp ?? null)
+// Timer + alarm are per board (bingo_sections row). Pages that already hold
+// their section pass it via `settings`; pages that only know the section id
+// pass `sectionId` and the component fetches + subscribes itself.
+export function TimeUpAlarm({ settings: settingsProp, sectionId }: { settings?: BoardTimer | null; sectionId?: string | null } = {}) {
+  const [settings, setSettings] = useState<BoardTimer | null>(settingsProp ?? null)
   const useOwnFetch = settingsProp === undefined
 
   useEffect(() => {
     if (!useOwnFetch) { setSettings(settingsProp ?? null); return }
+    if (!sectionId) { setSettings(null); return }
     let cancelled = false
-    supabase.from('bingo_settings').select('*').eq('id', 'main').single().then(({ data }) => {
+    supabase.from('bingo_sections').select('*').eq('id', sectionId).single().then(({ data }) => {
       if (!cancelled && data) setSettings(data)
     })
     const channel = supabase
-      .channel('bingo-settings-time-up-alarm')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_settings', filter: 'id=eq.main' }, ({ new: row }) => {
-        setSettings(row as BingoSettings)
+      .channel(`bingo-section-time-up-alarm-${sectionId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `id=eq.${sectionId}` }, ({ new: row }) => {
+        setSettings(row as BoardTimer)
       })
       .subscribe()
     return () => { cancelled = true; supabase.removeChannel(channel) }
-  }, [useOwnFetch, settingsProp])
+  }, [useOwnFetch, settingsProp, sectionId])
 
   const expired = useTimerExpired(settings)
   if (!expired || !settings) return null

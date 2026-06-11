@@ -74,7 +74,16 @@ export interface TeamScan {
 
 // ── Bingo Dash ────────────────────────────────────────────────
 
-export interface BingoSection {
+// Per-board timer + time's-up alarm fields (subset of BingoSection).
+export interface BoardTimer {
+  timer_seconds: number
+  timer_end_at: string | null
+  time_up_message: string
+  time_up_label: string
+  time_up_maps_url: string
+}
+
+export interface BingoSection extends BoardTimer {
   id: string
   name: string
   slug: string
@@ -82,6 +91,8 @@ export interface BingoSection {
   game_started: boolean
   board_note: string
   board_note_every: number
+  marshal_password: string
+  photo_submissions_enabled: boolean
   created_at: string
 }
 

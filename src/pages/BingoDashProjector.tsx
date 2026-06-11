@@ -73,28 +73,32 @@ export function BingoDashProjector() {
         const { data } = await supabase.from('bingo_settings').select('*').eq('id', 'main').single()
         if (data) setSettings(data)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_sections' }, async () => {
+        const { data } = await supabase.from('bingo_sections').select('*').order('sort_order')
+        if (data) setSections(data)
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Timer tick
+  const activeSectionId = settings?.active_section_id ?? null
+  const activeSection = sections.find(s => s.id === activeSectionId) ?? null
+
+  // Timer tick — driven by the active board's own timer
   useEffect(() => {
     const id = setInterval(() => {
-      if (!settings) { setTimerDisplay('00:00'); setTimerRunning(false); return }
-      if (settings.timer_end_at) {
-        const remaining = (new Date(settings.timer_end_at).getTime() - Date.now()) / 1000
+      if (!activeSection) { setTimerDisplay('00:00'); setTimerRunning(false); return }
+      if (activeSection.timer_end_at) {
+        const remaining = (new Date(activeSection.timer_end_at).getTime() - Date.now()) / 1000
         setTimerDisplay(formatTime(remaining))
         setTimerRunning(remaining > 0)
       } else {
-        setTimerDisplay(formatTime(settings.timer_seconds))
+        setTimerDisplay(formatTime(activeSection.timer_seconds))
         setTimerRunning(false)
       }
     }, 250)
     return () => clearInterval(id)
-  }, [settings])
-
-  const activeSectionId = settings?.active_section_id ?? null
-  const activeSection = sections.find(s => s.id === activeSectionId) ?? null
+  }, [activeSection])
 
   const sectionTeams = activeSectionId ? teams.filter(t => t.section_id === activeSectionId) : teams
   // Grid membership lives in bingo_board_cards (cards are shared across boards).
@@ -142,7 +146,7 @@ export function BingoDashProjector() {
             )}
           </div>
           <div className="flex flex-col items-end gap-2">
-            {settings && (settings.timer_end_at || settings.timer_seconds > 0) && (
+            {activeSection && (activeSection.timer_end_at || activeSection.timer_seconds > 0) && (
               <div
                 className={`px-6 py-3 rounded-2xl font-black text-4xl tabular-nums transition-colors ${
                   timerRunning ? 'bg-white/10 text-white' : 'bg-white/5 text-gray-500'

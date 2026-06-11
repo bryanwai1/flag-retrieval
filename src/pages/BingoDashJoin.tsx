@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { fetchBoardTasks } from '../lib/boardCards'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
-import type { BingoTask, BingoScan, BingoSection, BingoSettings, BingoTeam, BingoMember } from '../types/database'
+import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
 
 /* ── helpers ─────────────────────────────────────────────────────────────────── */
 
@@ -440,7 +440,7 @@ function BingoPopup({ letters, onDismiss }: { letters: string; onDismiss: () => 
 
 /* ── Timer ────────────────────────────────────────────────────────────────────── */
 
-function TimerDisplay({ settings }: { settings: BingoSettings | null }) {
+function TimerDisplay({ settings }: { settings: BoardTimer | null }) {
   const [display, setDisplay] = useState('00:00')
   const [isRunning, setIsRunning] = useState(false)
   const [isLow, setIsLow] = useState(false)
@@ -496,7 +496,7 @@ function BoardScreen({
   memberRole: 'member' | 'observer'
   gridTasks: BingoTask[]
   scans: BingoScan[]
-  settings: BingoSettings | null
+  settings: BoardTimer | null
   boardNote: string
   boardNoteEvery: number
   onLeave: () => void
@@ -748,7 +748,6 @@ export function BingoDashJoin() {
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
-  const [settings, setSettings] = useState<BingoSettings | null>(null)
   const [pageState, setPageState] = useState<'loading' | 'not-found' | 'join' | 'board'>('loading')
 
   // Resolve section by slug
@@ -833,10 +832,6 @@ export function BingoDashJoin() {
 
         // Load grid tasks for this section (cards are placed via bingo_board_cards)
         fetchBoardTasks(data.id).then(tasks => setGridTasks(tasks))
-
-        // Load settings
-        supabase.from('bingo_settings').select('*').eq('id', 'main').single()
-          .then(({ data: s }) => { if (s) setSettings(s) })
       })
   }, [sectionSlug])
 
@@ -859,18 +854,7 @@ export function BingoDashJoin() {
     return () => { supabase.removeChannel(channel) }
   }, [team])
 
-  // Live settings updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('bingo-join-settings')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_settings' }, () => {
-        supabase.from('bingo_settings').select('*').eq('id', 'main').single().then(({ data }) => { if (data) setSettings(data) })
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  // Live section game_started updates
+  // Live section updates (game_started, timer, alarm, board note)
   useEffect(() => {
     if (!section) return
     const channel = supabase
@@ -894,8 +878,6 @@ export function BingoDashJoin() {
         supabase.from('bingo_sections').select('*').eq('id', section.id).single()
           .then(({ data }) => { if (data) setSection(prev => prev ? { ...prev, ...data } as typeof prev : data) })
       }
-      supabase.from('bingo_settings').select('*').eq('id', 'main').single()
-        .then(({ data }) => { if (data) setSettings(data) })
       if (team?.id) {
         supabase.from('bingo_scans').select('*').eq('team_id', team.id)
           .then(({ data }) => { if (data) setScans(data) })
@@ -1027,7 +1009,7 @@ export function BingoDashJoin() {
     setPageState('join')
   }
 
-  const timeUpOverlay = <TimeUpAlarm settings={settings} />
+  const timeUpOverlay = <TimeUpAlarm settings={section} />
 
   if (pageState === 'loading') {
     return (
@@ -1107,7 +1089,7 @@ export function BingoDashJoin() {
           memberRole={memberRole}
           gridTasks={gridTasks}
           scans={scans}
-          settings={settings}
+          settings={section}
           boardNote={section.board_note ?? ''}
           boardNoteEvery={section.board_note_every ?? 0}
           onLeave={leaveTeam}

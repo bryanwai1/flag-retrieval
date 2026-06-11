@@ -589,7 +589,9 @@ export function BingoDashAdmin() {
     return slots
   })()
   const allCategories = [...new Set(scopedTasks.map(t => t.category).filter(Boolean))].sort() as string[]
-  const isTimerRunning = !!settings?.timer_end_at && new Date(settings.timer_end_at) > new Date()
+  // Timer + alarm + marshal password + photo toggle are per board (bingo_sections).
+  const currentBoard = sections.find(s => s.id === currentSectionId) ?? null
+  const isTimerRunning = !!currentBoard?.timer_end_at && new Date(currentBoard.timer_end_at) > new Date()
 
   // Library view: candidates for "Add to Grid" across sections.
   // Cards are universal — adding places the existing card on this board, no
@@ -992,32 +994,33 @@ export function BingoDashAdmin() {
   // Countdown tick
   useEffect(() => {
     const id = setInterval(() => {
-      if (!settings) { setTimerDisplay('00:00'); return }
-      if (settings.timer_end_at) {
-        setTimerDisplay(formatTime((new Date(settings.timer_end_at).getTime() - Date.now()) / 1000))
+      if (!currentBoard) { setTimerDisplay('00:00'); return }
+      if (currentBoard.timer_end_at) {
+        setTimerDisplay(formatTime((new Date(currentBoard.timer_end_at).getTime() - Date.now()) / 1000))
       } else {
-        setTimerDisplay(formatTime(settings.timer_seconds))
+        setTimerDisplay(formatTime(currentBoard.timer_seconds ?? 0))
       }
     }, 250)
     return () => clearInterval(id)
-  }, [settings])
+  }, [currentBoard?.timer_end_at, currentBoard?.timer_seconds]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Timer actions ──────────────────────────────────────────────────────────
-  const updateSettings = async (patch: Partial<Omit<BingoSettings, 'id' | 'created_at'>>) => {
+  // ── Timer actions (per board — writes the selected bingo_sections row) ─────
+  const updateBoardSettings = async (patch: Partial<Omit<BingoSection, 'id' | 'created_at'>>) => {
+    if (!currentSectionId) return
     setTimerSaving(true)
     try {
-      const { data } = await supabase.from('bingo_settings').update(patch).eq('id', 'main').select().single()
-      if (data) setSettings(data)
+      const { data } = await supabase.from('bingo_sections').update(patch).eq('id', currentSectionId).select().single()
+      if (data) setSections(prev => prev.map(s => s.id === data.id ? data : s))
     } finally { setTimerSaving(false) }
   }
 
   const adjustTimer = (deltaMinutes: number) => {
-    if (!settings) return
+    if (!currentBoard) return
     const delta = deltaMinutes * 60
-    if (isTimerRunning && settings.timer_end_at) {
-      updateSettings({ timer_end_at: new Date(new Date(settings.timer_end_at).getTime() + delta * 1000).toISOString() })
+    if (isTimerRunning && currentBoard.timer_end_at) {
+      updateBoardSettings({ timer_end_at: new Date(new Date(currentBoard.timer_end_at).getTime() + delta * 1000).toISOString() })
     } else {
-      updateSettings({ timer_seconds: Math.max(0, settings.timer_seconds + delta) })
+      updateBoardSettings({ timer_seconds: Math.max(0, (currentBoard.timer_seconds ?? 0) + delta) })
     }
   }
 
@@ -1026,25 +1029,25 @@ export function BingoDashAdmin() {
     if (isNaN(mins) || mins < 0) return
     const seconds = Math.round(mins * 60)
     if (isTimerRunning) {
-      updateSettings({ timer_end_at: new Date(Date.now() + seconds * 1000).toISOString(), timer_seconds: seconds })
+      updateBoardSettings({ timer_end_at: new Date(Date.now() + seconds * 1000).toISOString(), timer_seconds: seconds })
     } else {
-      updateSettings({ timer_seconds: seconds })
+      updateBoardSettings({ timer_seconds: seconds })
     }
     setTimerMinutesInput('')
   }
 
   const startTimer = () => {
-    if (!settings?.timer_seconds) return
-    updateSettings({ timer_end_at: new Date(Date.now() + settings.timer_seconds * 1000).toISOString() })
+    if (!currentBoard?.timer_seconds) return
+    updateBoardSettings({ timer_end_at: new Date(Date.now() + currentBoard.timer_seconds * 1000).toISOString() })
   }
 
   const pauseTimer = () => {
-    if (!settings?.timer_end_at) return
-    const remaining = Math.max(0, Math.round((new Date(settings.timer_end_at).getTime() - Date.now()) / 1000))
-    updateSettings({ timer_seconds: remaining, timer_end_at: null })
+    if (!currentBoard?.timer_end_at) return
+    const remaining = Math.max(0, Math.round((new Date(currentBoard.timer_end_at).getTime() - Date.now()) / 1000))
+    updateBoardSettings({ timer_seconds: remaining, timer_end_at: null })
   }
 
-  const resetTimer = () => updateSettings({ timer_end_at: null })
+  const resetTimer = () => updateBoardSettings({ timer_end_at: null })
 
   // ── Board grid actions ─────────────────────────────────────────────────────
   // Grid membership lives in bingo_board_cards: one placement row per
@@ -1869,20 +1872,20 @@ export function BingoDashAdmin() {
                 style={{
                   fontSize: 'clamp(3.5rem, 10vw, 6rem)',
                   color: isTimerRunning
-                    ? (settings?.timer_end_at && (new Date(settings.timer_end_at).getTime() - Date.now()) < 120_000 ? '#f87171' : '#4ade80')
+                    ? (currentBoard?.timer_end_at && (new Date(currentBoard.timer_end_at).getTime() - Date.now()) < 120_000 ? '#f87171' : '#4ade80')
                     : '#ffffff',
                 }}
               >
                 {timerDisplay}
               </div>
               <div className={`text-sm font-bold mt-2 tracking-wider uppercase ${isTimerRunning ? 'text-green-400' : 'text-gray-500'}`}>
-                {isTimerRunning ? '● Running' : (settings?.timer_seconds ?? 0) > 0 ? '■ Paused / Stopped' : '■ Not set'}
+                {isTimerRunning ? '● Running' : (currentBoard?.timer_seconds ?? 0) > 0 ? '■ Paused / Stopped' : '■ Not set'}
               </div>
             </div>
 
             <div className="flex gap-2 justify-center mb-5">
               {!isTimerRunning ? (
-                <button onClick={startTimer} disabled={!settings?.timer_seconds || timerSaving}
+                <button onClick={startTimer} disabled={!currentBoard?.timer_seconds || timerSaving}
                   className="px-7 py-2.5 bg-green-500 text-white rounded-xl font-bold hover:bg-green-400 disabled:opacity-40 transition-colors">
                   ▶ Start
                 </button>
@@ -1935,15 +1938,15 @@ export function BingoDashAdmin() {
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">Time's-Up Alarm</h3>
                   <p className="text-xs text-gray-500 mt-0.5">Shown full-screen to all players when the timer reaches 0. Press <span className="font-bold">Reset</span> above to clear it.</p>
                 </div>
-                {settings?.timer_end_at && new Date(settings.timer_end_at).getTime() <= Date.now() && (
+                {currentBoard?.timer_end_at && new Date(currentBoard.timer_end_at).getTime() <= Date.now() && (
                   <span className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse">● Alarm live</span>
                 )}
               </div>
 
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Message</label>
               <textarea
-                value={settings?.time_up_message ?? ''}
-                onChange={e => setSettings(prev => prev ? { ...prev, time_up_message: e.target.value } : prev)}
+                value={currentBoard?.time_up_message ?? ''}
+                onChange={e => setSections(prev => prev.map(s => s.id === currentSectionId ? { ...s, time_up_message: e.target.value } : s))}
                 placeholder="Time's up! Please return to the meeting point."
                 rows={3}
                 className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500 resize-none"
@@ -1954,8 +1957,8 @@ export function BingoDashAdmin() {
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Location label</label>
                   <input
                     type="text"
-                    value={settings?.time_up_label ?? ''}
-                    onChange={e => setSettings(prev => prev ? { ...prev, time_up_label: e.target.value } : prev)}
+                    value={currentBoard?.time_up_label ?? ''}
+                    onChange={e => setSections(prev => prev.map(s => s.id === currentSectionId ? { ...s, time_up_label: e.target.value } : s))}
                     placeholder="e.g. Colmar Plaza"
                     className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500"
                   />
@@ -1964,8 +1967,8 @@ export function BingoDashAdmin() {
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Google Maps link</label>
                   <input
                     type="text"
-                    value={settings?.time_up_maps_url ?? ''}
-                    onChange={e => setSettings(prev => prev ? { ...prev, time_up_maps_url: e.target.value } : prev)}
+                    value={currentBoard?.time_up_maps_url ?? ''}
+                    onChange={e => setSections(prev => prev.map(s => s.id === currentSectionId ? { ...s, time_up_maps_url: e.target.value } : s))}
                     placeholder="https://maps.app.goo.gl/..."
                     className="w-full px-4 py-2.5 rounded-lg border border-white/15 bg-gray-950 text-white placeholder-gray-600 text-sm font-medium focus:outline-none focus:border-violet-500"
                   />
@@ -1975,11 +1978,11 @@ export function BingoDashAdmin() {
               <div className="mt-3 flex justify-end">
                 <button
                   onClick={() => {
-                    if (!settings) return
-                    updateSettings({
-                      time_up_message: settings.time_up_message ?? '',
-                      time_up_label: settings.time_up_label ?? '',
-                      time_up_maps_url: settings.time_up_maps_url ?? '',
+                    if (!currentBoard) return
+                    updateBoardSettings({
+                      time_up_message: currentBoard.time_up_message ?? '',
+                      time_up_label: currentBoard.time_up_label ?? '',
+                      time_up_maps_url: currentBoard.time_up_maps_url ?? '',
                     })
                   }}
                   disabled={timerSaving}
@@ -1995,19 +1998,19 @@ export function BingoDashAdmin() {
         {/* ── Marshal Password ──────────────────────────────────────────────── */}
         <section>
           <h2 className="text-xl font-bold text-white mb-2">Marshal Password</h2>
-          <p className="text-xs text-gray-500 mb-3">Participants must enter this password to complete challenges that have "Require Marshal" enabled.</p>
+          <p className="text-xs text-gray-500 mb-3">Participants on this board must enter this password to complete challenges that have "Require Marshal" enabled.</p>
           <div className="flex gap-2 items-center">
             <input
               type="text"
-              value={settings?.marshal_password ?? ''}
-              onChange={e => setSettings(prev => prev ? { ...prev, marshal_password: e.target.value } : prev)}
+              value={currentBoard?.marshal_password ?? ''}
+              onChange={e => setSections(prev => prev.map(s => s.id === currentSectionId ? { ...s, marshal_password: e.target.value } : s))}
               placeholder="Marshal password..."
               className="flex-1 px-4 py-2.5 rounded-lg border border-white/15 bg-gray-900 text-white placeholder-gray-600 text-sm font-mono font-bold focus:outline-none focus:border-violet-500"
             />
             <button
               onClick={() => {
-                if (!settings) return
-                updateSettings({ marshal_password: settings.marshal_password })
+                if (!currentBoard) return
+                updateBoardSettings({ marshal_password: currentBoard.marshal_password })
               }}
               className="px-5 py-2.5 rounded-lg text-sm font-bold text-white bg-violet-500 hover:bg-violet-600 transition-colors"
             >
@@ -2023,18 +2026,18 @@ export function BingoDashAdmin() {
             </div>
             <button
               onClick={() => {
-                if (!settings) return
-                updateSettings({ photo_submissions_enabled: !settings.photo_submissions_enabled })
+                if (!currentBoard) return
+                updateBoardSettings({ photo_submissions_enabled: !currentBoard.photo_submissions_enabled })
               }}
               role="switch"
-              aria-checked={settings?.photo_submissions_enabled ?? true}
+              aria-checked={currentBoard?.photo_submissions_enabled ?? true}
               className={`relative shrink-0 w-14 h-8 rounded-full transition-colors ${
-                settings?.photo_submissions_enabled ?? true ? 'bg-violet-500' : 'bg-gray-600'
+                currentBoard?.photo_submissions_enabled ?? true ? 'bg-violet-500' : 'bg-gray-600'
               }`}
             >
               <span
                 className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${
-                  settings?.photo_submissions_enabled ?? true ? 'translate-x-6' : 'translate-x-0'
+                  currentBoard?.photo_submissions_enabled ?? true ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>

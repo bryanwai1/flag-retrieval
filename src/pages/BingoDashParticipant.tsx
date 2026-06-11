@@ -128,8 +128,10 @@ export function BingoDashParticipant() {
     })
   }, [taskId])
 
-  // Load marshal password + photo-submissions toggle, subscribe to live changes
+  // Load the board's marshal password + photo-submissions toggle, subscribe to live changes
+  const sectionId = team?.section_id ?? null
   useEffect(() => {
+    if (isSnakeLadder || !sectionId) return
     const applySettings = (data: { marshal_password?: string | null; photo_submissions_enabled?: boolean | null } | null) => {
       if (!data) return
       if (typeof data.marshal_password === 'string') setMarshalPassword(data.marshal_password)
@@ -137,16 +139,16 @@ export function BingoDashParticipant() {
         setPhotoSubmissionsEnabled(data.photo_submissions_enabled)
       }
     }
-    supabase.from('bingo_settings').select('marshal_password, photo_submissions_enabled').eq('id', 'main').single()
+    supabase.from('bingo_sections').select('marshal_password, photo_submissions_enabled').eq('id', sectionId).single()
       .then(({ data }) => applySettings(data))
     const channel = supabase
-      .channel('bingo-settings-participant')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_settings', filter: 'id=eq.main' }, (payload) => {
+      .channel('bingo-section-participant')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `id=eq.${sectionId}` }, (payload) => {
         applySettings(payload.new as { marshal_password?: string | null; photo_submissions_enabled?: boolean | null })
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [isSnakeLadder, sectionId])
 
   // Snake & Ladder mode: load teams + board config
   useEffect(() => {
@@ -254,7 +256,7 @@ export function BingoDashParticipant() {
 
   // The bingo time-up alarm overlays every state below — only mounted in the
   // bingo flow so Snake & Ladder players are unaffected.
-  const timeUpOverlay = !isSnakeLadder ? <TimeUpAlarm /> : null
+  const timeUpOverlay = !isSnakeLadder ? <TimeUpAlarm sectionId={team?.section_id ?? null} /> : null
 
   // ── Loading ─────────────────────────────────────────────────────────
   if ((!isSnakeLadder && teamLoading) || !task) {

@@ -5,7 +5,7 @@ import { fetchBoardTasks } from '../lib/boardCards'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
-import type { BingoTask, BingoScan, BingoSettings, BingoTeam } from '../types/database'
+import type { BingoTask, BingoScan, BingoSection, BingoTeam, BoardTimer } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
@@ -351,7 +351,7 @@ function BingoPopup({ letters, onDismiss }: { letters: string; onDismiss: () => 
 
 // ── Timer display ─────────────────────────────────────────────────────────────
 
-function TimerDisplay({ settings }: { settings: BingoSettings | null }) {
+function TimerDisplay({ settings }: { settings: BoardTimer | null }) {
   const [display, setDisplay] = useState('00:00')
   const [isRunning, setIsRunning] = useState(false)
   const [isLow, setIsLow] = useState(false)
@@ -403,7 +403,7 @@ function BoardScreen({
   team: { id: string; name: string }
   gridTasks: BingoTask[]
   scans: BingoScan[]
-  settings: BingoSettings | null
+  settings: BoardTimer | null
   boardNote: string
   boardNoteEvery: number
   onLeave: () => void
@@ -665,17 +665,16 @@ export function BingoDashHome() {
   const { team, loading: teamLoading, isRegistered, joinTeamById, leaveTeam } = useBingoDashTeam()
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [scans, setScans] = useState<BingoScan[]>([])
-  const [settings, setSettings] = useState<BingoSettings | null>(null)
+  const [section, setSection] = useState<BingoSection | null>(null)
   const [sectionId, setSectionId] = useState<string | null>(null)
   const [boardNote, setBoardNote] = useState('')
   const [boardNoteEvery, setBoardNoteEvery] = useState(0)
   const [dataLoading, setDataLoading] = useState(true)
 
-  // Load grid tasks for the active section + timer settings
+  // Load grid tasks + the active section (timer/alarm settings live on it)
   useEffect(() => {
-    supabase.from('bingo_settings').select('*').eq('id', 'main').single()
+    supabase.from('bingo_settings').select('active_section_id').eq('id', 'main').single()
       .then(async ({ data: settingsData }) => {
-        if (settingsData) setSettings(settingsData)
         const sectionId = settingsData?.active_section_id
         if (!sectionId) { setGridTasks([]); setDataLoading(false); return }
         setSectionId(sectionId)
@@ -683,10 +682,11 @@ export function BingoDashHome() {
         setGridTasks(taskData)
         const { data: sectionData } = await supabase
           .from('bingo_sections')
-          .select('board_note, board_note_every')
+          .select('*')
           .eq('id', sectionId)
           .single()
         if (sectionData) {
+          setSection(sectionData)
           setBoardNote(sectionData.board_note ?? '')
           setBoardNoteEvery(sectionData.board_note_every ?? 0)
         }
@@ -694,13 +694,14 @@ export function BingoDashHome() {
       })
   }, [])
 
-  // Live: board note updates from the admin
+  // Live: section updates from the admin (timer, alarm, board note)
   useEffect(() => {
     if (!sectionId) return
     const channel = supabase
       .channel(`bingo-home-section-${sectionId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `id=eq.${sectionId}` }, ({ new: updated }) => {
-        const sec = updated as { board_note?: string; board_note_every?: number }
+        const sec = updated as BingoSection
+        setSection(prev => prev ? { ...prev, ...sec } : sec)
         setBoardNote(sec.board_note ?? '')
         setBoardNoteEvery(sec.board_note_every ?? 0)
       })
@@ -738,18 +739,6 @@ export function BingoDashHome() {
     return () => { supabase.removeChannel(channel) }
   }, [team])
 
-  // Live: timer settings updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('bingo-home-settings')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_settings' }, () => {
-        supabase.from('bingo_settings').select('*').eq('id', 'main').single()
-          .then(({ data }) => { if (data) setSettings(data) })
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
   if (teamLoading || dataLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -762,7 +751,7 @@ export function BingoDashHome() {
     return (
       <>
         <JoinScreen onJoin={async (teamId, pwd) => { await joinTeamById(teamId, pwd) }} />
-        <TimeUpAlarm settings={settings} />
+        <TimeUpAlarm settings={section} />
       </>
     )
   }
@@ -773,12 +762,12 @@ export function BingoDashHome() {
         team={team!}
         gridTasks={gridTasks}
         scans={scans}
-        settings={settings}
+        settings={section}
         boardNote={boardNote}
         boardNoteEvery={boardNoteEvery}
         onLeave={leaveTeam}
       />
-      <TimeUpAlarm settings={settings} />
+      <TimeUpAlarm settings={section} />
     </>
   )
 }
