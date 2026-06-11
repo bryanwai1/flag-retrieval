@@ -8,7 +8,7 @@ import type { BingoSection } from '../types/database'
 
 /**
  * BINGO DASH — Participant briefing deck.
- * HSBC-branded opener + dark holding slide + content slides + Observer QR closer.
+ * Opener + dark holding slide + how-to-play content slides + Observer QR closer.
  * Route: /bingo-dash/slides/briefing                       (section picker)
  *        /bingo-dash/slides/briefing/:sectionSlug          (deck for that section)
  */
@@ -64,22 +64,22 @@ function SectionPicker() {
                 opacity: 0,
                 animationFillMode: 'forwards',
                 background: 'rgba(255,255,255,0.04)',
-                border: `2px solid ${isActive ? '#DB0011' : '#a855f733'}`,
-                boxShadow: isActive ? '0 0 32px rgba(219,0,17,0.25)' : 'none',
+                border: `2px solid ${isActive ? '#a855f7' : '#a855f733'}`,
+                boxShadow: isActive ? '0 0 32px rgba(168,85,247,0.25)' : 'none',
               }}
             >
-              <div className="text-6xl animate-float" style={{ filter: isActive ? 'drop-shadow(0 0 20px #DB0011aa)' : 'none' }}>
+              <div className="text-6xl animate-float" style={{ filter: isActive ? 'drop-shadow(0 0 20px #a855f7aa)' : 'none' }}>
                 📣
               </div>
               <div className="text-center w-full">
                 <h2 className="text-xl font-black text-white tracking-tight">{s.name}</h2>
                 {isActive && (
-                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#ff5b66' }}>
+                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#c084fc' }}>
                     ● Active now
                   </span>
                 )}
               </div>
-              <div className="w-full py-3 rounded-xl text-center text-sm font-black tracking-wider" style={{ background: '#DB0011', color: '#fff' }}>
+              <div className="w-full py-3 rounded-xl text-center text-sm font-black tracking-wider" style={{ background: '#a855f7', color: '#fff' }}>
                 ▶ RUN BRIEFING
               </div>
             </button>
@@ -103,8 +103,6 @@ type SlideKind =
   | 'how-to-submit'
   | 'preview-clue'
   | 'safety'
-  | 'weather'
-  | 'hsbc-acronym'
   | 'qr-wish'
 
 const SLIDES: SlideKind[] = [
@@ -119,8 +117,6 @@ const SLIDES: SlideKind[] = [
   'how-to-submit',
   'preview-clue',
   'safety',
-  'weather',
-  'hsbc-acronym',
   'qr-wish',
 ]
 
@@ -169,10 +165,10 @@ function BriefingShow({ sectionSlug }: { sectionSlug: string }) {
     )
   }
 
-  const isHsbcSlide = kind === 'main' || kind === 'qr-wish'
-  const slideStyle = isHsbcSlide
+  const isAccentSlide = kind === 'main' || kind === 'qr-wish'
+  const slideStyle = isAccentSlide
     ? {
-        background: 'linear-gradient(135deg, #DB0011 0%, #8B0009 100%)',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #3b0764 100%)',
         fontFamily: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`,
       }
     : {
@@ -186,7 +182,7 @@ function BriefingShow({ sectionSlug }: { sectionSlug: string }) {
       onClick={() => setSlideIdx(i => Math.min(totalSlides - 1, i + 1))}
       style={slideStyle}
     >
-      <SlideRenderer key={safeIdx} kind={kind} slideIdx={safeIdx} sectionSlug={sectionSlug} sectionName={section.name} />
+      <SlideRenderer key={safeIdx} kind={kind} slideIdx={safeIdx} sectionSlug={sectionSlug} sectionName={section.name} timerSeconds={section.timer_seconds ?? 0} />
 
       {/* Top nav */}
       <div className="absolute top-5 left-6 right-6 flex items-center justify-between text-[11px] text-white/60 font-semibold uppercase tracking-[0.25em] z-40">
@@ -213,8 +209,8 @@ function BriefingShow({ sectionSlug }: { sectionSlug: string }) {
             key={i}
             className="w-2 h-2 rounded-full transition-all"
             style={{
-              background: i <= safeIdx ? (isHsbcSlide ? '#fff' : '#fbbf24') : 'rgba(255,255,255,0.18)',
-              boxShadow: i === safeIdx ? `0 0 10px ${isHsbcSlide ? '#fff' : '#fbbf24'}` : 'none',
+              background: i <= safeIdx ? (isAccentSlide ? '#fff' : '#fbbf24') : 'rgba(255,255,255,0.18)',
+              boxShadow: i === safeIdx ? `0 0 10px ${isAccentSlide ? '#fff' : '#fbbf24'}` : 'none',
               transform: i === safeIdx ? 'scale(1.4)' : 'scale(1)',
             }}
           />
@@ -240,29 +236,27 @@ function BriefingShow({ sectionSlug }: { sectionSlug: string }) {
 }
 
 // ── Slide router ─────────────────────────────────────────────────────────
-function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName }: {
-  kind: SlideKind; slideIdx: number; sectionSlug: string; sectionName: string
+function SlideRenderer({ kind, slideIdx, sectionSlug, sectionName, timerSeconds }: {
+  kind: SlideKind; slideIdx: number; sectionSlug: string; sectionName: string; timerSeconds: number
 }) {
   switch (kind) {
-    case 'main':           return <MainSlide slideIdx={slideIdx} />
+    case 'main':           return <MainSlide slideIdx={slideIdx} sectionName={sectionName} />
     case 'holding':        return <HoldingSlide slideIdx={slideIdx} />
     case 'step1-roam':     return <Step1RoamSlide slideIdx={slideIdx} />
     case 'step2-card':     return <Step2CardSlide slideIdx={slideIdx} />
     case 'step3-bingo':    return <Step3BingoSlide slideIdx={slideIdx} />
-    case 'step4-time':     return <Step4TimeSlide slideIdx={slideIdx} />
+    case 'step4-time':     return <Step4TimeSlide slideIdx={slideIdx} timerSeconds={timerSeconds} />
     case 'roles':          return <RolesSlide slideIdx={slideIdx} />
     case 'submissions':    return <SubmissionTypesSlide slideIdx={slideIdx} />
     case 'how-to-submit':  return <HowToSubmitSlide slideIdx={slideIdx} />
     case 'preview-clue':   return <PreviewClueSlide slideIdx={slideIdx} />
     case 'safety':         return <SafetySlide slideIdx={slideIdx} />
-    case 'weather':        return <WeatherSlide slideIdx={slideIdx} />
-    case 'hsbc-acronym':   return <HsbcAcronymSlide slideIdx={slideIdx} />
     case 'qr-wish':        return <QrWishSlide slideIdx={slideIdx} sectionSlug={sectionSlug} sectionName={sectionName} />
   }
 }
 
-// ── 1. Main slide (HSBC red opener) ──────────────────────────────────────
-function MainSlide({ slideIdx }: { slideIdx: number }) {
+// ── 1. Main slide (opener) ───────────────────────────────────────────────
+function MainSlide({ slideIdx, sectionName }: { slideIdx: number; sectionName: string }) {
   return (
     <div key={slideIdx} className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 award-slide-enter">
       {/* Soft animated blobs */}
@@ -277,8 +271,11 @@ function MainSlide({ slideIdx }: { slideIdx: number }) {
         filter: 'blur(48px)', animation: 'medal-pulse 8s ease-in-out 1s infinite',
       }} />
 
-      <div className="relative z-10 mb-6" style={{ animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both' }}>
-        <HsbcHexagon size={110} />
+      <div className="relative z-10 mb-6 text-8xl" style={{
+        animation: 'pop-bounce-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both',
+        filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.55))',
+      }}>
+        🎯
       </div>
 
       <h1 className="relative z-10 font-black leading-[0.92] text-white" style={{
@@ -287,7 +284,7 @@ function MainSlide({ slideIdx }: { slideIdx: number }) {
         textShadow: '0 4px 30px rgba(0,0,0,0.45)',
         animation: 'title-slam 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both',
       }}>
-        HSBC KL<br />EXPLORACE 2026
+        BINGO DASH
       </h1>
 
       <p className="relative z-10 mt-6 text-white/95 font-black uppercase" style={{
@@ -295,7 +292,7 @@ function MainSlide({ slideIdx }: { slideIdx: number }) {
         letterSpacing: '0.35em',
         animation: 'slide-up-fade 0.7s ease-out 0.85s both',
       }}>
-        Bingo Dash
+        {sectionName}
       </p>
 
       <div className="relative z-10 mt-6 mx-auto" style={{
@@ -327,7 +324,7 @@ function HoldingSlide({ slideIdx }: { slideIdx: number }) {
 
       <p className="relative z-10 text-[11px] sm:text-xs font-bold uppercase tracking-[0.5em] text-amber-200/80"
          style={{ animation: 'slide-down-fade 0.55s ease-out 0.15s both' }}>
-        Welcome, Explorers
+        Welcome, Players
       </p>
 
       <h1 className="relative z-10 mt-3 font-black leading-none animate-gold-title" style={{
@@ -582,8 +579,13 @@ function Step3BingoSlide({ slideIdx }: { slideIdx: number }) {
   )
 }
 
-// ── Step 4 · Beat the clock (240 mins · ends 1:30 PM · lunch L16) ────────
-function Step4TimeSlide({ slideIdx }: { slideIdx: number }) {
+// ── Step 4 · Beat the clock (duration comes from the board's own timer) ──
+function Step4TimeSlide({ slideIdx, timerSeconds }: { slideIdx: number; timerSeconds: number }) {
+  const minutes = Math.max(1, Math.round(timerSeconds / 60))
+  const hours = minutes / 60
+  const durationLabel = Number.isInteger(hours)
+    ? `${hours} ${hours === 1 ? 'hour' : 'hours'} · one shot`
+    : 'One shot · no extensions'
   return (
     <ContentShell slideIdx={slideIdx} pretitle="Step 4" title="Beat the Clock" beam="#fda4af">
       <div className="relative z-10 flex flex-col items-center gap-8 max-w-5xl w-full mx-auto">
@@ -600,14 +602,14 @@ function Step4TimeSlide({ slideIdx }: { slideIdx: number }) {
                  textShadow: '0 4px 24px rgba(252,165,165,0.55)',
                  letterSpacing: '0.02em',
                }}>
-              240<span className="text-amber-300 ml-3" style={{ fontSize: '0.4em', verticalAlign: 'middle' }}>MIN</span>
+              {minutes}<span className="text-amber-300 ml-3" style={{ fontSize: '0.4em', verticalAlign: 'middle' }}>MIN</span>
             </p>
             <p className="text-amber-200/85 text-base sm:text-lg font-black uppercase tracking-[0.3em] mt-1"
-               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>4 hours · one shot</p>
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{durationLabel}</p>
           </div>
         </div>
 
-        {/* End time + lunch */}
+        {/* What happens at zero */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
           <div className="p-7 rounded-3xl border-2 text-center"
                style={{
@@ -617,10 +619,10 @@ function Step4TimeSlide({ slideIdx }: { slideIdx: number }) {
                  animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.7s both',
                }}>
             <p className="text-red-200 text-xs sm:text-sm font-black uppercase tracking-[0.4em] mb-3"
-               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>🛑 Hard stop</p>
-            <p className="font-black text-white tabular-nums leading-none"
-               style={{ fontSize: 'clamp(3rem, 9vw, 6rem)', textShadow: '0 4px 24px rgba(239,68,68,0.55)' }}>
-              1:30 PM
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>🛑 At zero</p>
+            <p className="font-black text-white leading-none"
+               style={{ fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', textShadow: '0 4px 24px rgba(239,68,68,0.55)' }}>
+              Board Locks
             </p>
             <p className="text-white/70 text-sm sm:text-base mt-3"
                style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -636,14 +638,14 @@ function Step4TimeSlide({ slideIdx }: { slideIdx: number }) {
                  animation: 'pop-bounce-in 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.85s both',
                }}>
             <p className="text-amber-200 text-xs sm:text-sm font-black uppercase tracking-[0.4em] mb-3"
-               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>🍱 Then</p>
+               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>📣 Then</p>
             <p className="font-black text-white leading-none"
                style={{ fontSize: 'clamp(2.4rem, 7vw, 4.5rem)', textShadow: '0 4px 24px rgba(251,191,36,0.55)' }}>
-              Level 16
+              Regroup
             </p>
             <p className="text-white/70 text-sm sm:text-base mt-3"
                style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-              Lunch is provided — head straight up after time's up.
+              A Time's Up alert appears in-app — follow it back to the meeting point.
             </p>
           </div>
         </div>
@@ -683,8 +685,8 @@ function RolesSlide({ slideIdx }: { slideIdx: number }) {
     {
       icon: '🎯',
       title: 'Player',
-      colour: '#DB0011',
-      ringColour: '#fca5a5',
+      colour: '#a855f7',
+      ringColour: '#d8b4fe',
       body: [
         'Joins a team of up to 4',
         'Enters the team\'s 4-digit password',
@@ -701,7 +703,7 @@ function RolesSlide({ slideIdx }: { slideIdx: number }) {
         'Scans the Observer QR — no password',
         'Browses the live board read-only',
         'Cannot submit, scan, or complete',
-        'Great for HSBC guests & sponsors',
+        'Great for guests & facilitators',
       ],
     },
   ]
@@ -1079,14 +1081,13 @@ function SafetySlide({ slideIdx }: { slideIdx: number }) {
   const rules = [
     { icon: '🚦', text: 'Cross roads only at marked crossings.' },
     { icon: '👫', text: 'Stay together — no teammate left behind.' },
-    { icon: '💧', text: 'Hydrate often. KL heat is no joke.' },
+    { icon: '💧', text: 'Hydrate often. The heat is no joke.' },
     { icon: '🚫', text: 'Respect locals, signage, and private property.' },
     { icon: '📱', text: 'Keep your phone charged — it\'s your bingo card.' },
   ]
   const contacts = [
     { name: 'Bryan Ng',  phone: '012-661 1043', role: 'Facilitator' },
     { name: 'Susan Yap', phone: '012-370 3732', role: 'InStep' },
-    { name: 'Ariel Lai', phone: '016-939 1957', role: 'HSBC' },
   ]
   return (
     <ContentShell slideIdx={slideIdx} pretitle="Stay Safe Out There" title="Safety First" beam="#fca5a5">
@@ -1155,165 +1156,7 @@ function SafetySlide({ slideIdx }: { slideIdx: number }) {
   )
 }
 
-// ── 8a. Weather report · animated video drop-in ──────────────────────────
-function WeatherSlide({ slideIdx }: { slideIdx: number }) {
-  return (
-    <ContentShell slideIdx={slideIdx} pretitle="One last thing" title="KL Weather Today" beam="#7dd3fc">
-      <div
-        className="relative z-10 mx-auto"
-        onClick={e => e.stopPropagation()}
-        style={{
-          animation: 'pop-bounce-in 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.4s both',
-        }}
-      >
-        {/* Glow halo behind the video */}
-        <div
-          className="absolute -inset-6 rounded-[2rem] pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle, rgba(125,211,252,0.45) 0%, transparent 70%)',
-            filter: 'blur(28px)',
-            animation: 'medal-pulse 4s ease-in-out infinite',
-          }}
-        />
-
-        <div
-          className="relative rounded-3xl overflow-hidden border-2"
-          style={{
-            borderColor: 'rgba(125,211,252,0.55)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 0 48px rgba(125,211,252,0.35)',
-            background: '#000',
-          }}
-        >
-          <video
-            src="/weather.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="block"
-            style={{
-              width: 'min(78vw, 920px)',
-              maxHeight: '68vh',
-              height: 'auto',
-              objectFit: 'contain',
-              background: '#000',
-            }}
-          />
-        </div>
-      </div>
-
-      <p
-        className="relative z-10 mt-6 text-sky-200/90 text-sm sm:text-base font-bold uppercase tracking-[0.3em]"
-        style={{
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          animation: 'slide-up-fade 0.7s ease-out 1.1s both',
-        }}
-      >
-        ☀️ Dress smart · Stay hydrated · Bring a poncho
-      </p>
-    </ContentShell>
-  )
-}
-
-// ── 8b. HSBC, decoded · click-to-reveal acronym ──────────────────────────
-function HsbcAcronymSlide({ slideIdx }: { slideIdx: number }) {
-  const items = [
-    { letter: 'H', word: 'Hen',  chinese: '很',       tint: '#fbbf24' },
-    { letter: 'S', word: 'Shi',  chinese: '湿 / 晒',  tint: '#f97316' },
-    { letter: 'B', word: 'But',  chinese: '',         tint: '#ef4444' },
-    { letter: 'C', word: 'Can',  chinese: '',         tint: '#dc2626' },
-  ]
-  const [revealed, setRevealed] = useState(0)
-  const allShown = revealed >= items.length
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (!allShown) {
-      e.stopPropagation()
-      setRevealed(r => Math.min(items.length, r + 1))
-    }
-  }
-
-  return (
-    <ContentShell slideIdx={slideIdx} pretitle="And finally…" title="HSBC, Decoded" beam="#fcd34d">
-      <div
-        className="relative z-10 flex flex-col gap-4 max-w-3xl w-full mx-auto"
-        onClick={handleClick}
-        style={{ cursor: allShown ? 'pointer' : 'pointer' }}
-      >
-        {items.map((it, i) => {
-          const isVisible = i < revealed
-          return (
-            <div
-              key={it.letter}
-              className="flex items-center gap-6 sm:gap-8 px-6 py-5 rounded-2xl border-2 text-left"
-              style={{
-                borderColor: isVisible ? `${it.tint}88` : 'rgba(255,255,255,0.08)',
-                background: isVisible
-                  ? `linear-gradient(160deg, ${it.tint}33 0%, rgba(0,0,0,0.45) 100%)`
-                  : 'rgba(255,255,255,0.03)',
-                boxShadow: isVisible ? `0 0 32px ${it.tint}44` : 'none',
-                opacity: isVisible ? 1 : 0.18,
-                transition: 'opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
-                animation: isVisible
-                  ? 'pop-bounce-in 0.55s cubic-bezier(0.34,1.56,0.64,1) both'
-                  : undefined,
-              }}
-            >
-              <span
-                className="font-black tabular-nums flex-shrink-0"
-                style={{
-                  fontSize: 'clamp(3rem, 7vw, 5.5rem)',
-                  color: isVisible ? it.tint : 'rgba(255,255,255,0.18)',
-                  textShadow: isVisible ? `0 0 22px ${it.tint}aa` : 'none',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  lineHeight: 1,
-                  width: '1.1em',
-                  textAlign: 'center',
-                }}
-              >
-                {it.letter}
-              </span>
-              <div className="flex-1">
-                <p
-                  className="text-white font-black leading-tight"
-                  style={{
-                    fontSize: 'clamp(1.8rem, 4vw, 3rem)',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    visibility: isVisible ? 'visible' : 'hidden',
-                  }}
-                >
-                  {it.word}
-                </p>
-                {it.chinese && (
-                  <p
-                    className="text-amber-200 font-bold leading-tight mt-1"
-                    style={{
-                      fontSize: 'clamp(1.4rem, 3vw, 2.2rem)',
-                      visibility: isVisible ? 'visible' : 'hidden',
-                    }}
-                  >
-                    {it.chinese}
-                  </p>
-                )}
-              </div>
-            </div>
-          )
-        })}
-
-        <p
-          className="text-white/60 text-xs sm:text-sm uppercase tracking-[0.35em] mt-3 font-bold text-center"
-          style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
-        >
-          {allShown
-            ? '✓ All revealed · tap to continue'
-            : `▶ Tap to reveal · ${revealed} / ${items.length}`}
-        </p>
-      </div>
-    </ContentShell>
-  )
-}
-
-// ── 9. QR + safety wish (HSBC red closer) ────────────────────────────────
+// ── 9. QR + safety wish (closer) ─────────────────────────────────────────
 function QrWishSlide({ slideIdx, sectionSlug, sectionName }: {
   slideIdx: number; sectionSlug: string; sectionName: string
 }) {
@@ -1375,7 +1218,7 @@ function QrWishSlide({ slideIdx, sectionSlug, sectionName }: {
       <p className="relative z-10 mt-3 text-white/85 text-sm sm:text-base font-light italic max-w-2xl"
          style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
                   animation: 'slide-up-fade 0.7s ease-out 1.35s both' }}>
-        From all of us at HSBC — wishing you a memorable, safe, and winning Explorace.
+        Wishing you a memorable, safe, and winning game of Bingo Dash.
       </p>
     </div>
   )
@@ -1416,20 +1259,3 @@ function ContentShell({ slideIdx, pretitle, title, beam, children }: {
   )
 }
 
-// ── HSBC hexagon mark ────────────────────────────────────────────────────
-function HsbcHexagon({ size }: { size: number }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 260 140"
-      style={{ width: size, height: 'auto', filter: 'drop-shadow(0 6px 22px rgba(0,0,0,0.55))' }}
-    >
-      <polygon points="0,70 65,0 65,140" fill="#fff" />
-      <polygon points="260,70 195,0 195,140" fill="#fff" />
-      <polygon points="65,0 130,70 195,0" fill="#fff" />
-      <polygon points="65,140 130,70 195,140" fill="#fff" />
-      <polygon points="65,0 130,70 65,140" fill="rgba(200,0,12,.7)" />
-      <polygon points="195,0 130,70 195,140" fill="rgba(200,0,12,.7)" />
-    </svg>
-  )
-}
