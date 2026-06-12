@@ -128,6 +128,14 @@ function BriefingShow({ sectionSlug }: { sectionSlug: string }) {
   useEffect(() => {
     supabase.from('bingo_sections').select('*').eq('slug', sectionSlug).maybeSingle()
       .then(({ data }) => { setSection(data ?? null); setLoaded(true) })
+    // Live-sync board edits (timer, name, …) made in admin while the deck is open
+    const channel = supabase
+      .channel(`bingo-briefing-${sectionSlug}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_sections', filter: `slug=eq.${sectionSlug}` }, ({ new: row }) => {
+        setSection(row as BingoSection)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   }, [sectionSlug])
 
   const totalSlides = SLIDES.length
