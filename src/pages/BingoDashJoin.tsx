@@ -218,7 +218,7 @@ function JoinScreen({
             disabled={submitting}
           />
 
-          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+          <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
             {filteredGroups.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-6">
                 {search ? 'No groups match your search.' : 'No groups available yet.'}

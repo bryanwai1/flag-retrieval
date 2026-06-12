@@ -87,7 +87,7 @@ export function BingoDashRegistration({ onRegister, hexCode, taskTitle }: BingoD
                 {teams.length === 0 ? 'No teams registered yet.' : 'No teams match your search.'}
               </div>
             ) : (
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
                 {filtered.map(team => (
                   <button
                     key={team.id}

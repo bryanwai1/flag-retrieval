@@ -114,7 +114,7 @@ function JoinScreen({ onJoin }: { onJoin: (teamId: string, password: string) => 
             autoFocus
           />
 
-          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+          <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
             {groupsLoading ? (
               <p className="text-gray-400 text-sm text-center py-6">Loading groups...</p>
             ) : filteredGroups.length === 0 ? (
