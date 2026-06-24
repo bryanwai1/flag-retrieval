@@ -35,21 +35,26 @@ export function useCurrentTeam() {
       } catch { /* ignore */ }
     }
 
-    // Validate in background — update cache if changed, clear if team deleted
+    // Validate in background — update cache if changed, clear ONLY if the server
+    // confirms the team is gone (query succeeded, zero rows). A transient error
+    // (network blip / 5xx / RLS) returns an error with null data; in that case keep
+    // the cached session so a momentary failure doesn't force a needless re-login.
     supabase
       .from('teams')
       .select('*')
       .eq('id', teamId)
-      .single()
-      .then(({ data }) => {
+      .maybeSingle()
+      .then(({ data, error }) => {
         if (data) {
           setTeam(data)
           localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(data))
-        } else {
+        } else if (!error) {
+          // Confirmed: the team no longer exists.
           localStorage.removeItem(TEAM_ID_KEY)
           localStorage.removeItem(TEAM_DATA_KEY)
           setTeam(null)
         }
+        // else: transient error — keep the cached session untouched.
         if (!cached) setLoading(false)
       })
   }, [])

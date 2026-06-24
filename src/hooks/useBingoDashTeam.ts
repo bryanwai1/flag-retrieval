@@ -21,21 +21,27 @@ export function useBingoDashTeam() {
       try { setTeam(JSON.parse(cached)); setLoading(false) } catch { /* ignore */ }
     }
 
-    // Validate in background
+    // Validate in background. IMPORTANT: only clear the saved session when the
+    // server *confirms* the team is gone (query succeeded, zero rows). A network
+    // blip / 5xx / RLS hiccup returns an error with null data — in that case keep
+    // the cached session so a momentary failure doesn't kick a registered player
+    // back to the join screen (which led to duplicate sign-ups).
     supabase
       .from('bingo_teams')
       .select('*')
       .eq('id', teamId)
-      .single()
-      .then(({ data }) => {
+      .maybeSingle()
+      .then(({ data, error }) => {
         if (data) {
           setTeam(data)
           localStorage.setItem(TEAM_DATA_KEY, JSON.stringify(data))
-        } else {
+        } else if (!error) {
+          // Confirmed: the team no longer exists.
           localStorage.removeItem(TEAM_ID_KEY)
           localStorage.removeItem(TEAM_DATA_KEY)
           setTeam(null)
         }
+        // else: transient error — keep the cached session untouched.
         if (!cached) setLoading(false)
       })
   }, [])

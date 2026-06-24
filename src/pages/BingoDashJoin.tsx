@@ -771,14 +771,21 @@ export function BingoDashJoin() {
         // Drop any stale observer session so they aren't silently kept in observer mode
         // — that would make every task QR they scan show "Observer Mode".
         if (!isObserver && cachedRole === 'observer') {
+          // Stale observer session for this board: the user now wants to PLAY, so
+          // clear this board's observer cache (they must re-pick a team + password —
+          // observers never had one). Only clear the SHARED global keys if they too
+          // belong to an observer session; otherwise leave a real player session
+          // (e.g. for another board) intact instead of wiping it.
           localStorage.removeItem(MEMBER_ID_KEY(sectionSlug))
           localStorage.removeItem(MEMBER_DATA_KEY(sectionSlug))
           localStorage.removeItem(TEAM_ID_KEY(sectionSlug))
           localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
           localStorage.removeItem(MEMBER_ROLE_KEY(sectionSlug))
-          localStorage.removeItem(GLOBAL_TEAM_ID_KEY)
-          localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
-          localStorage.removeItem(GLOBAL_MEMBER_ROLE_KEY)
+          if (localStorage.getItem(GLOBAL_MEMBER_ROLE_KEY) === 'observer') {
+            localStorage.removeItem(GLOBAL_TEAM_ID_KEY)
+            localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
+            localStorage.removeItem(GLOBAL_MEMBER_ROLE_KEY)
+          }
           setPageState('join')
         } else if (cachedMemberId && cachedTeamId && cachedTeamData) {
           try {
@@ -789,20 +796,26 @@ export function BingoDashJoin() {
             localStorage.setItem(GLOBAL_TEAM_ID_KEY, cachedTeamId)
             localStorage.setItem(GLOBAL_TEAM_DATA_KEY, cachedTeamData)
             localStorage.setItem(GLOBAL_MEMBER_ROLE_KEY, cachedRole)
-            // Validate team still exists in background
-            supabase.from('bingo_teams').select('*').eq('id', cachedTeamId).single().then(({ data: t }) => {
+            // Validate team still exists in background. Only drop the saved session
+            // when the server *confirms* the team is gone (query succeeded, zero rows).
+            // A transient error (network blip / 5xx / RLS) returns an error with null
+            // data — keep the cached session so it doesn't force a needless re-join
+            // (which led to duplicate sign-ups).
+            supabase.from('bingo_teams').select('*').eq('id', cachedTeamId).maybeSingle().then(({ data: t, error }) => {
               if (t) {
                 setTeam(t)
                 const json = JSON.stringify(t)
                 localStorage.setItem(TEAM_DATA_KEY(sectionSlug), json)
                 localStorage.setItem(GLOBAL_TEAM_DATA_KEY, json)
               }
-              else {
+              else if (!error) {
+                // Confirmed: the team no longer exists.
                 localStorage.removeItem(MEMBER_ID_KEY(sectionSlug)); localStorage.removeItem(MEMBER_DATA_KEY(sectionSlug))
                 localStorage.removeItem(TEAM_ID_KEY(sectionSlug)); localStorage.removeItem(TEAM_DATA_KEY(sectionSlug))
                 localStorage.removeItem(GLOBAL_TEAM_ID_KEY); localStorage.removeItem(GLOBAL_TEAM_DATA_KEY)
                 setTeam(null); setPageState('join')
               }
+              // else: transient error — keep showing the board with cached data.
             })
           } catch { setPageState('join') }
         } else {
@@ -938,13 +951,18 @@ export function BingoDashJoin() {
       }
     }
 
-    // Look up existing member for this section
-    const { data: existing } = await supabase
+    // Look up existing member for this section (case-insensitive). Take the
+    // earliest row rather than erroring on legacy duplicates — .maybeSingle()
+    // throws when >1 row exists, which used to fall through to the insert path
+    // below and compound the duplication.
+    const { data: existingRows } = await supabase
       .from('bingo_members')
       .select('*')
       .eq('section_id', section.id)
       .ilike('name', memberName)
-      .maybeSingle()
+      .order('created_at', { ascending: true })
+      .limit(1)
+    const existing = existingRows?.[0] ?? null
 
     // Enforce 4-member cap only for non-observer joiners (don't block a returning member on their own team)
     const isReturningSameTeam = existing?.team_id === teamId
@@ -972,8 +990,29 @@ export function BingoDashJoin() {
         .insert({ name: memberName, password, team_id: teamId, section_id: section.id, role })
         .select()
         .single()
-      if (error) throw error
-      member = created
+      if (error) {
+        // 23505 = unique violation: another device/tab registered this name first
+        // (enforced by the bingo_members (section_id, lower(name)) unique index).
+        // Re-fetch that row and update it instead of creating a duplicate.
+        if (error.code === '23505') {
+          const { data: raced } = await supabase
+            .from('bingo_members')
+            .select('*')
+            .eq('section_id', section.id)
+            .ilike('name', memberName)
+            .order('created_at', { ascending: true })
+            .limit(1)
+          const existingRaced = raced?.[0]
+          if (!existingRaced) throw error
+          await supabase.from('bingo_members')
+            .update({ team_id: teamId, password, role }).eq('id', existingRaced.id)
+          member = { ...existingRaced, team_id: teamId, password, role }
+        } else {
+          throw error
+        }
+      } else {
+        member = created
+      }
     }
 
     const liveTeamJson = JSON.stringify(liveTeam)
