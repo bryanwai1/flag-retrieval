@@ -339,13 +339,14 @@ function BingoTile({
         <div className="absolute top-1.5 right-1.5 z-10 w-2.5 h-2.5 rounded-full border-2 border-white/80" />
       )}
 
-      <div className="relative z-0 px-2 py-2 text-center flex flex-col items-center gap-1">
-        <p className="text-white/70 text-[9px] font-black uppercase tracking-widest leading-none">{task.color}</p>
-        <h3 className="text-white font-black text-[11px] leading-tight line-clamp-3">{task.title}</h3>
+      <div className="relative z-0 w-full px-1 text-center flex flex-col items-center gap-0.5">
+        <p className="w-full text-white/55 text-[7px] font-bold uppercase tracking-tight leading-tight line-clamp-1">{task.color}</p>
+        <h3 className="w-full text-white font-black text-[10px] leading-[1.15] line-clamp-2 px-0.5">{task.title}</h3>
       </div>
 
+      {/* Points chip — top-left corner, clear of the title and the top-right scanned ring */}
       {(task.points ?? 0) > 0 && (
-        <div className="absolute bottom-1 right-1 z-10 bg-black/40 text-white text-[8px] font-black rounded px-1 leading-tight">
+        <div className="absolute top-1 left-1 z-10 bg-black/45 text-white/90 text-[8px] font-black rounded px-1 leading-tight">
           {task.points}
         </div>
       )}
