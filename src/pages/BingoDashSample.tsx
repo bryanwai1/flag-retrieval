@@ -75,7 +75,6 @@ function DemoBar({
   sections,
   selectedId,
   onSelect,
-  teamName,
   marshalPassword,
   onReset,
   onQuickWin,
@@ -84,7 +83,6 @@ function DemoBar({
   sections: BingoSection[]
   selectedId: string | null
   onSelect: (id: string) => void
-  teamName: string | null
   marshalPassword: string
   onReset: () => void
   onQuickWin: () => void
@@ -92,69 +90,59 @@ function DemoBar({
 }) {
   return (
     <div className="sticky top-0 z-40 w-full bg-gray-950/95 backdrop-blur border-b border-purple-500/30">
-      <div className="max-w-5xl mx-auto px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-purple-500 text-black text-xs font-black tracking-wider">
-            🎬 SAMPLE BINGO
+      <div className="max-w-5xl mx-auto px-2.5 py-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+        {/* Row 1: badge + board picker (picker fills the row on mobile) */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex-shrink-0 px-2 py-1 rounded-lg bg-purple-500 text-black text-[11px] font-black tracking-wider whitespace-nowrap">
+            🎬 SAMPLE
           </span>
-          <span className="hidden sm:inline text-[11px] text-gray-400 font-semibold">
-            Demo mode · nothing is saved
-          </span>
-        </div>
-
-        <label className="flex items-center gap-2 text-xs">
-          <span className="text-gray-400 font-bold uppercase tracking-wider">Board</span>
           <select
             value={selectedId ?? ''}
             onChange={e => onSelect(e.target.value)}
-            className="bg-white/10 text-white font-bold rounded-lg px-2.5 py-1.5 border border-white/15 focus:outline-none focus:border-purple-400 max-w-[12rem]"
+            aria-label="Choose board"
+            className="flex-1 min-w-0 sm:flex-none sm:max-w-[12rem] bg-white/10 text-white text-xs font-bold rounded-lg px-2.5 py-2 border border-white/15 focus:outline-none focus:border-purple-400"
           >
             {sections.length === 0 && <option value="">No boards found</option>}
             {sections.map(s => (
               <option key={s.id} value={s.id} className="bg-gray-900">{s.name}</option>
             ))}
           </select>
-        </label>
-
-        {/* Cheat sheet so the presenter knows the demo passwords */}
-        <div className="flex items-center gap-2 text-[11px] font-bold">
-          <span className="px-2 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
-            🔑 Login pw: <span className="text-purple-300">{SAMPLE_TEAM_PASSWORD}</span>
-          </span>
-          <span className="px-2 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10">
-            👮 Marshal pw: <span className="text-yellow-300">{marshalPassword}</span>
-          </span>
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
-          {showQuickWin && (
+        {/* Row 2: password cheat-sheet pills + actions (icon-only on phones) */}
+        <div className="flex items-center gap-1.5 sm:ml-auto">
+          <span className="flex-shrink-0 px-2 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10 text-[11px] font-bold whitespace-nowrap">
+            🔑 <span className="text-purple-300">{SAMPLE_TEAM_PASSWORD}</span>
+          </span>
+          <span className="flex-shrink-0 px-2 py-1 rounded-lg bg-white/5 text-gray-300 border border-white/10 text-[11px] font-bold whitespace-nowrap">
+            👮 <span className="text-yellow-300">{marshalPassword}</span>
+          </span>
+          <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+            {showQuickWin && (
+              <button
+                onClick={onQuickWin}
+                title="Quick BINGO — instantly complete one line"
+                className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-yellow-400/20 text-yellow-200 border border-yellow-400/40 text-xs font-black hover:bg-yellow-400/30 transition-colors whitespace-nowrap"
+              >
+                ⚡<span className="hidden sm:inline"> BINGO</span>
+              </button>
+            )}
             <button
-              onClick={onQuickWin}
-              className="px-2.5 py-1.5 rounded-lg bg-yellow-400/20 text-yellow-200 border border-yellow-400/40 text-xs font-black hover:bg-yellow-400/30 transition-colors"
-              title="Instantly complete one line to show the BINGO celebration"
+              onClick={onReset}
+              title="Reset demo"
+              className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors whitespace-nowrap"
             >
-              ⚡ Quick BINGO
+              ↺<span className="hidden sm:inline"> Reset</span>
             </button>
-          )}
-          <button
-            onClick={onReset}
-            className="px-2.5 py-1.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors"
-          >
-            ↺ Reset
-          </button>
-          <Link
-            to="/"
-            className="px-2.5 py-1.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors"
-          >
-            ← Hub
-          </Link>
-        </div>
-
-        {teamName && (
-          <div className="w-full sm:hidden text-[11px] text-gray-500">
-            Playing as <span className="text-purple-300 font-bold">{teamName}</span>
+            <Link
+              to="/"
+              title="Back to Game Hub"
+              className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors whitespace-nowrap"
+            >
+              ←<span className="hidden sm:inline"> Hub</span>
+            </Link>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -1185,7 +1173,6 @@ export function BingoDashSample() {
         sections={sections}
         selectedId={selectedId}
         onSelect={handleSelectBoard}
-        teamName={teamName}
         marshalPassword={marshalPassword}
         onReset={handleReset}
         onQuickWin={handleQuickWin}
