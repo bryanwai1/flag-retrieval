@@ -14,6 +14,7 @@ function formatTime(totalSeconds: number): string {
 type Row = {
   team: BingoTeam
   points: number
+  bonus: number
   bingos: number
   tasksDone: number
 }
@@ -27,6 +28,7 @@ export function BingoDashProjector() {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [timerDisplay, setTimerDisplay] = useState('00:00')
   const [timerRunning, setTimerRunning] = useState(false)
+  const [showBonus, setShowBonus] = useState(false)
 
   // Initial load
   useEffect(() => {
@@ -120,11 +122,14 @@ export function BingoDashProjector() {
     )
     const bingos = completedBingoLines(slots, completedIds).length
     const tasksDone = completedIds.size
-    return { team, points, bingos, tasksDone }
+    const bonus = team.bonus_points ?? 0
+    return { team, points, bonus, bingos, tasksDone }
   })
 
+  // When the "Total after Bonus" view is on, rank by Bingo points + manual bonus points.
+  const scoreOf = (r: Row) => showBonus ? r.points + r.bonus : r.points
   rows.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points
+    if (scoreOf(b) !== scoreOf(a)) return scoreOf(b) - scoreOf(a)
     if (b.bingos !== a.bingos) return b.bingos - a.bingos
     return b.tasksDone - a.tasksDone
   })
@@ -159,6 +164,16 @@ export function BingoDashProjector() {
               </div>
             )}
             <p className="text-gray-500 text-sm font-bold">{sectionTeams.length} teams competing</p>
+            <button
+              onClick={() => setShowBonus(v => !v)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all ${
+                showBonus
+                  ? 'bg-amber-400 text-gray-950 shadow-lg shadow-amber-500/30'
+                  : 'bg-white/10 text-amber-300 border border-amber-700/50 hover:bg-white/15'
+              }`}
+            >
+              {showBonus ? '✓ Total after Bonus' : '＋ Total after Bonus'}
+            </button>
           </div>
         </div>
       </header>
@@ -177,7 +192,7 @@ export function BingoDashProjector() {
               <div className="grid grid-cols-[80px_1fr_200px_200px_200px] gap-4 px-6 py-2 text-gray-500 text-xs font-black uppercase tracking-widest">
                 <div>Rank</div>
                 <div>Team</div>
-                <div className="text-center">Points</div>
+                <div className="text-center">{showBonus ? 'Total (Bingo + Bonus)' : 'Points'}</div>
                 <div className="text-center">Bingo Lines</div>
                 <div className="text-center">Tasks Done</div>
               </div>
@@ -208,8 +223,18 @@ export function BingoDashProjector() {
                       <p className="text-white text-3xl font-black tracking-tight">{row.team.name}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-white text-5xl font-black tabular-nums">{row.points}</p>
-                      <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">pts</p>
+                      <p className="text-white text-5xl font-black tabular-nums">
+                        {showBonus ? row.points + row.bonus : row.points}
+                      </p>
+                      {showBonus ? (
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">
+                          <span className="text-violet-300">{row.points} bingo</span>
+                          <span className="text-gray-600"> + </span>
+                          <span className="text-amber-400">{row.bonus} bonus</span>
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">pts</p>
+                      )}
                     </div>
                     <div className="text-center">
                       <p className="text-amber-400 text-5xl font-black tabular-nums">
