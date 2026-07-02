@@ -89,6 +89,24 @@ export function useTeams(ownerValue: string | null = null) {
     return rows.length
   }, [fetchTeams, ownerValue])
 
+  // Complete reset: wipe ALL of this tenant's tribes plus their members and
+  // scans in one go. Children first — no ON DELETE CASCADE on team_id FKs.
+  const deleteAllTeams = useCallback(async () => {
+    let idQuery = supabase.from('teams').select('id')
+    idQuery = ownerValue === null ? idQuery.is('owner_id', null) : idQuery.eq('owner_id', ownerValue)
+    const { data: rows, error: idError } = await idQuery
+    if (idError) throw idError
+    const ids = (rows ?? []).map(r => r.id)
+    if (ids.length === 0) return
+    const { error: memberError } = await supabase.from('team_members').delete().in('team_id', ids)
+    if (memberError) throw memberError
+    const { error: scanError } = await supabase.from('team_scans').delete().in('team_id', ids)
+    if (scanError) throw scanError
+    const { error } = await supabase.from('teams').delete().in('id', ids)
+    if (error) throw error
+    await fetchTeams()
+  }, [fetchTeams, ownerValue])
+
   const deleteTeam = useCallback(async (id: string) => {
     setTeams(prev => prev.filter(t => t.id !== id))
     await supabase.from('team_members').delete().eq('team_id', id)
@@ -102,5 +120,5 @@ export function useTeams(ownerValue: string | null = null) {
     }
   }, [fetchTeams])
 
-  return { teams, loading, refetch: fetchTeams, createTeam, renameTeam, deleteTeam, seedDefaultTeams }
+  return { teams, loading, refetch: fetchTeams, createTeam, renameTeam, deleteTeam, deleteAllTeams, seedDefaultTeams }
 }

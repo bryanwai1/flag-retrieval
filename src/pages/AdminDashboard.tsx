@@ -22,7 +22,7 @@ export function AdminDashboard() {
   // Anonymous pages (projector, facilitator) resolve the tenant from this param.
   const tenantQS = ownerValue ? `?t=${ownerValue}` : ''
   const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks(ownerValue)
-  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, seedDefaultTeams } = useTeams(ownerValue)
+  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, deleteAllTeams, seedDefaultTeams } = useTeams(ownerValue)
 
   // On first load: if the admin has zero tribes, auto-seed "Group 1" .. "Group 17"
   // with random 4-digit codes. The seed only fires once per page load; admin can
@@ -129,6 +129,19 @@ export function AdminDashboard() {
               title="Delete all team scans"
             >
               Reset All Scores
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('COMPLETE RESET? This deletes ALL tribes, their members and every score, then re-creates fresh Group 1–17 with new join codes. Cards are kept.')) return
+                try {
+                  await deleteAllTeams()
+                  await seedDefaultTeams()
+                } catch (e) { alert(`Complete reset failed: ${(e as Error).message}`) }
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+              title="Delete all tribes, members and scores, then re-seed fresh default groups"
+            >
+              Complete Reset
             </button>
             <button
               onClick={() => {
