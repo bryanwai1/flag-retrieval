@@ -36,16 +36,36 @@ export function BingoAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     ;(async () => {
-      const { data } = await supabase.auth.getSession()
+      // getSession() can throw a transient Navigator LockManager error when
+      // another tab of the app steals the auth-token lock; retry, and always
+      // resolve the loading gate so the admin never hangs on "Loading...".
+      let initialSession: Session | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const { data } = await supabase.auth.getSession()
+          initialSession = data.session
+          break
+        } catch {
+          await new Promise((r) => setTimeout(r, 500))
+        }
+      }
       if (!active) return
-      setSession(data.session)
-      await loadAccount(data.session?.user.id)
-      setLoading(false)
+      setSession(initialSession)
+      try {
+        await loadAccount(initialSession?.user.id)
+      } catch {
+        // leave account null; RequireBingoAdmin will show the login gate
+      }
+      if (active) setLoading(false)
     })()
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
-      await loadAccount(newSession?.user.id)
+      try {
+        await loadAccount(newSession?.user.id)
+      } catch {
+        // transient fetch failure; keep previous account state
+      }
     })
     return () => { active = false; sub.subscription.unsubscribe() }
   }, [loadAccount])
