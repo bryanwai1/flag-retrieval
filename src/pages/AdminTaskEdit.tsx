@@ -13,10 +13,12 @@ import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { useTaskLinks } from '../hooks/useTaskLinks'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { PhotoGalleryView } from '../components/PhotoGalleryView'
+import { useBingoAuth } from '../hooks/useBingoAuth'
 import type { Task, TaskPage } from '../types/database'
 
 export function AdminTaskEdit() {
   const { taskId } = useParams<{ taskId: string }>()
+  const { account, isOwner } = useBingoAuth()
   const navigate = useNavigate()
   const [task, setTask] = useState<Task | null>(null)
   const [editingMeta, setEditingMeta] = useState(false)
@@ -54,6 +56,29 @@ export function AdminTaskEdit() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-400">Loading task...</p>
+      </div>
+    )
+  }
+
+  // Flag Retrieval cards belong to exactly one tenant — block cross-tenant
+  // access outright (RLS blocks the writes regardless).
+  const isMineTask = isOwner ? (task.owner_id ?? null) === null : task.owner_id === account?.id
+  if (!isMineTask) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl p-8 text-center">
+          <p className="text-3xl mb-3">🔒</p>
+          <h1 className="text-gray-900 font-black text-xl mb-2">Not your card</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            "{task.title}" belongs to another account, so it can't be edited here.
+          </p>
+          <button
+            onClick={() => navigate('/admin')}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+          >
+            ← Back to admin
+          </button>
+        </div>
       </div>
     )
   }

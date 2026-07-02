@@ -57,9 +57,10 @@ interface TemplateData {
 
 interface TemplateUploadProps {
   onComplete: () => void
+  ownerValue?: string | null
 }
 
-export function TemplateUpload({ onComplete }: TemplateUploadProps) {
+export function TemplateUpload({ onComplete, ownerValue = null }: TemplateUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [status, setStatus] = useState('')
   const [preview, setPreview] = useState<TemplateData | null>(null)
@@ -108,6 +109,7 @@ export function TemplateUpload({ onComplete }: TemplateUploadProps) {
             hex_code: task.hex_code,
             title: task.title,
             sort_order: task.sort_order,
+            owner_id: ownerValue,
           })
           .select()
           .single()

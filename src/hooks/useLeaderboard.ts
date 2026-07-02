@@ -9,16 +9,19 @@ export interface LeaderboardEntry {
   lastCompletedAt: string | null
 }
 
-export function useLeaderboard() {
+// Tenancy flows through the team: owner_id NULL = house event.
+export function useLeaderboard(ownerValue: string | null = null) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchLeaderboard = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
-    const { data } = await supabase
+    let query = supabase
       .from('team_scans')
-      .select('team_id, completed_at, teams(name), tasks(points)')
+      .select('team_id, completed_at, teams!inner(name, owner_id), tasks(points)')
       .eq('completed', true)
+    query = ownerValue === null ? query.is('teams.owner_id', null) : query.eq('teams.owner_id', ownerValue)
+    const { data } = await query
 
     const map = new Map<string, LeaderboardEntry>()
     for (const scan of data ?? []) {
@@ -41,7 +44,7 @@ export function useLeaderboard() {
     }
     setEntries(Array.from(map.values()))
     setLoading(false)
-  }, [])
+  }, [ownerValue])
 
   useEffect(() => {
     fetchLeaderboard()

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
@@ -20,6 +21,10 @@ type Row = {
 }
 
 export function BingoDashProjector() {
+  // Optional /bingo-dash/projector/:sectionSlug — pins the projector to one
+  // board (used by sub-account admins). Without it, falls back to the global
+  // active board (the owner's front door).
+  const { sectionSlug } = useParams<{ sectionSlug?: string }>()
   const [tasks, setTasks] = useState<BingoTask[]>([])
   const [boardCards, setBoardCards] = useState<BingoBoardCard[]>([])
   const [teams, setTeams] = useState<BingoTeam[]>([])
@@ -83,8 +88,9 @@ export function BingoDashProjector() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const activeSectionId = settings?.active_section_id ?? null
-  const activeSection = sections.find(s => s.id === activeSectionId) ?? null
+  const slugSection = sectionSlug ? sections.find(s => s.slug === sectionSlug) ?? null : null
+  const activeSectionId = slugSection?.id ?? (sectionSlug ? null : settings?.active_section_id ?? null)
+  const activeSection = slugSection ?? sections.find(s => s.id === activeSectionId) ?? null
 
   // Timer tick — driven by the active board's own timer
   useEffect(() => {

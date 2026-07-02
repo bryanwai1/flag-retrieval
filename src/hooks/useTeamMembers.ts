@@ -9,20 +9,30 @@ export interface TeamMember {
   joined_at: string
 }
 
-export function useTeamMembers() {
+// Members have no owner_id — tenancy flows through the team. Pass the scoped
+// team-id list (from useTeams) to only load this tenant's members; omit for the
+// legacy fetch-everything behaviour (anonymous pages).
+export function useTeamMembers(teamIds?: string[]) {
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Depend on the joined key, not the array identity — callers rebuild the
+  // array every render.
+  const teamKey = teamIds ? teamIds.join(',') : null
+
   const fetchMembers = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
-    const { data, error } = await supabase
-      .from('team_members')
-      .select('*')
-      .order('joined_at', { ascending: true })
+    let query = supabase.from('team_members').select('*')
+    if (teamKey !== null) {
+      const ids = teamKey ? teamKey.split(',') : []
+      if (ids.length === 0) { setMembers([]); setLoading(false); return }
+      query = query.in('team_id', ids)
+    }
+    const { data, error } = await query.order('joined_at', { ascending: true })
     if (error) console.error('useTeamMembers fetch failed:', error)
     if (data) setMembers(data)
     setLoading(false)
-  }, [])
+  }, [teamKey])
 
   useEffect(() => {
     fetchMembers()

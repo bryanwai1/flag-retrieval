@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBingoAuth } from '../hooks/useBingoAuth'
 import { useSetting } from '../hooks/useSettings'
 import { useTasks } from '../hooks/useTasks'
 import { useTeams } from '../hooks/useTeams'
@@ -15,8 +16,13 @@ import type { Task } from '../types/database'
 
 export function AdminDashboard() {
   const navigate = useNavigate()
-  const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks()
-  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, seedDefaultTeams } = useTeams()
+  const { account, isOwner, signOut } = useBingoAuth()
+  // Tenancy convention: owner_id NULL = house data; subs write their own uid.
+  const ownerValue = isOwner ? null : (account?.id ?? null)
+  // Anonymous pages (projector, facilitator) resolve the tenant from this param.
+  const tenantQS = ownerValue ? `?t=${ownerValue}` : ''
+  const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks(ownerValue)
+  const { teams, loading: teamsLoading, createTeam, renameTeam, deleteTeam, seedDefaultTeams } = useTeams(ownerValue)
 
   // On first load: if the admin has zero tribes, auto-seed "Group 1" .. "Group 17"
   // with random 4-digit codes. The seed only fires once per page load; admin can
@@ -28,8 +34,9 @@ export function AdminDashboard() {
     seededRef.current = true
     seedDefaultTeams()
   }, [teamsLoading, teams.length, seedDefaultTeams])
-  const { members, renameMember, removeMember, moveMember } = useTeamMembers()
-  const { scans, toggleComplete, resetTeamScans, resetAllScans } = useTeamScans()
+  const teamIds = useMemo(() => teams.map(t => t.id), [teams])
+  const { members, renameMember, removeMember, moveMember } = useTeamMembers(teamIds)
+  const { scans, toggleComplete, resetTeamScans, resetAllScans } = useTeamScans(teamIds)
   const [showForm, setShowForm] = useState(false)
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [editingTeamName, setEditingTeamName] = useState('')
@@ -44,10 +51,10 @@ export function AdminDashboard() {
   const [showUpload, setShowUpload] = useState(false)
   const [showConverter, setShowConverter] = useState(false)
   const [qrTask, setQrTask] = useState<Task | null>(null)
-  const [pointsSetting, setPointsSetting] = useSetting('points_enabled', 'false')
+  const [pointsSetting, setPointsSetting] = useSetting('points_enabled', 'false', ownerValue)
   const pointsEnabled = pointsSetting === 'true'
   const setPointsEnabled = (val: boolean) => setPointsSetting(String(val))
-  const [marshalPassword, setMarshalPassword] = useSetting('marshal_password', '1234')
+  const [marshalPassword, setMarshalPassword] = useSetting('marshal_password', '1234', ownerValue)
   const [marshalDraft, setMarshalDraft] = useState('')
   const [marshalSaved, setMarshalSaved] = useState(false)
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null)
@@ -132,12 +139,12 @@ export function AdminDashboard() {
               Points {pointsEnabled ? 'ON' : 'OFF'}
             </button>
             <div className="flex items-center rounded-lg overflow-hidden border border-gray-700">
-              <a href="/flag-retrieval" target="_blank" className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-700 text-sm transition-colors">
+              <a href={`/flag-retrieval${tenantQS}`} target="_blank" className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-700 text-sm transition-colors">
                 Facilitator View
               </a>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/flag-retrieval`)
+                  navigator.clipboard.writeText(`${window.location.origin}/flag-retrieval${tenantQS}`)
                   setCopiedFaciLink(true)
                   setTimeout(() => setCopiedFaciLink(false), 1500)
                 }}
@@ -147,9 +154,18 @@ export function AdminDashboard() {
                 {copiedFaciLink ? '✓' : '🔗'}
               </button>
             </div>
-            <a href="/projector" target="_blank" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors">
+            <a href={`/projector${tenantQS}`} target="_blank" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors">
               Projector View
             </a>
+            <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
+              <span className="text-xs text-gray-400 hidden md:inline" title="Signed in as">{account?.email}</span>
+              <button
+                onClick={() => signOut()}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -429,8 +445,8 @@ export function AdminDashboard() {
               {showUpload ? 'Hide' : 'Import JSON'}
             </button>
           </div>
-          {showConverter && <ActivityConverter onComplete={() => { refetch(); setShowConverter(false) }} existingTaskCount={tasks.length} />}
-          {showUpload && <TemplateUpload onComplete={() => { refetch(); setShowUpload(false) }} />}
+          {showConverter && <ActivityConverter onComplete={() => { refetch(); setShowConverter(false) }} existingTaskCount={tasks.length} ownerValue={ownerValue} />}
+          {showUpload && <TemplateUpload onComplete={() => { refetch(); setShowUpload(false) }} ownerValue={ownerValue} />}
         </section>
 
         {/* Task Cards — split into Live slot + Library */}

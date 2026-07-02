@@ -20,15 +20,17 @@ import type { Task } from '../types/database'
 
 export function ParticipantView() {
   const { taskId } = useParams<{ taskId: string }>()
-  const { team, memberName, loading: teamLoading, isRegistered, createTribe, joinTribe, searchTribes, leaveTribe } = useCurrentTeam()
+  const [task, setTask] = useState<Task | null>(null)
+  // The task row's owner_id IS the tenant: team registration, tribe search and
+  // the marshal password all resolve against the account that owns this card.
+  const { team, memberName, loading: teamLoading, isRegistered, createTribe, joinTribe, searchTribes, leaveTribe } = useCurrentTeam(task?.owner_id)
   const { pages, loading: pagesLoading } = useTaskPages(taskId)
   const { photos, loading: photosLoading } = useTaskPhotos(taskId)
   const { links } = useTaskLinks(taskId)
   const { recordScan, toggleComplete } = useTeamScans()
-  const [marshalPassword] = useSetting('marshal_password', '1234')
+  const [marshalPassword] = useSetting('marshal_password', '1234', task?.owner_id ?? null)
   const [marshalInput, setMarshalInput] = useState('')
   const [marshalError, setMarshalError] = useState('')
-  const [task, setTask] = useState<Task | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
   const [scanRecorded, setScanRecorded] = useState(false)
   const [showSplash, setShowSplash] = useState(true)

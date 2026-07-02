@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { supabase } from '../lib/supabase'
+import { useBingoAuth } from '../hooks/useBingoAuth'
 import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 
@@ -71,6 +72,18 @@ function formatTime(totalSeconds: number): string {
   const m = Math.floor(s / 60)
   const sec = s % 60
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
+// .in() filters with many ids can blow past URL limits — fetch in chunks.
+async function fetchInChunks<T>(table: string, column: string, ids: string[]): Promise<T[]> {
+  if (ids.length === 0) return []
+  const CHUNK = 150
+  const out: T[] = []
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { data } = await supabase.from(table).select('*').in(column, ids.slice(i, i + CHUNK))
+    if (data) out.push(...(data as T[]))
+  }
+  return out
 }
 
 // ── Import helpers ─────────────────────────────────────────────────────────────
@@ -430,6 +443,13 @@ const ADMIN_SECTION_KEY = 'bingo-dash-admin-section-id'
 // ── Main component ─────────────────────────────────────────────────────────────
 export function BingoDashAdmin() {
   const navigate = useNavigate()
+  const { account, isOwner, signOut } = useBingoAuth()
+  const uid = account?.id ?? null
+  // Tenancy convention: owner_id NULL = main-account (house) data, so the
+  // owner writes null and everyone else writes their own uid.
+  const myOwnerValue = isOwner ? null : uid
+  const isMineRow = (ownerId: string | null | undefined) =>
+    isOwner ? (ownerId ?? null) === null : ownerId === uid
   const [tasks, setTasks] = useState<BingoTask[]>([])
   const [boardCards, setBoardCards] = useState<BingoBoardCard[]>([])
   const [teams, setTeams] = useState<BingoTeam[]>([])
@@ -437,7 +457,15 @@ export function BingoDashAdmin() {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [categories, setCategories] = useState<BingoCategory[]>([])
   const [challengeSections, setChallengeSections] = useState<BingoChallengeSection[]>([])
-  const [currentSectionId, setCurrentSectionId] = useState<string | null>(() => localStorage.getItem(ADMIN_SECTION_KEY))
+  // Remembered board is namespaced per signed-in account so switching accounts
+  // on the same browser never inherits someone else's stale board id.
+  const sectionStorageKey = `${ADMIN_SECTION_KEY}:${uid ?? 'anon'}`
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(() => localStorage.getItem(sectionStorageKey))
+  // Per-account "live board" pointer (subs); the owner's pointer stays in the
+  // global bingo_settings row so the anonymous front-door pages keep working.
+  const [myActiveBoard, setMyActiveBoard] = useState<string | null>(account?.active_section_id ?? null)
+  // Owner-only: sub-account emails for the "Sub-account cards" library group.
+  const [accountEmails, setAccountEmails] = useState<Map<string, string>>(new Map())
   const [showSectionManager, setShowSectionManager] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
   const [showInlineBoardCreate, setShowInlineBoardCreate] = useState(false)
@@ -544,6 +572,12 @@ export function BingoDashAdmin() {
   const [libraryCompartmentFilter, setLibraryCompartmentFilter] = useState<'all' | string>('all')
 
   // ── Derived ────────────────────────────────────────────────────────────────
+  // Boards this account actually manages: house boards for the owner, own
+  // boards for subs. (For subs, `sections` also holds the owner's boards for
+  // library labels — those must never appear as manageable boards.)
+  const myBoards = sections.filter(s => isMineRow(s.owner_id))
+  // Which board is "live for players" from this account's point of view.
+  const activeBoardPointer = isOwner ? (settings?.active_section_id ?? null) : myActiveBoard
   const scopedTasks = currentSectionId ? tasks.filter(t => t.section_id === currentSectionId) : []
   const scopedTeams = currentSectionId
     ? teams.filter(t => t.section_id === currentSectionId).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
@@ -693,63 +727,132 @@ export function BingoDashAdmin() {
     return result
   })()
 
-  // Library: Compartment > Category > Cards (all sections)
+  // Library: Compartment > Category > Cards.
+  // "Mine" groups are this account's own compartments (editable). Foreign
+  // groups follow: subs see the main account's shared cards; the owner sees a
+  // "Sub-account cards" group per sub account. Foreign cards are read-only —
+  // placing one on a board creates an independent copy (copy-on-use).
   const groupedLibrary = (() => {
-    const sectionList = libraryCompartmentFilter === 'all'
-      ? sections
-      : sections.filter(s => s.id === libraryCompartmentFilter)
-    return sectionList.map(section => {
-      const sectionTasks = tasks.filter(t => t.section_id === section.id)
-      const byCategory = new Map<string, BingoTask[]>()
+    const byCategory = (list: BingoTask[]) => {
+      const map = new Map<string, BingoTask[]>()
       const uncategorized: BingoTask[] = []
-      for (const task of sectionTasks) {
+      for (const task of list) {
         if (!task.category) { uncategorized.push(task); continue }
-        if (!byCategory.has(task.category)) byCategory.set(task.category, [])
-        byCategory.get(task.category)!.push(task)
+        if (!map.has(task.category)) map.set(task.category, [])
+        map.get(task.category)!.push(task)
       }
-      const categories = [...byCategory.keys()].sort().map(cat => ({
-        label: cat, key: cat, tasks: byCategory.get(cat)!.sort((a, b) => a.title.localeCompare(b.title)),
+      const cats = [...map.keys()].sort().map(cat => ({
+        label: cat, key: cat, tasks: map.get(cat)!.sort((a, b) => a.title.localeCompare(b.title)),
       }))
-      if (uncategorized.length > 0) categories.push({ label: 'Uncategorized', key: '__none__', tasks: uncategorized })
-      return { section, categories, totalTasks: sectionTasks.length }
+      if (uncategorized.length > 0) cats.push({ label: 'Uncategorized', key: '__none__', tasks: uncategorized })
+      return cats
+    }
+
+    const mineSections = libraryCompartmentFilter === 'all'
+      ? myBoards
+      : myBoards.filter(s => s.id === libraryCompartmentFilter)
+    const groups = mineSections.map(section => {
+      const sectionTasks = tasks.filter(t => t.section_id === section.id && isMineRow(t.owner_id))
+      return { section: { id: section.id, name: section.name, foreign: false }, categories: byCategory(sectionTasks), totalTasks: sectionTasks.length }
     })
+
+    if (libraryCompartmentFilter !== 'all') return groups
+
+    if (isOwner) {
+      const byAccount = new Map<string, BingoTask[]>()
+      for (const t of tasks) {
+        if (!t.owner_id) continue
+        if (!byAccount.has(t.owner_id)) byAccount.set(t.owner_id, [])
+        byAccount.get(t.owner_id)!.push(t)
+      }
+      for (const [ownerId, list] of byAccount) {
+        groups.push({
+          section: { id: `sub:${ownerId}`, name: `Sub-account cards — ${accountEmails.get(ownerId) ?? ownerId.slice(0, 8)}`, foreign: true },
+          categories: byCategory(list),
+          totalTasks: list.length,
+        })
+      }
+    } else {
+      for (const section of sections.filter(s => s.owner_id === null)) {
+        const list = tasks.filter(t => t.section_id === section.id && t.owner_id === null)
+        if (list.length === 0) continue
+        groups.push({
+          section: { id: `house:${section.id}`, name: `Main library — ${section.name}`, foreign: true },
+          categories: byCategory(list),
+          totalTasks: list.length,
+        })
+      }
+    }
+    return groups
   })()
 
   // ── Data fetching ──────────────────────────────────────────────────────────
+  // Two-stage, tenancy-scoped fetch (hub model):
+  //  - owner: all sections + tasks (needs sub content for the shared library),
+  //    but gameplay data only for house boards
+  //  - sub: own sections + own tasks + the owner's shared (house) tasks;
+  //    gameplay data only for their own boards
   const fetchAll = useCallback(async () => {
-    const [tasksRes, boardCardsRes, teamsRes, scansRes, sectionsRes, categoriesRes, challengeSectionsRes, membersRes, subsRes] = await Promise.all([
-      supabase.from('bingo_tasks').select('*').order('sort_order'),
-      supabase.from('bingo_board_cards').select('*').order('slot'),
-      supabase.from('bingo_teams').select('*').order('created_at'),
-      supabase.from('bingo_scans').select('*'),
-      supabase.from('bingo_sections').select('*').order('sort_order'),
-      supabase.from('bingo_categories').select('*').order('sort_order'),
-      supabase.from('bingo_challenge_sections').select('*').order('sort_order'),
-      supabase.from('bingo_members').select('*').order('created_at'),
-      supabase.from('bingo_photo_submissions').select('*').order('created_at', { ascending: false }),
+    // Stage 1: boards + cards + per-board config
+    const orMine = `owner_id.eq.${uid},owner_id.is.null`
+    const [sectionsRes, tasksRes] = await Promise.all([
+      isOwner
+        ? supabase.from('bingo_sections').select('*').order('sort_order')
+        : supabase.from('bingo_sections').select('*').or(orMine).order('sort_order'),
+      isOwner
+        ? supabase.from('bingo_tasks').select('*').order('sort_order')
+        : supabase.from('bingo_tasks').select('*').or(orMine).order('sort_order'),
     ])
-    if (tasksRes.data) setTasks(tasksRes.data)
-    if (boardCardsRes.data) setBoardCards(boardCardsRes.data)
-    if (teamsRes.data) setTeams(teamsRes.data)
-    if (scansRes.data) setScans(scansRes.data)
-    if (sectionsRes.data) {
-      setSections(sectionsRes.data)
-      // Keep the remembered board if it still exists; otherwise fall back to the first
-      setCurrentSectionId(prev =>
-        prev && sectionsRes.data.some(s => s.id === prev) ? prev : sectionsRes.data[0]?.id ?? null
-      )
-    }
-    if (categoriesRes.data) setCategories(categoriesRes.data)
-    if (challengeSectionsRes.data) setChallengeSections(challengeSectionsRes.data)
-    if (membersRes.data) setMembers(membersRes.data)
-    if (subsRes.data) setPhotoSubmissions(subsRes.data)
+    const allSections = (sectionsRes.data ?? []) as BingoSection[]
+    const mineSections = allSections.filter(s => isOwner ? s.owner_id === null : s.owner_id === uid)
+    const mySectionIds = mineSections.map(s => s.id)
+
+    // Stage 2: everything keyed to my boards (teams first — scans/photo
+    // submissions have no section_id and hang off the team).
+    const [boardCardsData, teamsData, categoriesData, challengeSectionsData, accountsData] = await Promise.all([
+      isOwner
+        ? supabase.from('bingo_board_cards').select('*').order('slot').then(r => r.data ?? [])
+        : fetchInChunks<BingoBoardCard>('bingo_board_cards', 'section_id', mySectionIds),
+      fetchInChunks<BingoTeam>('bingo_teams', 'section_id', mySectionIds),
+      isOwner
+        ? supabase.from('bingo_categories').select('*').order('sort_order').then(r => r.data ?? [])
+        : fetchInChunks<BingoCategory>('bingo_categories', 'section_id', mySectionIds),
+      isOwner
+        ? supabase.from('bingo_challenge_sections').select('*').order('sort_order').then(r => r.data ?? [])
+        : fetchInChunks<BingoChallengeSection>('bingo_challenge_sections', 'game_section_id', mySectionIds),
+      isOwner
+        ? supabase.from('bingo_accounts').select('id, email').then(r => r.data ?? [])
+        : Promise.resolve([] as { id: string; email: string | null }[]),
+    ])
+    const myTeamIds = teamsData.map(t => t.id)
+    const [scansData, membersData, photoSubsData] = await Promise.all([
+      fetchInChunks<BingoScan>('bingo_scans', 'team_id', myTeamIds),
+      fetchInChunks<BingoMember>('bingo_members', 'section_id', mySectionIds),
+      fetchInChunks<BingoPhotoSubmission>('bingo_photo_submissions', 'team_id', myTeamIds),
+    ])
+
+    setSections(allSections)
+    setTasks((tasksRes.data ?? []) as BingoTask[])
+    setBoardCards(boardCardsData.sort((a, b) => a.slot - b.slot))
+    setTeams(teamsData.sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    setScans(scansData)
+    setCategories(categoriesData.sort((a, b) => a.sort_order - b.sort_order))
+    setChallengeSections(challengeSectionsData.sort((a, b) => a.sort_order - b.sort_order))
+    setMembers(membersData.sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    setPhotoSubmissions(photoSubsData.sort((a, b) => b.created_at.localeCompare(a.created_at)))
+    if (isOwner) setAccountEmails(new Map(accountsData.map(a => [a.id, a.email ?? a.id])))
+    // Keep the remembered board if it's still one of MINE; otherwise fall back
+    // to my first board (never someone else's).
+    setCurrentSectionId(prev =>
+      prev && mineSections.some(s => s.id === prev) ? prev : mineSections[0]?.id ?? null
+    )
     setLoading(false)
-  }, [])
+  }, [isOwner, uid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist the selected board so returning from Preview / task edit restores it
   useEffect(() => {
-    if (currentSectionId) localStorage.setItem(ADMIN_SECTION_KEY, currentSectionId)
-  }, [currentSectionId])
+    if (currentSectionId) localStorage.setItem(sectionStorageKey, currentSectionId)
+  }, [currentSectionId, sectionStorageKey])
 
   // ── Section CRUD ──────────────────────────────────────────────────────────
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -761,10 +864,18 @@ export function BingoDashAdmin() {
     let slug = baseSlug
     let i = 2
     while (sections.some(s => s.slug === slug)) { slug = `${baseSlug}-${i++}` }
-    const maxOrder = sections.reduce((m, s) => Math.max(m, s.sort_order), -1)
-    const { data, error } = await supabase.from('bingo_sections')
-      .insert({ name, slug, sort_order: maxOrder + 1 })
+    const maxOrder = myBoards.reduce((m, s) => Math.max(m, s.sort_order), -1)
+    let { data, error } = await supabase.from('bingo_sections')
+      .insert({ name, slug, sort_order: maxOrder + 1, owner_id: myOwnerValue })
       .select().single()
+    if (error) {
+      // Slugs are globally unique across accounts and other accounts' boards
+      // aren't visible here — retry once with a random suffix on collision.
+      const retry = await supabase.from('bingo_sections')
+        .insert({ name, slug: `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`, sort_order: maxOrder + 1, owner_id: myOwnerValue })
+        .select().single()
+      data = retry.data; error = retry.error
+    }
     if (error || !data) { alert('Failed to create section'); return }
     setSections(prev => [...prev, data])
     setCurrentSectionId(data.id)
@@ -782,7 +893,7 @@ export function BingoDashAdmin() {
   const deleteSection = async (id: string) => {
     const section = sections.find(s => s.id === id)
     if (!section) return
-    if (sections.length <= 1) { alert('Cannot delete the last section.'); return }
+    if (myBoards.length <= 1) { alert('Cannot delete the last section.'); return }
     const taskCount = tasks.filter(t => t.section_id === id).length
     const teamCount = teams.filter(t => t.section_id === id).length
     if (!confirm(`Delete "${section.name}"? This will remove ${taskCount} challenges and ${teamCount} teams.`)) return
@@ -912,9 +1023,14 @@ export function BingoDashAdmin() {
     await supabase.from('bingo_categories').update({ challenge_section_id: challengeSectionId }).eq('id', catId)
   }
 
+  // Per-account active board: the RPC validates ownership server-side and,
+  // only for the owner, also moves the global bingo_settings pointer that the
+  // anonymous front-door pages read. Subs never touch the global pointer.
   const setActiveSection = async (id: string) => {
-    setSettings(prev => prev ? { ...prev, active_section_id: id } : prev)
-    await supabase.from('bingo_settings').update({ active_section_id: id }).eq('id', 'main')
+    if (isOwner) setSettings(prev => prev ? { ...prev, active_section_id: id } : prev)
+    setMyActiveBoard(id)
+    const { error } = await supabase.rpc('set_active_board', { p_section: id })
+    if (error) alert('Failed to set the live board — has the accounts migration been run in Supabase?')
   }
 
   // Save the per-board note shown below the bingo board on the player page
@@ -929,14 +1045,16 @@ export function BingoDashAdmin() {
 
   const toggleSectionGameStarted = async (sectionId: string, started: boolean) => {
     if (started) {
-      // Lock every other board and make this one the live board for players
-      setSections(prev => prev.map(s => ({ ...s, game_started: s.id === sectionId })))
-      setSettings(prev => prev ? { ...prev, active_section_id: sectionId } : prev)
-      const otherIds = sections.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
+      // Lock every other board OF THIS ACCOUNT and make this one live for its
+      // players. Other accounts' boards are never touched.
+      setSections(prev => prev.map(s => isMineRow(s.owner_id) ? { ...s, game_started: s.id === sectionId } : s))
+      if (isOwner) setSettings(prev => prev ? { ...prev, active_section_id: sectionId } : prev)
+      setMyActiveBoard(sectionId)
+      const otherIds = myBoards.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
       await Promise.all([
         supabase.from('bingo_sections').update({ game_started: true }).eq('id', sectionId),
         otherIds.length > 0 ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds) : Promise.resolve(),
-        supabase.from('bingo_settings').update({ active_section_id: sectionId }).eq('id', 'main'),
+        supabase.rpc('set_active_board', { p_section: sectionId }),
       ])
     } else {
       setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: false } : s))
@@ -951,14 +1069,15 @@ export function BingoDashAdmin() {
 
   useEffect(() => { fetchAll(); fetchSettings() }, [fetchAll, fetchSettings])
 
-  // Real-time timer sync
+  // Real-time timer sync (global settings row — owner-only concern)
   useEffect(() => {
+    if (!isOwner) return
     const channel = supabase
       .channel('bingo-settings-admin')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_settings' }, fetchSettings)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [fetchSettings])
+  }, [fetchSettings, isOwner])
 
   // Real-time section game_started sync
   useEffect(() => {
@@ -971,12 +1090,18 @@ export function BingoDashAdmin() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Real-time photo submissions sync — without this, new uploads don't appear until the admin refreshes
+  // Real-time photo submissions sync — without this, new uploads don't appear until the admin refreshes.
+  // Realtime events arrive for EVERY account's submissions, so inserts are
+  // filtered to teams on this account's boards (updates/deletes merge by id,
+  // which is already scoped since state only ever holds this account's rows).
+  const myTeamIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => { myTeamIdsRef.current = new Set(teams.map(t => t.id)) }, [teams])
   useEffect(() => {
     const channel = supabase
       .channel('bingo-submissions-admin')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bingo_photo_submissions' }, ({ new: row }) => {
         const sub = row as BingoPhotoSubmission
+        if (!myTeamIdsRef.current.has(sub.team_id)) return
         setPhotoSubmissions(prev => prev.some(s => s.id === sub.id) ? prev : [sub, ...prev])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bingo_photo_submissions' }, ({ new: row }) => {
@@ -1077,17 +1202,74 @@ export function BingoDashAdmin() {
     await applySlots(slots)
   }
 
+  // Deep-copy a card (task + instruction pages + photos + links) into one of
+  // this account's compartments. Used for copy-on-use (placing another
+  // account's card) and for manual duplication.
+  const copyTaskFull = async (task: BingoTask, opts: { sectionId: string; title?: string; clonedFrom?: string | null }): Promise<BingoTask> => {
+    const [pagesRes, photosRes, linksRes] = await Promise.all([
+      supabase.from('bingo_task_pages').select('*').eq('task_id', task.id).order('page_order'),
+      supabase.from('bingo_task_photos').select('*').eq('task_id', task.id).order('photo_order'),
+      supabase.from('bingo_task_links').select('*').eq('task_id', task.id).order('sort_order'),
+    ])
+    const { data: created, error } = await supabase.from('bingo_tasks').insert({
+      section_id: opts.sectionId,
+      owner_id: myOwnerValue,
+      cloned_from: opts.clonedFrom !== undefined ? opts.clonedFrom : task.id,
+      title: opts.title ?? task.title,
+      color: task.color, hex_code: task.hex_code, category: task.category,
+      points: task.points, in_grid: false,
+      task_type: task.task_type,
+      answer_question: task.answer_question, answer_text: task.answer_text,
+      completion_warning: task.completion_warning, require_marshal: task.require_marshal,
+      maps_url: task.maps_url, maps_label: task.maps_label,
+      sort_order: Math.max(25, tasks.filter(t => t.section_id === opts.sectionId).length + 25),
+    }).select().single()
+    if (error || !created) throw new Error(error?.message ?? 'Failed to copy card')
+    const reparent = <T extends { id: string; task_id: string; created_at: string }>(rows: T[]) =>
+      rows.map(({ id, task_id, created_at, ...rest }) => {
+        void id; void task_id; void created_at
+        return { ...rest, task_id: created.id }
+      })
+    await Promise.all([
+      pagesRes.data?.length ? supabase.from('bingo_task_pages').insert(reparent(pagesRes.data)) : Promise.resolve(),
+      photosRes.data?.length ? supabase.from('bingo_task_photos').insert(reparent(photosRes.data)) : Promise.resolve(),
+      linksRes.data?.length ? supabase.from('bingo_task_links').insert(reparent(linksRes.data)) : Promise.resolve(),
+    ])
+    setTasks(prev => [...prev, created])
+    return created as BingoTask
+  }
+
+  // Copy-on-use: placing another account's card never places the original —
+  // it places (and if needed first creates) this account's own copy, so the
+  // card owner editing or deleting theirs can never touch a live board here.
+  const resolveOwnTaskForPlacement = async (taskId: string): Promise<string | null> => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || isMineRow(task.owner_id)) return taskId
+    const existing = tasks.find(t => t.cloned_from === task.id && isMineRow(t.owner_id))
+    if (existing) return existing.id
+    if (!currentSectionId) return null
+    try {
+      const copy = await copyTaskFull(task, { sectionId: currentSectionId })
+      return copy.id
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to copy card')
+      return null
+    }
+  }
+
   // Place a card at the exact slot the user chose. If that slot is taken,
   // fall back to the first empty slot so we never silently overwrite.
   const insertIntoGrid = async (taskId: string, atIndex: number) => {
-    if (!currentSectionId || placedTaskIds.has(taskId)) return
+    if (!currentSectionId) return
+    const resolvedId = await resolveOwnTaskForPlacement(taskId)
+    if (!resolvedId || placedTaskIds.has(resolvedId)) return
     let target = atIndex
     if (target < 0 || target >= 25 || gridSlots[target] !== null) {
       target = gridSlots.findIndex(s => s === null)
       if (target === -1) return
     }
     const { data: created, error } = await supabase.from('bingo_board_cards')
-      .insert({ section_id: currentSectionId, task_id: taskId, slot: target })
+      .insert({ section_id: currentSectionId, task_id: resolvedId, slot: target })
       .select().single()
     if (error || !created) { alert('Failed to add card to board'); return }
     setBoardCards(prev => [...prev, created])
@@ -1185,26 +1367,13 @@ export function BingoDashAdmin() {
   }
 
   const duplicateTask = async (task: BingoTask) => {
-    const { data: taskPages } = await supabase
-      .from('bingo_task_pages').select('*').eq('task_id', task.id).order('page_order')
-    const { data: created, error } = await supabase.from('bingo_tasks').insert({
-      section_id: task.section_id,
-      title: `${task.title} (copy)`,
-      color: task.color, hex_code: task.hex_code, category: task.category,
-      points: task.points,
-      in_grid: false,
-      sort_order: Math.max(25, tasks.filter(t => t.section_id === task.section_id).length + 25),
-    }).select().single()
-    if (error || !created) { alert('Failed to duplicate'); return }
-    if (taskPages && taskPages.length > 0) {
-      const copies = taskPages.map(p => {
-        const { id, task_id, created_at, ...rest } = p
-        void id; void task_id; void created_at
-        return { ...rest, task_id: created.id }
-      })
-      await supabase.from('bingo_task_pages').insert(copies)
+    try {
+      // A manual duplicate is a fresh card, not copy-on-use lineage
+      // (clonedFrom null keeps it out of the "already copied" lookup).
+      await copyTaskFull(task, { sectionId: task.section_id, title: `${task.title} (copy)`, clonedFrom: null })
+    } catch {
+      alert('Failed to duplicate')
     }
-    setTasks(prev => [...prev, created])
   }
 
   const saveCategoryInline = async (taskId: string, categoryName: string) => {
@@ -1247,6 +1416,7 @@ export function BingoDashAdmin() {
       const nextOrder = Math.max(25, scopedTasks.length + 25)
       await supabase.from('bingo_tasks').insert({
         section_id: currentSectionId,
+        owner_id: myOwnerValue,
         title: formTitle.trim(), color: formColor.trim(), hex_code: formHex,
         category: formCategory.trim(), sort_order: nextOrder, points: formPoints,
         task_type: formTaskType,
@@ -1633,7 +1803,7 @@ export function BingoDashAdmin() {
         const row = importPreview[i]
         const { data: task, error: taskErr } = await supabase
           .from('bingo_tasks')
-          .insert({ section_id: currentSectionId, title: row.title, color: row.color, hex_code: row.hex_code, category: '', sort_order: startOrder + i * 10 })
+          .insert({ section_id: currentSectionId, owner_id: myOwnerValue, title: row.title, color: row.color, hex_code: row.hex_code, category: '', sort_order: startOrder + i * 10 })
           .select().single()
         if (taskErr) throw taskErr
         if (row.clues.length > 0) {
@@ -1692,7 +1862,7 @@ export function BingoDashAdmin() {
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-violet-400 border border-violet-800 hover:bg-violet-950/60 transition-colors">
               Player View ↗
             </a>
-            <a href="/bingo-dash/projector" target="_blank" rel="noopener noreferrer"
+            <a href={currentBoard ? `/bingo-dash/projector/${currentBoard.slug}` : '/bingo-dash/projector'} target="_blank" rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-400 border border-amber-800 hover:bg-amber-950/60 transition-colors">
               Scoreboard ↗
             </a>
@@ -1708,15 +1878,34 @@ export function BingoDashAdmin() {
             >
               Import
             </button>
+            {isOwner && (
+              <button
+                onClick={() => navigate('/bingo-dash/accounts')}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-sky-400 border border-sky-800 hover:bg-sky-950/60 transition-colors"
+              >
+                Accounts
+              </button>
+            )}
+            <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+              <span className="hidden md:block text-[11px] text-gray-500 max-w-[140px] truncate" title={account?.email ?? ''}>
+                {account?.email}
+              </span>
+              <button
+                onClick={signOut}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 border border-gray-700 hover:bg-white/5 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ── Board tab bar ─────────────────────────────────────────────────── */}
         <div className="max-w-6xl mx-auto px-6 py-2.5 flex items-center gap-1.5 overflow-x-auto border-t border-white/5">
           <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mr-2 flex-shrink-0">Boards</span>
-          {sections.map(s => {
+          {myBoards.map(s => {
             const isActive = currentSectionId === s.id
-            const isLive = settings?.active_section_id === s.id || s.game_started
+            const isLive = activeBoardPointer === s.id || s.game_started
             return (
               <button
                 key={s.id}
@@ -1756,7 +1945,7 @@ export function BingoDashAdmin() {
             </button>
           )}
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-            {currentSectionId && settings?.active_section_id === currentSectionId ? (
+            {currentSectionId && activeBoardPointer === currentSectionId ? (
               <span className="text-xs font-bold text-green-400 flex items-center gap-1.5 px-2.5 py-1.5 bg-green-950/50 border border-green-800 rounded-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" /> Live
               </span>
@@ -2296,16 +2485,16 @@ export function BingoDashAdmin() {
               onClick={() => setLibraryCompartmentFilter('all')}
               className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${libraryCompartmentFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
             >
-              All Compartments ({tasks.length})
+              All Compartments ({tasks.filter(t => isMineRow(t.owner_id)).length})
             </button>
-            {sections.map(s => (
+            {myBoards.map(s => (
               <button
                 key={s.id}
                 onClick={() => setLibraryCompartmentFilter(s.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${libraryCompartmentFilter === s.id ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               >
                 {s.name} ({tasks.filter(t => t.section_id === s.id).length})
-                {settings?.active_section_id === s.id && <span className="ml-1 text-green-400">●</span>}
+                {activeBoardPointer === s.id && <span className="ml-1 text-green-400">●</span>}
               </button>
             ))}
           </div>
@@ -2414,28 +2603,35 @@ export function BingoDashAdmin() {
                   <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center gap-2">
                       <h2 className="text-base font-black text-white uppercase tracking-wider">{section.name}</h2>
-                      {settings?.active_section_id === section.id && (
+                      {activeBoardPointer === section.id && (
                         <span className="text-[10px] font-black text-green-400 bg-green-950/60 border border-green-800 px-1.5 py-0.5 rounded uppercase">Live</span>
+                      )}
+                      {section.foreign && (
+                        <span className="text-[10px] font-black text-sky-400 bg-sky-950/60 border border-sky-800 px-1.5 py-0.5 rounded uppercase" title="Shared cards — adding one to your board creates your own independent copy">Shared</span>
                       )}
                     </div>
                     <span className="text-xs text-gray-500 font-medium">{totalTasks} cards</span>
                     <div className="flex-1 h-px bg-white/10" />
-                    <button
-                      onClick={() => setShowCategoryManager(showCategoryManager === section.id ? null : section.id)}
-                      className={`text-xs font-bold transition-colors flex-shrink-0 px-2 py-0.5 rounded ${
-                        showCategoryManager === section.id
-                          ? 'bg-violet-900/50 text-violet-400'
-                          : 'text-gray-500 hover:text-violet-400'
-                      }`}
-                    >
-                      Categories ({categories.filter(c => c.section_id === section.id).length})
-                    </button>
-                    <button
-                      onClick={() => { setCurrentSectionId(section.id); setActiveTab('board') }}
-                      className="text-xs text-violet-600 hover:text-violet-800 font-bold transition-colors flex-shrink-0"
-                    >
-                      Open Board →
-                    </button>
+                    {!section.foreign && (
+                      <>
+                        <button
+                          onClick={() => setShowCategoryManager(showCategoryManager === section.id ? null : section.id)}
+                          className={`text-xs font-bold transition-colors flex-shrink-0 px-2 py-0.5 rounded ${
+                            showCategoryManager === section.id
+                              ? 'bg-violet-900/50 text-violet-400'
+                              : 'text-gray-500 hover:text-violet-400'
+                          }`}
+                        >
+                          Categories ({categories.filter(c => c.section_id === section.id).length})
+                        </button>
+                        <button
+                          onClick={() => { setCurrentSectionId(section.id); setActiveTab('board') }}
+                          className="text-xs text-violet-600 hover:text-violet-800 font-bold transition-colors flex-shrink-0"
+                        >
+                          Open Board →
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Category manager panel */}
@@ -2529,7 +2725,11 @@ export function BingoDashAdmin() {
                                 <div className="px-4 pt-4 pb-3 flex-1">
                                   <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">{task.color}</p>
                                   <h3 className="text-white font-black text-lg leading-tight">{task.title}</h3>
-                                  {editingCategoryId === task.id ? (
+                                  {section.foreign ? (
+                                    task.category && (
+                                      <p className="mt-1.5 text-white/50 text-xs">📂 {task.category}</p>
+                                    )
+                                  ) : editingCategoryId === task.id ? (
                                     <select
                                       autoFocus
                                       defaultValue={task.category || ''}
@@ -2565,21 +2765,32 @@ export function BingoDashAdmin() {
                                       return n > 0 ? `✓ On ${n} board${n > 1 ? 's' : ''}` : 'Not on any board'
                                     })()}
                                   </p>
-                                  <button
-                                    onClick={async () => {
-                                      const newVal = !task.require_marshal
-                                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, require_marshal: newVal } : t))
-                                      await supabase.from('bingo_tasks').update({ require_marshal: newVal }).eq('id', task.id)
-                                    }}
-                                    className={`mt-1.5 text-xs font-bold px-2 py-0.5 rounded-full transition-colors ${
-                                      task.require_marshal
-                                        ? 'bg-yellow-400/30 text-yellow-200 hover:bg-yellow-400/50'
-                                        : 'bg-white/10 text-white/30 hover:bg-white/20'
-                                    }`}
-                                  >
-                                    {task.require_marshal ? '🔒 Marshal ON' : '🔓 Marshal OFF'}
-                                  </button>
+                                  {!section.foreign && (
+                                    <button
+                                      onClick={async () => {
+                                        const newVal = !task.require_marshal
+                                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, require_marshal: newVal } : t))
+                                        await supabase.from('bingo_tasks').update({ require_marshal: newVal }).eq('id', task.id)
+                                      }}
+                                      className={`mt-1.5 text-xs font-bold px-2 py-0.5 rounded-full transition-colors ${
+                                        task.require_marshal
+                                          ? 'bg-yellow-400/30 text-yellow-200 hover:bg-yellow-400/50'
+                                          : 'bg-white/10 text-white/30 hover:bg-white/20'
+                                      }`}
+                                    >
+                                      {task.require_marshal ? '🔒 Marshal ON' : '🔓 Marshal OFF'}
+                                    </button>
+                                  )}
                                 </div>
+                                {section.foreign ? (
+                                  <div className="px-3 pb-3">
+                                    <button onClick={() => addCardFromLibrary(task)}
+                                      className="w-full px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors"
+                                      title="Copies this card into your board — the original stays untouched">
+                                      + Add to board
+                                    </button>
+                                  </div>
+                                ) : (
                                 <div className="px-3 pb-3 flex flex-wrap gap-1.5">
                                   <button onClick={() => navigate(`/bingo-dash/admin/task/${task.id}`)}
                                     className="px-3 py-1.5 bg-white/20 rounded-lg text-white text-xs font-bold hover:bg-white/30 transition-colors">Edit</button>
@@ -2598,6 +2809,7 @@ export function BingoDashAdmin() {
                                   <button onClick={() => deleteTask(task.id, task.title)}
                                     className="px-3 py-1.5 bg-red-500/30 rounded-lg text-white text-xs font-bold hover:bg-red-500/50 transition-colors">Delete</button>
                                 </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -2950,7 +3162,7 @@ export function BingoDashAdmin() {
                 {/* Board header */}
                 <div className="flex items-center gap-3 mb-4">
                   <h2 className="text-base font-black text-white uppercase tracking-wider">{section.name}</h2>
-                  {settings?.active_section_id === section.id && (
+                  {activeBoardPointer === section.id && (
                     <span className="text-[10px] font-black text-green-400 bg-green-950/60 border border-green-800 px-1.5 py-0.5 rounded uppercase">Live</span>
                   )}
                   <span className="text-xs text-gray-500 font-medium">{sectionTeams.length} group{sectionTeams.length !== 1 ? 's' : ''}</span>
@@ -3161,7 +3373,7 @@ export function BingoDashAdmin() {
                                 onChange={e => moveTeamToSection(team.id, e.target.value)}
                                 className="px-2 py-1 rounded border border-white/15 text-xs bg-gray-800 text-gray-300 focus:outline-none focus:border-violet-500"
                               >
-                                {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {myBoards.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                               </select>
                             </td>
                             {/* Progress + Bingos */}
@@ -3537,7 +3749,7 @@ export function BingoDashAdmin() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
                 <select value={tileSectionId} onChange={e => setTileSectionId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-                  {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {myBoards.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 {editingTile && tileSectionId !== editingTile.section_id && (
                   <p className="text-xs text-amber-600 mt-1">Moving to a different section will take this card off the board.</p>
@@ -3742,7 +3954,7 @@ export function BingoDashAdmin() {
                 </button>
               </div>
               <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
-                {sections.map(s => {
+                {myBoards.map(s => {
                   const taskCount = tasks.filter(t => t.section_id === s.id).length
                   const teamCount = teams.filter(t => t.section_id === s.id).length
                   return (
@@ -3759,7 +3971,7 @@ export function BingoDashAdmin() {
                         <span className="text-xs text-gray-400 flex-shrink-0">{taskCount} cards · {teamCount} teams</span>
                         <button onClick={() => deleteSection(s.id)}
                           className="text-xs text-red-400 hover:text-red-600 px-1.5 py-1 flex-shrink-0 disabled:opacity-30"
-                          disabled={sections.length <= 1}>
+                          disabled={myBoards.length <= 1}>
                           Delete
                         </button>
                       </div>

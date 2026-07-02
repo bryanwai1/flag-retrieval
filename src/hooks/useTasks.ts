@@ -2,21 +2,23 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { Task } from '../types/database'
 
-export function useTasks() {
+// Tenancy convention: owner_id NULL = main-account (house) data. Pass the
+// signed-in sub-account's uid to scope everything to that tenant; the default
+// (null) keeps anonymous pages and the owner working against house data.
+export function useTasks(ownerValue: string | null = null) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchTasks = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
     try {
-      const { data } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('sort_order', { ascending: true })
+      let query = supabase.from('tasks').select('*')
+      query = ownerValue === null ? query.is('owner_id', null) : query.eq('owner_id', ownerValue)
+      const { data } = await query.order('sort_order', { ascending: true })
       if (data) setTasks(data)
     } catch { /* ignore */ }
     setLoading(false)
-  }, [])
+  }, [ownerValue])
 
   useEffect(() => {
     fetchTasks()
@@ -30,8 +32,8 @@ export function useTasks() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchTasks])
 
-  const createTask = async (task: Omit<Task, 'id' | 'created_at' | 'is_live'> & { is_live?: boolean }) => {
-    const { data, error } = await supabase.from('tasks').insert(task).select().single()
+  const createTask = async (task: Omit<Task, 'id' | 'created_at' | 'is_live' | 'owner_id'> & { is_live?: boolean }) => {
+    const { data, error } = await supabase.from('tasks').insert({ ...task, owner_id: ownerValue }).select().single()
     if (error) throw error
     return data
   }
@@ -61,6 +63,7 @@ export function useTasks() {
         sort_order: maxOrder + 1,
         points: src.points,
         is_live: false,
+        owner_id: ownerValue,
       })
       .select()
       .single()

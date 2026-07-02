@@ -6,6 +6,7 @@ export interface Task {
   sort_order: number
   points: number
   is_live: boolean
+  owner_id: string | null
   created_at: string
 }
 
@@ -60,6 +61,7 @@ export interface Team {
   id: string
   name: string
   password: string
+  owner_id: string | null
   created_at: string
 }
 
@@ -93,6 +95,7 @@ export interface BingoSection extends BoardTimer {
   board_note_every: number
   marshal_password: string
   photo_submissions_enabled: boolean
+  owner_id: string | null
   created_at: string
 }
 
@@ -130,6 +133,8 @@ export interface BingoTask {
   require_marshal: boolean
   maps_url: string | null
   maps_label: string | null
+  owner_id: string | null
+  cloned_from: string | null
   created_at: string
 }
 
@@ -148,6 +153,7 @@ export interface BingoSettings {
   timer_seconds: number
   timer_end_at: string | null
   active_section_id: string | null
+  template_section_id: string | null
   marshal_password: string
   game_started: boolean
   photo_submissions_enabled: boolean
@@ -218,6 +224,19 @@ export interface BingoPhotoSubmission {
   scan_id: string | null
   photo_url: string
   status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
+// Authenticated admin account (Supabase Auth user + approval profile).
+// owner = main holder with full access; sub = approved collaborator.
+export interface BingoAccount {
+  id: string
+  email: string | null
+  role: 'owner' | 'sub'
+  status: 'pending' | 'approved' | 'rejected'
+  can_bingo: boolean
+  can_flag: boolean
+  active_section_id: string | null
   created_at: string
 }
 

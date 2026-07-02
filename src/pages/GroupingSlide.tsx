@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { useFullscreen } from '../hooks/useFullscreen'
@@ -39,6 +40,9 @@ function loadPasswords(): Record<string, string> {
 }
 
 export function GroupingSlide() {
+  // ?t=<owner uid> pins pushed tribes to a rented account; absent = house.
+  const [searchParams] = useSearchParams()
+  const tenant = searchParams.get('t')
   const eventName = localStorage.getItem('event_name') || 'SWIFT TEAM BUILDING'
   const [groups, setGroups] = useState(loadGroups)
   const dragSrc = useRef<{ groupIdx: number; memberIdx: number } | null>(null)
@@ -64,12 +68,14 @@ export function GroupingSlide() {
           newPasswords[group.name] = String(Math.floor(1000 + Math.random() * 9000))
         }
         const password = newPasswords[group.name]
-        // Check if team already exists
-        const { data: existing } = await supabase.from('teams').select('id').ilike('name', group.name).maybeSingle()
+        // Check if team already exists (within this tenant)
+        let nameCheck = supabase.from('teams').select('id')
+        nameCheck = tenant === null ? nameCheck.is('owner_id', null) : nameCheck.eq('owner_id', tenant)
+        const { data: existing } = await nameCheck.ilike('name', group.name).maybeSingle()
         if (existing) {
           await supabase.from('teams').update({ password }).eq('id', existing.id)
         } else {
-          await supabase.from('teams').insert({ name: group.name, password })
+          await supabase.from('teams').insert({ name: group.name, password, owner_id: tenant })
         }
       }
       localStorage.setItem('grouping_passwords', JSON.stringify(newPasswords))

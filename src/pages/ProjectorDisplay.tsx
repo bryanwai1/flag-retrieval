@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { TaskCard } from '../components/TaskCard'
 import { QRCodeModal } from '../components/QRCodeModal'
@@ -6,7 +7,11 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import type { Task } from '../types/database'
 
 export function ProjectorDisplay() {
-  const { tasks, loading } = useTasks()
+  // ?t=<owner uid> pins this anonymous page to a rented account's event;
+  // absent = the house event.
+  const [searchParams] = useSearchParams()
+  const tenant = searchParams.get('t')
+  const { tasks, loading } = useTasks(tenant)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   const liveTasks = tasks.filter(t => t.is_live)

@@ -10,10 +10,12 @@ import { InstructionPage } from '../components/InstructionPage'
 import { TaskLinksEditor } from '../components/TaskLinksEditor'
 import { TaskLinkButtons } from '../components/TaskLinkButtons'
 import { ParticleBackground } from '../components/ParticleBackground'
+import { useBingoAuth } from '../hooks/useBingoAuth'
 import type { BingoTask, BingoTaskPage } from '../types/database'
 
 export function BingoDashTaskEdit() {
   const { taskId } = useParams<{ taskId: string }>()
+  const { account, isOwner } = useBingoAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const backPath = searchParams.get('from') === 'snake-ladder' ? '/snake-ladder/admin' : '/bingo-dash/admin'
@@ -131,6 +133,30 @@ export function BingoDashTaskEdit() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-400">Loading task...</p>
+      </div>
+    )
+  }
+
+  // Hub model: cards owned by another account are copy-on-use only — never
+  // editable here, even for the owner (RLS blocks sub writes anyway).
+  const isMineTask = isOwner ? (task.owner_id ?? null) === null : task.owner_id === account?.id
+  if (!isMineTask) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-gray-900 border border-white/10 rounded-2xl p-8 text-center">
+          <p className="text-3xl mb-3">🔒</p>
+          <h1 className="text-white font-black text-xl mb-2">Shared card — read only</h1>
+          <p className="text-gray-400 text-sm mb-6">
+            "{task.title}" belongs to another account. To use it, add it to your board from
+            the library — that creates your own independent copy you can edit.
+          </p>
+          <button
+            onClick={() => navigate(backPath)}
+            className="px-5 py-2.5 bg-violet-600 text-white rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors"
+          >
+            ← Back to admin
+          </button>
+        </div>
       </div>
     )
   }

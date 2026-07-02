@@ -2,21 +2,23 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { Team } from '../types/database'
 
-export function useTeams() {
+// Tenancy convention: owner_id NULL = main-account (house) data. Names are
+// unique per tenant (DB: unique (owner_id, name) nulls not distinct), so all
+// existence checks here are scoped the same way as the fetch.
+export function useTeams(ownerValue: string | null = null) {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchTeams = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
     try {
-      const { data } = await supabase
-        .from('teams')
-        .select('*')
-        .order('created_at', { ascending: true })
+      let query = supabase.from('teams').select('*')
+      query = ownerValue === null ? query.is('owner_id', null) : query.eq('owner_id', ownerValue)
+      const { data } = await query.order('created_at', { ascending: true })
       if (data) setTeams(data)
     } catch { /* ignore */ }
     setLoading(false)
-  }, [])
+  }, [ownerValue])
 
   useEffect(() => {
     fetchTeams()
@@ -33,16 +35,14 @@ export function useTeams() {
   const createTeam = useCallback(async (name: string): Promise<{ team: Team; password: string }> => {
     const trimmed = name.trim()
     if (!trimmed) throw new Error('NAME_REQUIRED')
-    const { data: existing } = await supabase
-      .from('teams')
-      .select('id')
-      .ilike('name', trimmed)
-      .maybeSingle()
+    let nameCheck = supabase.from('teams').select('id')
+    nameCheck = ownerValue === null ? nameCheck.is('owner_id', null) : nameCheck.eq('owner_id', ownerValue)
+    const { data: existing } = await nameCheck.ilike('name', trimmed).maybeSingle()
     if (existing) throw new Error('TRIBE_NAME_TAKEN')
     const password = String(Math.floor(1000 + Math.random() * 9000))
     const { data, error } = await supabase
       .from('teams')
-      .insert({ name: trimmed, password })
+      .insert({ name: trimmed, password, owner_id: ownerValue })
       .select()
       .single()
     if (error || !data) {
@@ -51,7 +51,7 @@ export function useTeams() {
     }
     await fetchTeams()
     return { team: data, password }
-  }, [fetchTeams])
+  }, [fetchTeams, ownerValue])
 
   const renameTeam = useCallback(async (id: string, name: string) => {
     const trimmed = name.trim()
@@ -70,11 +70,14 @@ export function useTeams() {
   // Each name that already exists is skipped so this is safe to call against a
   // partially-populated list. Returns the number of tribes actually inserted.
   const seedDefaultTeams = useCallback(async (): Promise<number> => {
-    const { data: existing } = await supabase.from('teams').select('name')
+    let namesQuery = supabase.from('teams').select('name')
+    namesQuery = ownerValue === null ? namesQuery.is('owner_id', null) : namesQuery.eq('owner_id', ownerValue)
+    const { data: existing } = await namesQuery
     const taken = new Set((existing ?? []).map(r => r.name.trim().toLowerCase()))
     const rows = Array.from({ length: 17 }, (_, i) => ({
       name: `Group ${i + 1}`,
       password: String(Math.floor(1000 + Math.random() * 9000)),
+      owner_id: ownerValue,
     })).filter(r => !taken.has(r.name.toLowerCase()))
     if (rows.length === 0) return 0
     const { error } = await supabase.from('teams').insert(rows)
@@ -84,7 +87,7 @@ export function useTeams() {
     }
     await fetchTeams()
     return rows.length
-  }, [fetchTeams])
+  }, [fetchTeams, ownerValue])
 
   const deleteTeam = useCallback(async (id: string) => {
     setTeams(prev => prev.filter(t => t.id !== id))

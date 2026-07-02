@@ -44,9 +44,10 @@ function emptyActivity(): ActivityDraft {
 interface ActivityConverterProps {
   onComplete: () => void
   existingTaskCount: number
+  ownerValue?: string | null
 }
 
-export function ActivityConverter({ onComplete, existingTaskCount }: ActivityConverterProps) {
+export function ActivityConverter({ onComplete, existingTaskCount, ownerValue = null }: ActivityConverterProps) {
   const [activities, setActivities] = useState<ActivityDraft[]>([emptyActivity()])
   const [importing, setImporting] = useState(false)
   const [status, setStatus] = useState('')
@@ -132,6 +133,7 @@ export function ActivityConverter({ onComplete, existingTaskCount }: ActivityCon
             hex_code: act.hex_code,
             title: act.title.trim(),
             sort_order: existingTaskCount + i + 1,
+            owner_id: ownerValue,
           })
           .select()
           .single()

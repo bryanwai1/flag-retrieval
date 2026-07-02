@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { useLeaderboard } from '../hooks/useLeaderboard'
 import { useTeams } from '../hooks/useTeams'
@@ -20,10 +21,14 @@ function formatElapsed(ms: number) {
 }
 
 export function ProjectorView() {
-  const { tasks, loading: tasksLoading } = useTasks()
-  const { byPoints, loading: lbLoading } = useLeaderboard()
-  const { teams, loading: teamsLoading } = useTeams()
-  const [manualOrder, setManualOrder] = useSetting('flag-retrieval-ranking-order', '')
+  // ?t=<owner uid> pins this anonymous page to a rented account's event;
+  // absent = the house event.
+  const [searchParams] = useSearchParams()
+  const tenant = searchParams.get('t')
+  const { tasks, loading: tasksLoading } = useTasks(tenant)
+  const { byPoints, loading: lbLoading } = useLeaderboard(tenant)
+  const { teams, loading: teamsLoading } = useTeams(tenant)
+  const [manualOrder, setManualOrder] = useSetting('flag-retrieval-ranking-order', '', tenant)
   const [editRank, setEditRank] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [startTime, setStartTime] = useState<number | null>(() => {

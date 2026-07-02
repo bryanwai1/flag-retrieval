@@ -14,7 +14,11 @@ export interface TribeResult {
   password: string
 }
 
-export function useCurrentTeam() {
+// ownerValue = the tenant that owns the event (from the task row's owner_id;
+// NULL/undefined = house). Tribe search and creation stay inside that tenant so
+// two accounts can run events the same day without seeing each other's teams.
+export function useCurrentTeam(ownerValue: string | null | undefined = null) {
+  const tenant = ownerValue ?? null
   const [team, setTeam] = useState<Team | null>(null)
   const [memberName, setMemberName] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -60,9 +64,11 @@ export function useCurrentTeam() {
   }, [])
 
   const searchTribes = async (query: string): Promise<TribeResult[]> => {
-    const { data } = await supabase
+    let q = supabase
       .from('teams')
       .select('id, name, password, team_members(id)')
+    q = tenant === null ? q.is('owner_id', null) : q.eq('owner_id', tenant)
+    const { data } = await q
       .ilike('name', `%${query}%`)
       .order('name')
       .limit(20)
@@ -78,16 +84,14 @@ export function useCurrentTeam() {
   }
 
   const createTribe = async (tribeName: string, name: string, password: string): Promise<Team> => {
-    const { data: existing } = await supabase
-      .from('teams')
-      .select('id')
-      .ilike('name', tribeName)
-      .maybeSingle()
+    let nameCheck = supabase.from('teams').select('id')
+    nameCheck = tenant === null ? nameCheck.is('owner_id', null) : nameCheck.eq('owner_id', tenant)
+    const { data: existing } = await nameCheck.ilike('name', tribeName).maybeSingle()
     if (existing) throw new Error('TRIBE_NAME_TAKEN')
 
     const { data: newTeam, error } = await supabase
       .from('teams')
-      .insert({ name: tribeName, password })
+      .insert({ name: tribeName, password, owner_id: tenant })
       .select()
       .single()
     if (error) throw error

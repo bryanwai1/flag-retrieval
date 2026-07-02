@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { ParticipantView } from './pages/ParticipantView'
 import { FlagRetrievalFacilitator } from './pages/FlagRetrievalFacilitator'
+import { BingoAuthProvider } from './hooks/useBingoAuth'
+import { RequireBingoAdmin } from './components/RequireBingoAdmin'
 
 const GameSelector          = lazy(() => import('./pages/GameSelector').then(m => ({ default: m.GameSelector })))
 const ProjectorDisplay      = lazy(() => import('./pages/ProjectorDisplay').then(m => ({ default: m.ProjectorDisplay })))
@@ -29,6 +31,7 @@ const BingoDashAwardAdmin   = lazy(() => import('./pages/BingoDashAwardAdmin').t
 const BingoDashBriefingSlides = lazy(() => import('./pages/BingoDashBriefingSlides').then(m => ({ default: m.BingoDashBriefingSlides })))
 const BingoDashTeamMembers  = lazy(() => import('./pages/BingoDashTeamMembers').then(m => ({ default: m.BingoDashTeamMembers })))
 const BingoDashAllTeamsMembers = lazy(() => import('./pages/BingoDashAllTeamsMembers').then(m => ({ default: m.BingoDashAllTeamsMembers })))
+const BingoDashAccounts     = lazy(() => import('./pages/BingoDashAccounts').then(m => ({ default: m.BingoDashAccounts })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 const VotingAdmin           = lazy(() => import('./pages/VotingAdmin').then(m => ({ default: m.VotingAdmin })))
@@ -45,8 +48,11 @@ export default function App() {
           <Route path="/instructions" element={<InstructionsHub />} />
           <Route path="/instructions/:deckId" element={<InstructionsSlide />} />
           <Route path="/projector" element={<ProjectorView />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/task/:taskId" element={<AdminTaskEdit />} />
+          {/* Flag Retrieval admin — gated behind an approved account with flag access */}
+          <Route element={<BingoAuthProvider><Outlet /></BingoAuthProvider>}>
+            <Route path="/admin" element={<RequireBingoAdmin game="flag"><AdminDashboard /></RequireBingoAdmin>} />
+            <Route path="/admin/task/:taskId" element={<RequireBingoAdmin game="flag"><AdminTaskEdit /></RequireBingoAdmin>} />
+          </Route>
           <Route path="/task/:taskId" element={<ParticipantView />} />
           <Route path="/flag-retrieval/facilitator" element={<FlagRetrievalFacilitator />} />
           <Route path="/shape-sequence" element={<ShapeSequenceProjector />} />
@@ -56,9 +62,14 @@ export default function App() {
           <Route path="/event/grouping" element={<GroupingSlide />} />
           <Route path="/bingo-dash" element={<BingoDashHome />} />
           <Route path="/bingo-dash/task/:taskId" element={<BingoDashParticipant />} />
-          <Route path="/bingo-dash/admin" element={<BingoDashAdmin />} />
-          <Route path="/bingo-dash/admin/task/:taskId" element={<BingoDashTaskEdit />} />
+          {/* Admin subtree — gated behind an approved account (Bingo Dash accounts) */}
+          <Route element={<BingoAuthProvider><Outlet /></BingoAuthProvider>}>
+            <Route path="/bingo-dash/admin" element={<RequireBingoAdmin game="bingo"><BingoDashAdmin /></RequireBingoAdmin>} />
+            <Route path="/bingo-dash/admin/task/:taskId" element={<RequireBingoAdmin game="bingo"><BingoDashTaskEdit /></RequireBingoAdmin>} />
+            <Route path="/bingo-dash/accounts" element={<RequireBingoAdmin ownerOnly><BingoDashAccounts /></RequireBingoAdmin>} />
+          </Route>
           <Route path="/bingo-dash/projector" element={<BingoDashProjector />} />
+          <Route path="/bingo-dash/projector/:sectionSlug" element={<BingoDashProjector />} />
           <Route path="/bingo-dash/play/:sectionSlug" element={<BingoDashJoin />} />
           <Route path="/bingo-dash/sample" element={<BingoDashSample />} />
           <Route path="/bingo-dash/colmar-intro" element={<BingoDashColmarIntro />} />
