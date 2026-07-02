@@ -34,6 +34,8 @@ export function BingoDashAccounts() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [copiedInvite, setCopiedInvite] = useState(false)
+  const inviteUrl = `${window.location.origin}/bingo-dash/login`
 
   const load = useCallback(async () => {
     const [accountsRes, boardsRes, settingsRes] = await Promise.all([
@@ -167,6 +169,27 @@ export function BingoDashAccounts() {
           <p className="text-gray-400 animate-pulse">Loading…</p>
         ) : (
           <div className="flex flex-col gap-8">
+            <section className="px-4 py-4 rounded-2xl bg-white/5 border border-white/10">
+              <h2 className="text-white text-sm font-black uppercase tracking-widest mb-2">Invite link</h2>
+              <p className="text-gray-500 text-xs mb-3">
+                Send this to a client. They sign up with email or Google, then show up under Pending for your approval.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 min-w-0 truncate px-4 py-3 rounded-2xl bg-black/30 border-2 border-white/15 text-gray-300 text-sm">
+                  {inviteUrl}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteUrl)
+                    setCopiedInvite(true)
+                    setTimeout(() => setCopiedInvite(false), 1500)
+                  }}
+                  className="px-4 py-3 rounded-2xl text-sm font-black bg-purple-600 hover:bg-purple-500 text-white transition-colors flex-shrink-0">
+                  {copiedInvite ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+            </section>
+
             <section className="px-4 py-4 rounded-2xl bg-white/5 border border-white/10">
               <h2 className="text-white text-sm font-black uppercase tracking-widest mb-2">Default board template</h2>
               <p className="text-gray-500 text-xs mb-3">
