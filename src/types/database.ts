@@ -237,6 +237,10 @@ export interface BingoAccount {
   can_bingo: boolean
   can_flag: boolean
   active_section_id: string | null
+  /** Set = temporary facilitator working ON this host account's tenant. */
+  facilitator_host: string | null
+  /** NULL = access never expires. */
+  access_expires_at: string | null
   created_at: string
 }
 

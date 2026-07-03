@@ -15,7 +15,7 @@ import type { BingoTask, BingoTaskPage } from '../types/database'
 
 export function BingoDashTaskEdit() {
   const { taskId } = useParams<{ taskId: string }>()
-  const { account, isOwner } = useBingoAuth()
+  const { workingOwnerValue } = useBingoAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const backPath = searchParams.get('from') === 'snake-ladder' ? '/snake-ladder/admin' : '/bingo-dash/admin'
@@ -139,7 +139,7 @@ export function BingoDashTaskEdit() {
 
   // Hub model: cards owned by another account are copy-on-use only — never
   // editable here, even for the owner (RLS blocks sub writes anyway).
-  const isMineTask = isOwner ? (task.owner_id ?? null) === null : task.owner_id === account?.id
+  const isMineTask = (task.owner_id ?? null) === workingOwnerValue
   if (!isMineTask) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">

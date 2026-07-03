@@ -6,9 +6,20 @@ import type { BingoAccount } from '../types/database'
 interface BingoAuthValue {
   session: Session | null
   account: BingoAccount | null
+  /** Host account row when this login is a facilitator (facilitator_host set). */
+  hostAccount: BingoAccount | null
   loading: boolean
   isOwner: boolean
   isApproved: boolean
+  isFacilitator: boolean
+  /** access_expires_at has passed — RequireBingoAdmin shows the expired gate. */
+  isExpired: boolean
+  /**
+   * The owner_id value this session reads/writes tenant rows with:
+   * owner -> null (house data), facilitator -> the host tenant's value
+   * (null when the host is the owner), sub -> own uid.
+   */
+  workingOwnerValue: string | null
   signInWithPassword: (email: string, password: string) => Promise<void>
   signUpWithPassword: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
   signInWithGoogle: (redirectTo?: string) => Promise<void>
@@ -21,16 +32,30 @@ const BingoAuthContext = createContext<BingoAuthValue | null>(null)
 export function BingoAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [account, setAccount] = useState<BingoAccount | null>(null)
+  const [hostAccount, setHostAccount] = useState<BingoAccount | null>(null)
   const [loading, setLoading] = useState(true)
 
   const loadAccount = useCallback(async (userId: string | undefined) => {
-    if (!userId) { setAccount(null); return }
+    if (!userId) { setAccount(null); setHostAccount(null); return }
     const { data } = await supabase
       .from('bingo_accounts')
       .select('*')
       .eq('id', userId)
       .maybeSingle()
-    setAccount((data as BingoAccount) ?? null)
+    const acct = (data as BingoAccount) ?? null
+    // Facilitators need the host row before workingOwnerValue is trustworthy,
+    // so fetch it here — the initial-load gate keeps loading=true until then.
+    if (acct?.facilitator_host) {
+      const { data: host } = await supabase
+        .from('bingo_accounts')
+        .select('*')
+        .eq('id', acct.facilitator_host)
+        .maybeSingle()
+      setHostAccount((host as BingoAccount) ?? null)
+    } else {
+      setHostAccount(null)
+    }
+    setAccount(acct)
   }, [])
 
   useEffect(() => {
@@ -96,16 +121,28 @@ export function BingoAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setAccount(null)
+    setHostAccount(null)
   }, [])
 
   const refreshAccount = useCallback(() => loadAccount(session?.user.id), [loadAccount, session])
 
+  const isFacilitator = !!account?.facilitator_host
   const value: BingoAuthValue = {
     session,
     account,
+    hostAccount,
     loading,
     isOwner: account?.role === 'owner' && account?.status === 'approved',
     isApproved: account?.status === 'approved',
+    isFacilitator,
+    isExpired: !!account?.access_expires_at && new Date(account.access_expires_at).getTime() <= Date.now(),
+    workingOwnerValue: !account
+      ? null
+      : account.role === 'owner'
+        ? null
+        : account.facilitator_host
+          ? (hostAccount?.role === 'owner' ? null : account.facilitator_host)
+          : account.id,
     signInWithPassword,
     signUpWithPassword,
     signInWithGoogle,

@@ -29,7 +29,7 @@ export function RequireBingoAdmin({ children, ownerOnly = false, game }: {
   ownerOnly?: boolean
   game?: 'bingo' | 'flag'
 }) {
-  const { session, account, loading, isOwner, signOut } = useBingoAuth()
+  const { session, account, loading, isOwner, isExpired, signOut } = useBingoAuth()
 
   if (loading) {
     return (
@@ -45,6 +45,14 @@ export function RequireBingoAdmin({ children, ownerOnly = false, game }: {
     return <Gate
       emoji="⏳" title="Waiting for approval"
       body="Your account was created. An admin needs to approve your access before you can manage boards."
+      email={session.user.email} onSignOut={signOut}
+    />
+  }
+
+  if (isExpired) {
+    return <Gate
+      emoji="⌛" title="Access expired"
+      body="Your temporary access has ended. Ask the event organizer to extend it if you still need to help out."
       email={session.user.email} onSignOut={signOut}
     />
   }

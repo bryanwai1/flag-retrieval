@@ -18,7 +18,7 @@ import type { Task, TaskPage } from '../types/database'
 
 export function AdminTaskEdit() {
   const { taskId } = useParams<{ taskId: string }>()
-  const { account, isOwner } = useBingoAuth()
+  const { workingOwnerValue } = useBingoAuth()
   const navigate = useNavigate()
   const [task, setTask] = useState<Task | null>(null)
   const [editingMeta, setEditingMeta] = useState(false)
@@ -62,7 +62,7 @@ export function AdminTaskEdit() {
 
   // Flag Retrieval cards belong to exactly one tenant — block cross-tenant
   // access outright (RLS blocks the writes regardless).
-  const isMineTask = isOwner ? (task.owner_id ?? null) === null : task.owner_id === account?.id
+  const isMineTask = (task.owner_id ?? null) === workingOwnerValue
   if (!isMineTask) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">

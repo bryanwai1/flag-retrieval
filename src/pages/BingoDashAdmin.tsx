@@ -443,13 +443,14 @@ const ADMIN_SECTION_KEY = 'bingo-dash-admin-section-id'
 // ── Main component ─────────────────────────────────────────────────────────────
 export function BingoDashAdmin() {
   const navigate = useNavigate()
-  const { account, isOwner, signOut } = useBingoAuth()
+  const { account, isOwner, workingOwnerValue, signOut } = useBingoAuth()
   const uid = account?.id ?? null
-  // Tenancy convention: owner_id NULL = main-account (house) data, so the
-  // owner writes null and everyone else writes their own uid.
-  const myOwnerValue = isOwner ? null : uid
+  // Tenancy convention: owner_id NULL = main-account (house) data. The hook
+  // resolves the working tenant: owner -> null, facilitator -> host tenant,
+  // sub -> own uid.
+  const myOwnerValue = workingOwnerValue
   const isMineRow = (ownerId: string | null | undefined) =>
-    isOwner ? (ownerId ?? null) === null : ownerId === uid
+    (ownerId ?? null) === myOwnerValue
   const [tasks, setTasks] = useState<BingoTask[]>([])
   const [boardCards, setBoardCards] = useState<BingoBoardCard[]>([])
   const [teams, setTeams] = useState<BingoTeam[]>([])
@@ -772,7 +773,9 @@ export function BingoDashAdmin() {
           totalTasks: list.length,
         })
       }
-    } else {
+    } else if (myOwnerValue !== null) {
+      // House shared library — skipped for a facilitator working on house
+      // data (myOwnerValue null): those sections already ARE their boards.
       for (const section of sections.filter(s => s.owner_id === null)) {
         const list = tasks.filter(t => t.section_id === section.id && t.owner_id === null)
         if (list.length === 0) continue
@@ -793,18 +796,25 @@ export function BingoDashAdmin() {
   //  - sub: own sections + own tasks + the owner's shared (house) tasks;
   //    gameplay data only for their own boards
   const fetchAll = useCallback(async () => {
-    // Stage 1: boards + cards + per-board config
-    const orMine = `owner_id.eq.${uid},owner_id.is.null`
+    // Stage 1: boards + cards + per-board config.
+    // Non-owner scope is the WORKING tenant: a sub (or facilitator of a sub)
+    // fetches that tenant's rows plus the house shared library; a facilitator
+    // of the owner works on house data directly, so house rows only.
+    const orMine = `owner_id.eq.${myOwnerValue},owner_id.is.null`
     const [sectionsRes, tasksRes] = await Promise.all([
       isOwner
         ? supabase.from('bingo_sections').select('*').order('sort_order')
-        : supabase.from('bingo_sections').select('*').or(orMine).order('sort_order'),
+        : myOwnerValue === null
+          ? supabase.from('bingo_sections').select('*').is('owner_id', null).order('sort_order')
+          : supabase.from('bingo_sections').select('*').or(orMine).order('sort_order'),
       isOwner
         ? supabase.from('bingo_tasks').select('*').order('sort_order')
-        : supabase.from('bingo_tasks').select('*').or(orMine).order('sort_order'),
+        : myOwnerValue === null
+          ? supabase.from('bingo_tasks').select('*').is('owner_id', null).order('sort_order')
+          : supabase.from('bingo_tasks').select('*').or(orMine).order('sort_order'),
     ])
     const allSections = (sectionsRes.data ?? []) as BingoSection[]
-    const mineSections = allSections.filter(s => isOwner ? s.owner_id === null : s.owner_id === uid)
+    const mineSections = allSections.filter(s => isMineRow(s.owner_id))
     const mySectionIds = mineSections.map(s => s.id)
 
     // Stage 2: everything keyed to my boards (teams first — scans/photo
@@ -847,7 +857,7 @@ export function BingoDashAdmin() {
       prev && mineSections.some(s => s.id === prev) ? prev : mineSections[0]?.id ?? null
     )
     setLoading(false)
-  }, [isOwner, uid]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOwner, uid, myOwnerValue]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist the selected board so returning from Preview / task edit restores it
   useEffect(() => {

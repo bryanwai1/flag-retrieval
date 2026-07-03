@@ -16,9 +16,10 @@ import type { Task } from '../types/database'
 
 export function AdminDashboard() {
   const navigate = useNavigate()
-  const { account, isOwner, signOut } = useBingoAuth()
-  // Tenancy convention: owner_id NULL = house data; subs write their own uid.
-  const ownerValue = isOwner ? null : (account?.id ?? null)
+  const { account, workingOwnerValue, signOut } = useBingoAuth()
+  // Tenancy convention: owner_id NULL = house data. The hook resolves the
+  // working tenant: owner -> null, facilitator -> host tenant, sub -> own uid.
+  const ownerValue = workingOwnerValue
   // Anonymous pages (projector, facilitator) resolve the tenant from this param.
   const tenantQS = ownerValue ? `?t=${ownerValue}` : ''
   const { tasks, createTask, updateTask, deleteTask, duplicateTask, refetch } = useTasks(ownerValue)

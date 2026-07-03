@@ -10,6 +10,17 @@ const STATUS_STYLES: Record<BingoAccount['status'], string> = {
   rejected: 'bg-red-400/15 text-red-300 border-red-400/40',
 }
 
+const FACILITATOR_DURATIONS = [
+  { label: '4 hours',  hours: 4 },
+  { label: '12 hours', hours: 12 },
+  { label: '24 hours', hours: 24 },
+  { label: '48 hours', hours: 48 },
+  { label: '7 days',   hours: 168 },
+]
+
+const fmtExpiry = (iso: string) =>
+  new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+
 function GameToggle({ label, on, busy, onToggle }: {
   label: string; on: boolean; busy: boolean; onToggle: () => void
 }) {
@@ -35,6 +46,10 @@ export function BingoDashAccounts() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [copiedInvite, setCopiedInvite] = useState(false)
+  // "Make facilitator" inline form: which row it's open on + its inputs
+  const [facForId, setFacForId] = useState<string | null>(null)
+  const [facHost, setFacHost] = useState('')
+  const [facHours, setFacHours] = useState(24)
   const inviteUrl = `${window.location.origin}/bingo-dash/login`
 
   const load = useCallback(async () => {
@@ -99,10 +114,56 @@ export function BingoDashAccounts() {
     } finally { setBusyId(null) }
   }
 
+  const makeFacilitator = async (a: BingoAccount) => {
+    if (!facHost) { setNotice('Pick whose event this facilitator is helping with.'); return }
+    setBusyId(a.id)
+    setNotice('')
+    try {
+      const expires = new Date(Date.now() + facHours * 3600_000).toISOString()
+      const { error } = await supabase.from('bingo_accounts').update({
+        facilitator_host: facHost,
+        access_expires_at: expires,
+        status: 'approved',
+        can_bingo: true,
+        can_flag: true,
+      }).eq('id', a.id)
+      if (error) throw error
+      setFacForId(null)
+      setNotice(`${a.email ?? 'Account'} is now a facilitator until ${fmtExpiry(expires)}.`)
+      await load()
+    } catch (err) {
+      setNotice(err instanceof Error ? `Could not grant facilitator access: ${err.message}` : 'Could not grant facilitator access')
+    } finally { setBusyId(null) }
+  }
+
+  const endFacilitatorAccess = async (a: BingoAccount) => {
+    setBusyId(a.id)
+    try {
+      await supabase.from('bingo_accounts').update({ access_expires_at: new Date().toISOString() }).eq('id', a.id)
+      await load()
+    } finally { setBusyId(null) }
+  }
+
+  const removeFacilitator = async (a: BingoAccount) => {
+    setBusyId(a.id)
+    try {
+      await supabase.from('bingo_accounts').update({ facilitator_host: null, access_expires_at: null }).eq('id', a.id)
+      await load()
+    } finally { setBusyId(null) }
+  }
+
   const pending = accounts.filter(a => a.status === 'pending')
   const others = accounts.filter(a => a.status !== 'pending')
+  // Accounts a facilitator can assist: you (the owner) or any approved,
+  // non-facilitator sub (renters running their own events).
+  const hostOptions = accounts.filter(a =>
+    a.role === 'owner' || (a.status === 'approved' && !a.facilitator_host))
 
-  const Row = ({ a }: { a: BingoAccount }) => (
+  const Row = ({ a }: { a: BingoAccount }) => {
+    const isFac = !!a.facilitator_host
+    const facExpired = !!a.access_expires_at && new Date(a.access_expires_at).getTime() <= Date.now()
+    const hostEmail = accounts.find(x => x.id === a.facilitator_host)?.email ?? 'unknown host'
+    return (
     <div className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -116,11 +177,27 @@ export function BingoDashAccounts() {
                 owner
               </span>
             )}
+            {isFac && (
+              <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                facExpired
+                  ? 'bg-red-400/15 text-red-300 border-red-400/40'
+                  : 'bg-sky-400/15 text-sky-300 border-sky-400/40'
+              }`}>
+                facilitator
+              </span>
+            )}
             {a.id === me?.id && <span className="text-[11px] text-gray-500">you</span>}
           </div>
         </div>
         {a.role !== 'owner' && (
           <div className="flex gap-2 flex-shrink-0">
+            {!isFac && a.status !== 'approved' && (
+              <button onClick={() => { setFacForId(facForId === a.id ? null : a.id); setFacHost(me?.id ?? ''); setFacHours(24) }}
+                title="Grant temporary helper access instead of a full account (no board clone)"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-sky-300 border border-sky-400/40 hover:bg-sky-400/10 transition-colors">
+                Make facilitator
+              </button>
+            )}
             {a.status !== 'approved' && (
               <button onClick={() => setStatus(a.id, 'approved')} disabled={busyId === a.id}
                 className="px-3 py-1.5 rounded-xl text-xs font-black bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50">
@@ -136,20 +213,81 @@ export function BingoDashAccounts() {
           </div>
         )}
       </div>
-      {a.role !== 'owner' && a.status === 'approved' && (
+      {isFac && (
+        <div className="flex items-center flex-wrap gap-2 mt-3 pt-3 border-t border-white/10">
+          <span className="text-xs text-gray-400 min-w-0 truncate">
+            Assisting <span className="text-white font-bold">{hostEmail}</span>
+            {a.access_expires_at && (
+              <span className={facExpired ? 'text-red-300' : ''}>
+                {' '}· {facExpired ? 'expired' : 'expires'} {fmtExpiry(a.access_expires_at)}
+              </span>
+            )}
+          </span>
+          <div className="flex gap-2 ml-auto flex-shrink-0">
+            {!facExpired && (
+              <button onClick={() => endFacilitatorAccess(a)} disabled={busyId === a.id}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-white/10 hover:bg-red-500/80 text-white transition-colors disabled:opacity-50">
+                End access now
+              </button>
+            )}
+            <button onClick={() => removeFacilitator(a)} disabled={busyId === a.id}
+              title="Turn this back into a normal account (no host, no expiry)"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white/80 border border-white/20 hover:bg-white/10 transition-colors disabled:opacity-50">
+              Remove facilitator
+            </button>
+          </div>
+        </div>
+      )}
+      {!isFac && a.role !== 'owner' && a.status === 'approved' && (
         <div className="flex items-center flex-wrap gap-2 mt-3 pt-3 border-t border-white/10">
           <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mr-1">Games:</span>
           <GameToggle label="Bingo Dash" on={a.can_bingo} busy={busyId === a.id} onToggle={() => toggleGame(a, 'can_bingo')} />
           <GameToggle label="Flag Retrieval" on={a.can_flag} busy={busyId === a.id} onToggle={() => toggleGame(a, 'can_flag')} />
-          <button onClick={() => provision(a)} disabled={busyId === a.id || !templateId}
-            title={templateId ? 'Clone the template board into this account' : 'Pick a template board first'}
-            className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold text-white/80 border border-white/20 hover:bg-white/10 transition-colors disabled:opacity-40">
-            Give default board
-          </button>
+          <div className="flex gap-2 ml-auto">
+            <button onClick={() => { setFacForId(facForId === a.id ? null : a.id); setFacHost(me?.id ?? ''); setFacHours(24) }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-sky-300 border border-sky-400/40 hover:bg-sky-400/10 transition-colors">
+              Make facilitator
+            </button>
+            <button onClick={() => provision(a)} disabled={busyId === a.id || !templateId}
+              title={templateId ? 'Clone the template board into this account' : 'Pick a template board first'}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white/80 border border-white/20 hover:bg-white/10 transition-colors disabled:opacity-40">
+              Give default board
+            </button>
+          </div>
+        </div>
+      )}
+      {!isFac && a.role !== 'owner' && facForId === a.id && (
+        <div className="mt-3 pt-3 border-t border-white/10 flex flex-col gap-2">
+          <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest">
+            Temporary event helper — edits the host's boards, auto-expires
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={facHost} onChange={e => setFacHost(e.target.value)}
+              className="flex-1 min-w-[160px] px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm focus:border-sky-500 outline-none transition-colors">
+              {hostOptions.filter(h => h.id !== a.id).map(h => (
+                <option key={h.id} value={h.id}>
+                  {h.role === 'owner' ? `You (${h.email ?? 'main account'})` : h.email ?? h.id}
+                </option>
+              ))}
+            </select>
+            <select value={facHours} onChange={e => setFacHours(Number(e.target.value))}
+              className="px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm focus:border-sky-500 outline-none transition-colors">
+              {FACILITATOR_DURATIONS.map(d => <option key={d.hours} value={d.hours}>{d.label}</option>)}
+            </select>
+            <button onClick={() => makeFacilitator(a)} disabled={busyId === a.id || !facHost}
+              className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 hover:bg-sky-500 text-white transition-colors disabled:opacity-50">
+              Grant access
+            </button>
+            <button onClick={() => setFacForId(null)}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-white/60 hover:bg-white/10 transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
-  )
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 px-6 py-10">
