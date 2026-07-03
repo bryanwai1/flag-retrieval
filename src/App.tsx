@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom'
 import { ParticipantView } from './pages/ParticipantView'
 import { FlagRetrievalFacilitator } from './pages/FlagRetrievalFacilitator'
 import { BingoAuthProvider } from './hooks/useBingoAuth'
@@ -67,6 +67,9 @@ export default function App() {
             <Route path="/bingo-dash/admin" element={<RequireBingoAdmin game="bingo"><BingoDashAdmin /></RequireBingoAdmin>} />
             <Route path="/bingo-dash/admin/task/:taskId" element={<RequireBingoAdmin game="bingo"><BingoDashTaskEdit /></RequireBingoAdmin>} />
             <Route path="/bingo-dash/accounts" element={<RequireBingoAdmin ownerOnly><BingoDashAccounts /></RequireBingoAdmin>} />
+            {/* Invite-link landing: login/signup when signed out, approval gate
+                while pending, straight to the admin once approved */}
+            <Route path="/bingo-dash/login" element={<RequireBingoAdmin><Navigate to="/bingo-dash/admin" replace /></RequireBingoAdmin>} />
           </Route>
           <Route path="/bingo-dash/projector" element={<BingoDashProjector />} />
           <Route path="/bingo-dash/projector/:sectionSlug" element={<BingoDashProjector />} />
