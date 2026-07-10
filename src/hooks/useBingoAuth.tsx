@@ -84,13 +84,20 @@ export function BingoAuthProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false)
     })()
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    // NEVER run supabase queries synchronously inside this callback:
+    // auth-js emits events (SIGNED_IN on every tab refocus, TOKEN_REFRESHED)
+    // while holding the auth lock and AWAITS subscribers, so a query here
+    // waits for the lock the emitter still holds — a permanent deadlock that
+    // silently hangs every later request in the tab (create/duplicate/start
+    // game all stop working). Defer to a macrotask so the callback returns
+    // and the lock is released before loadAccount touches the client.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
-      try {
-        await loadAccount(newSession?.user.id)
-      } catch {
-        // transient fetch failure; keep previous account state
-      }
+      setTimeout(() => {
+        loadAccount(newSession?.user.id).catch(() => {
+          // transient fetch failure; keep previous account state
+        })
+      }, 0)
     })
     return () => { active = false; sub.subscription.unsubscribe() }
   }, [loadAccount])
