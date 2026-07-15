@@ -1,9 +1,9 @@
 /*
  * DISC Personality Test — question bank + profile content.
  *
- * 40 statements, 10 per dimension (D, I, S, C). Participants rate each
+ * 44 statements, 11 per dimension (D, I, S, C). Participants rate each
  * statement on a 1-5 scale (Strongly Disagree → Strongly Agree). Scoring
- * sums the points per dimension into raw totals (10–50), which are then
+ * sums the points per dimension into raw totals (11–55), which are then
  * mapped to a 2-D position on the DISC quadrant:
  *
  *      Active / Fast-paced  (D, I)
@@ -25,7 +25,7 @@
 window.DISC_QUIZ = {
   testSlug: 'disc-personality',
   title: 'DISC Personality Test',
-  subtitle: 'A 40-statement profile that maps how you naturally show up at work.',
+  subtitle: 'A 44-statement profile that maps how you naturally show up at work.',
   scaleLabels: [
     'Strongly Disagree',
     'Disagree',
@@ -34,9 +34,9 @@ window.DISC_QUIZ = {
     'Strongly Agree'
   ],
   // Each question is tagged with the dimension it measures.
-  // Score = the chosen scale value (1..5). Total per dimension = 10..50.
+  // Score = the chosen scale value (1..5). Total per dimension = 11..55.
   questions: [
-    // ---------- D — Dominance (10) ----------
+    // ---------- D — Dominance (11) ----------
     { dim: 'D', text: 'I take charge quickly when no one else is leading.' },
     { dim: 'D', text: 'I push hard for results, even when it ruffles feathers.' },
     { dim: 'D', text: 'I make decisions fast and adjust later if needed.' },
@@ -47,8 +47,9 @@ window.DISC_QUIZ = {
     { dim: 'D', text: 'I am willing to take big risks to win big.' },
     { dim: 'D', text: 'I prefer to set the agenda rather than follow one.' },
     { dim: 'D', text: 'I focus on the goal more than on how people feel about it.' },
+    { dim: 'D', text: 'I would rather make a wrong call than make no call at all.' },
 
-    // ---------- I — Influence (10) ----------
+    // ---------- I — Influence (11) ----------
     { dim: 'I', text: 'I energise a room when I walk into it.' },
     { dim: 'I', text: 'I make new connections easily with people I just met.' },
     { dim: 'I', text: 'I am optimistic, even when things look uncertain.' },
@@ -59,8 +60,9 @@ window.DISC_QUIZ = {
     { dim: 'I', text: 'I rely on charm and persuasion to get buy-in.' },
     { dim: 'I', text: 'I tell stories to make a point land.' },
     { dim: 'I', text: 'I can usually read what someone is feeling in the room.' },
+    { dim: 'I', text: 'I find it easy to get others excited about my ideas.' },
 
-    // ---------- S — Steadiness (10) ----------
+    // ---------- S — Steadiness (11) ----------
     { dim: 'S', text: 'I am the calm one when things get tense.' },
     { dim: 'S', text: 'I prefer steady, predictable work over constant change.' },
     { dim: 'S', text: 'I listen more than I talk in most meetings.' },
@@ -71,8 +73,9 @@ window.DISC_QUIZ = {
     { dim: 'S', text: 'I find it hard to say no when someone needs help.' },
     { dim: 'S', text: 'I dislike sudden changes to plans I had agreed to.' },
     { dim: 'S', text: 'I am loyal to my team even when leaving would be easier.' },
+    { dim: 'S', text: 'People come to me when they need someone dependable.' },
 
-    // ---------- C — Conscientiousness (10) ----------
+    // ---------- C — Conscientiousness (11) ----------
     { dim: 'C', text: 'I double-check my work before sending it out.' },
     { dim: 'C', text: 'I want to see the data before I commit to a position.' },
     { dim: 'C', text: 'I notice details that other people miss.' },
@@ -82,7 +85,8 @@ window.DISC_QUIZ = {
     { dim: 'C', text: 'I am uncomfortable submitting work that is not polished.' },
     { dim: 'C', text: 'I think things through privately before sharing my view.' },
     { dim: 'C', text: 'I want to know the standard before I start a new task.' },
-    { dim: 'C', text: 'I would rather be accurate than fast.' }
+    { dim: 'C', text: 'I would rather be accurate than fast.' },
+    { dim: 'C', text: 'I feel uneasy when a plan is vague or leaves out the details.' }
   ],
 
   // ------------------------------------------------------------------
@@ -285,3 +289,22 @@ window.DISC_QUIZ = {
     }
   }
 };
+
+/*
+ * Emoji avatars for the live projector map — exactly 100 options.
+ * Each participant picks one on the landing screen; it becomes their
+ * marker on the projected quadrant. Avoid glyphs that need a
+ * variation selector so they render on canvas across platforms.
+ */
+window.DISC_EMOJIS = [
+  '😀','😎','🤩','🥳','😇','🤠','🤓','😺','🤖','👽',
+  '👻','💀','🎃','😈','🤡','👾','🧙','🧛','🧜','🦸',
+  '🐶','🐱','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷',
+  '🐸','🐵','🐔','🐧','🦆','🦉','🦇','🐺','🐴','🦄',
+  '🐝','🦋','🐞','🐢','🐍','🦖','🐙','🦀','🐬','🦈',
+  '🐘','🦒','🦓','🦘','🦥','🦔','🐪','🦩','🦚','🦜',
+  '🍎','🍊','🍋','🍉','🍇','🍓','🍒','🍑','🍍','🥥',
+  '🥑','🌽','🥕','🍄','🍔','🍕','🌮','🍣','🍩','🍪',
+  '🎂','🍦','🍿','🧁','⚽','🏀','🎾','🎱','🎯','🎮',
+  '🎲','🎸','🥁','🎤','🚀','🛸','⛵','🌈','⭐','🔥'
+];

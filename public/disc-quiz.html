@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DISC Personality Test &mdash; Game Hub</title>
-  <meta name="description" content="A 40-question DISC personality profile that maps how you naturally show up at work.">
+  <meta name="description" content="A 44-question DISC personality profile that maps how you naturally show up at work.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260504a">
+  <link rel="stylesheet" href="css/styles.css?v=20260715a">
 </head>
 <body>
 
@@ -20,8 +20,8 @@
     </a>
     <ul class="nav-links" id="navLinks">
       <li><a href="/">Home</a></li>
-      <li><a href="/disc-quiz.html" class="active">DISC Test</a></li>
-      <li><a href="/disc-admin.html">Admin</a></li>
+      <li><a href="disc-quiz.html" class="active">DISC Test</a></li>
+      <li><a href="disc-admin.html">DISC Admin</a></li>
     </ul>
     <button class="hamburger" id="hamburger" aria-label="Toggle menu">
       <span></span><span></span><span></span>
@@ -53,8 +53,8 @@
           </div>
 
           <ul class="quiz-meta-list">
-            <li><strong><span id="questionCount">40</span></strong> statements</li>
-            <li>~<strong>8 minutes</strong></li>
+            <li><strong><span id="questionCount">44</span></strong> statements</li>
+            <li>~<strong>9 minutes</strong></li>
             <li>Get a <strong>personalised profile</strong></li>
           </ul>
 
@@ -77,6 +77,14 @@
               <span>Email <em class="quiz-field-optional">optional</em></span>
               <input type="email" id="email" autocomplete="email" placeholder="jane.tan@company.com">
             </label>
+
+            <div class="quiz-field disc-emoji-field">
+              <span>Pick your emoji <em>*</em> <span class="disc-emoji-hint">&mdash; this is you on the projector screen</span></span>
+              <div class="disc-emoji-grid" id="emojiGrid" role="listbox" aria-label="Pick your emoji marker"></div>
+              <p class="disc-emoji-picked" id="emojiPicked"></p>
+            </div>
+
+            <p class="quiz-landing-error" id="landingError" role="alert"></p>
             <button type="submit" class="btn btn-primary btn-lg quiz-start-btn">Start the test &#x2192;</button>
           </form>
 
@@ -89,7 +97,7 @@
         <div class="quiz-card quiz-card--wide">
           <div class="quiz-progress">
             <div class="quiz-progress-row">
-              <span id="qProgressLabel">Statement 1 of 40</span>
+              <span id="qProgressLabel">Statement 1 of 44</span>
             </div>
             <div class="quiz-progress-track">
               <div class="quiz-progress-fill" id="qProgressBar"></div>
@@ -206,16 +214,16 @@
       </div>
       <div class="footer-links">
         <a href="/">Home</a>
-        <a href="/disc-quiz.html">DISC Test</a>
-        <a href="/disc-admin.html">Admin</a>
+        <a href="disc-quiz.html">DISC Test</a>
+        <a href="disc-admin.html">Admin</a>
       </div>
     </div>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="js/main.js?v=20260504a"></script>
-  <script src="js/supabase-config.js?v=20260504a"></script>
-  <script src="js/disc-quiz-data.js?v=20260504a"></script>
-  <script type="module" src="js/disc-engine.js?v=20260504a"></script>
+  <script src="js/main.js?v=20260715a"></script>
+  <script src="js/supabase-config.js?v=20260715a"></script>
+  <script src="js/disc-quiz-data.js?v=20260715a"></script>
+  <script type="module" src="js/disc-engine.js?v=20260715a"></script>
 </body>
 </html>

@@ -1,11 +1,12 @@
 /*
  * DISC Personality Test — engine.
- * Loads session, runs the 40-statement Likert quiz, scores into D/I/S/C
+ * Loads session, runs the 44-statement Likert quiz, scores into D/I/S/C
  * axes, plots the participant on the DISC quadrant, and submits to
- * Supabase. Also handles the participant PDF download.
+ * Supabase. Also registers the participant on the live projector board
+ * (name + emoji) and handles the participant PDF download.
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { drawQuadrant, DISC_COLORS } from './disc-chart.js?v=20260504a';
+import { drawQuadrant, DISC_COLORS } from './disc-chart.js?v=20260715a';
 
 export { drawQuadrant };
 
@@ -16,13 +17,21 @@ const sessionCode = (qs.get('s') || '').trim().toLowerCase();
 const sb = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 const quiz = window.DISC_QUIZ;
 
+// Per-dimension question count drives the score ranges everywhere.
+const PER_DIM  = quiz.questions.length / 4;   // 11
+const AXIS_MIN = PER_DIM;                     // 11
+const AXIS_MAX = PER_DIM * 5;                 // 55
+
 const state = {
   session: null,
   test: null,
   answers: new Array(quiz.questions.length).fill(null),
   currentIndex: 0,
   startedAt: null,
-  result: null
+  result: null,
+  emoji: null,
+  liveEnabled: false,
+  liveId: null
 };
 
 // ---------------------------------------------------------------
@@ -92,21 +101,96 @@ async function bootstrap() {
     });
   }
   $('questionCount').textContent = quiz.questions.length;
+  await loadEmojiPicker();
   show('screenLanding');
+}
+
+// ---------------------------------------------------------------
+// Emoji picker — the participant's marker on the projector board
+// ---------------------------------------------------------------
+
+const EMOJIS = window.DISC_EMOJIS || [];
+
+async function loadEmojiPicker() {
+  const taken = new Set();
+  const { data, error } = await sb
+    .from('disc_live')
+    .select('emoji')
+    .eq('session_id', state.session.id);
+  if (error) {
+    // disc_live not deployed yet — the quiz still works, the
+    // participant just won't appear on the live projector.
+    state.liveEnabled = false;
+    console.warn('disc_live unavailable:', error.message);
+  } else {
+    state.liveEnabled = true;
+    (data || []).forEach(r => taken.add(r.emoji));
+  }
+  if (state.emoji && taken.has(state.emoji)) state.emoji = null;
+  renderEmojiGrid(taken);
+}
+
+function renderEmojiGrid(taken) {
+  const grid = $('emojiGrid');
+  grid.innerHTML = '';
+  EMOJIS.forEach(em => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'disc-emoji-btn';
+    btn.textContent = em;
+    if (taken.has(em)) {
+      btn.classList.add('taken');
+      btn.disabled = true;
+      btn.title = 'Already taken in this session';
+    }
+    if (state.emoji === em) btn.classList.add('selected');
+    btn.addEventListener('click', () => {
+      state.emoji = em;
+      grid.querySelectorAll('.disc-emoji-btn').forEach(el => el.classList.remove('selected'));
+      btn.classList.add('selected');
+      $('emojiPicked').textContent = `${em}  — that's you on the big screen`;
+    });
+    grid.appendChild(btn);
+  });
 }
 
 // ---------------------------------------------------------------
 // Landing
 // ---------------------------------------------------------------
 
-$('landingForm').addEventListener('submit', (e) => {
+$('landingForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  $('landingError').textContent = '';
   const fullName = $('fullName').value.trim();
   const ageRaw   = $('age').value.trim();
   const position = $('position').value.trim();
   if (!fullName || !ageRaw || !position) return;
   const age = parseInt(ageRaw, 10);
   if (Number.isNaN(age) || age < 14 || age > 99) return;
+  if (!state.emoji) {
+    $('landingError').textContent = 'Pick an emoji — that will be your marker on the big screen.';
+    $('emojiGrid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // Register on the live projector board (joined, still taking the test).
+  if (state.liveEnabled) {
+    const { data, error } = await sb
+      .from('disc_live')
+      .insert({ session_id: state.session.id, full_name: fullName, emoji: state.emoji })
+      .select('id')
+      .single();
+    if (error) {
+      if (error.code === '23505') {
+        $('landingError').textContent = 'That emoji was just taken by someone else — pick another one.';
+        await loadEmojiPicker();
+        return;
+      }
+      console.warn('disc_live join failed:', error.message);
+    } else {
+      state.liveId = data.id;
+    }
+  }
 
   state.fullName = fullName;
   state.age = age;
@@ -245,8 +329,9 @@ async function submit() {
     email: state.email,
     age: state.age,
     position: state.position,
+    emoji: state.emoji,
     score: scores.D + scores.I + scores.S + scores.C,
-    max_score: 4 * 5 * (quiz.questions.length / 4),
+    max_score: 5 * quiz.questions.length,
     result_tier: primary,
     primary_type: primary,
     d_score: scores.D,
@@ -261,11 +346,31 @@ async function submit() {
     }
   };
 
-  const { error } = await sb.from('submissions').insert(payload);
+  let { error } = await sb.from('submissions').insert(payload);
+  if (error && /emoji/i.test(error.message || '')) {
+    // supabase/disc-live-schema.sql not run yet — submit without the
+    // emoji column rather than losing the participant's answers.
+    const { emoji, ...fallback } = payload;
+    ({ error } = await sb.from('submissions').insert(fallback));
+  }
   if (error) {
     showError('Couldn’t submit your answers',
       error.message + ' — please tell your trainer.');
     return;
+  }
+
+  // Push the result to the live projector board.
+  if (state.liveEnabled && state.liveId) {
+    const { error: liveErr } = await sb
+      .from('disc_live')
+      .update({
+        x: position.x,
+        y: position.y,
+        primary_type: primary,
+        finished_at: new Date().toISOString()
+      })
+      .eq('id', state.liveId);
+    if (liveErr) console.warn('disc_live update failed:', liveErr.message);
   }
 
   renderResultScreen();
@@ -301,7 +406,7 @@ function renderQuadrantScreen() {
   const { profile, position } = state.result;
 
   drawQuadrant($('quadrantCanvas'), [
-    { label: 'You', x: position.x, y: position.y, primary: state.result.primary, isYou: true }
+    { label: 'You', x: position.x, y: position.y, primary: state.result.primary, isYou: true, emoji: state.emoji }
   ]);
 
   fillList('resultStrengths', profile.strengths);
@@ -374,7 +479,7 @@ function generateParticipantPdf() {
 
   const drawBar = (label, value, color) => {
     const barW = pageW - margin * 2 - 90;
-    const pct = (value - 10) / 40; // 10..50 → 0..1
+    const pct = (value - AXIS_MIN) / (AXIS_MAX - AXIS_MIN); // 11..55 → 0..1
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(40);
@@ -383,7 +488,7 @@ function generateParticipantPdf() {
     doc.rect(margin + 30, y, barW, 12, 'F');
     doc.setFillColor(...hexToRgb(color));
     doc.rect(margin + 30, y, Math.max(2, barW * pct), 12, 'F');
-    doc.text(`${value} / 50`, margin + 30 + barW + 8, y + 10);
+    doc.text(`${value} / ${AXIS_MAX}`, margin + 30 + barW + 8, y + 10);
     y += 20;
   };
   drawBar('D', scores.D, DISC_COLORS.D);
@@ -395,7 +500,7 @@ function generateParticipantPdf() {
   // Quadrant chart — render to offscreen canvas at print res, embed
   const off = document.createElement('canvas');
   off.width = 720; off.height = 720;
-  drawQuadrant(off, [{ label: state.fullName, x: position.x, y: position.y, primary: state.result.primary, isYou: true }]);
+  drawQuadrant(off, [{ label: state.fullName, x: position.x, y: position.y, primary: state.result.primary, isYou: true, emoji: state.emoji }]);
   const img = off.toDataURL('image/png');
   const chartW = pageW - margin * 2;
   const chartH = chartW;

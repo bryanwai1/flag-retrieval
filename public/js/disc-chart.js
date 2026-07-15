@@ -2,10 +2,12 @@
  * DISC quadrant chart renderer — pure, no side effects.
  * Used by disc-engine, admin, and disc-projector.
  *
- * Coordinate system: each axis is in raw-score space [-80, +80].
- *   x: -80 (full task) ... +80 (full people)
- *   y: -80 (full reflective) ... +80 (full active)
+ * Coordinate system: each axis is in raw-score space [-RANGE, +RANGE].
+ * RANGE = perDimensionQuestions * 8 (44 questions → 11 per dim → ±88).
+ * Older 40-question submissions (±80) still plot inside the new range.
  */
+
+export const DISC_RANGE = 88;
 
 export const DISC_COLORS = {
   D: '#ef4444',
@@ -23,9 +25,12 @@ export function quadrantColor(primary) {
 
 /**
  * Draw the DISC quadrant onto canvasEl with the given dots plotted.
- * Each dot: { label, x, y, primary, isYou }.
+ * Each dot: { label, x, y, primary, isYou, emoji }.
+ * When `emoji` is set the marker is drawn as that emoji in a white
+ * badge ringed with the quadrant colour (used by the live projector).
+ * opts: { range, emojiSize }
  */
-export function drawQuadrant(canvasEl, dots) {
+export function drawQuadrant(canvasEl, dots, opts = {}) {
   const ctx = canvasEl.getContext('2d');
   const W = canvasEl.width;
   const H = canvasEl.height;
@@ -96,7 +101,7 @@ export function drawQuadrant(canvasEl, dots) {
   ctx.fillText('PEOPLE', 0, 0);
   ctx.restore();
 
-  const RANGE = 80;
+  const RANGE = opts.range || DISC_RANGE;
   const toPx = (x, y) => ({
     px: pad + ((x + RANGE) / (RANGE * 2)) * innerW,
     py: pad + ((-y + RANGE) / (RANGE * 2)) * innerH
@@ -106,6 +111,29 @@ export function drawQuadrant(canvasEl, dots) {
     const { px, py } = toPx(d.x, d.y);
     const color = quadrantColor(d.primary);
     const r = d.isYou ? 12 : 7;
+
+    if (d.emoji) {
+      const size = opts.emojiSize || (d.isYou ? 36 : 30);
+      const badge = size * 0.74;
+      ctx.beginPath();
+      ctx.arc(px, py, badge, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(d.emoji, px, py + 2);
+      if (d.label) {
+        ctx.fillStyle = '#111827';
+        ctx.font = d.isYou ? 'bold 14px Inter, sans-serif' : '12px Inter, sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.fillText(d.label, px, py + badge + 4);
+      }
+      return;
+    }
 
     if (d.isYou) {
       ctx.beginPath();

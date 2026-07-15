@@ -3,7 +3,7 @@
  * Login + sessions + per-session detail. DISC-only (no literacy quiz path).
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { drawQuadrant } from './disc-chart.js?v=20260504a';
+import { drawQuadrant } from './disc-chart.js?v=20260715a';
 
 const $  = (id) => document.getElementById(id);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -15,38 +15,18 @@ const sb = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
 const DISC_COLORS = { D: '#ef4444', I: '#f59e0b', S: '#10b981', C: '#3b82f6', BALANCED: '#8b5cf6' };
 const DISC_SLUG = 'disc-personality';
 
+// Axis score range follows the question bank (44 questions → 11 per dim → 11..55).
+const PER_DIM  = window.DISC_QUIZ ? window.DISC_QUIZ.questions.length / 4 : 11;
+const AXIS_MIN = PER_DIM;
+const AXIS_MAX = PER_DIM * 5;
+
 const state = {
   user: null,
   discTest: null,
   sessions: [],
   submissions: [],
-  activeSessionId: null,
-  pollTimer: null
+  activeSessionId: null
 };
-
-const POLL_MS = 5000;
-
-function startPolling() {
-  if (state.pollTimer) return;
-  state.pollTimer = setInterval(refreshLiveData, POLL_MS);
-}
-
-function stopPolling() {
-  if (state.pollTimer) {
-    clearInterval(state.pollTimer);
-    state.pollTimer = null;
-  }
-}
-
-async function refreshLiveData() {
-  if (!state.discTest) return;
-  await Promise.all([loadSessions(), loadSubmissions()]);
-  if (state.activeSessionId) {
-    renderSessionDetail();
-  } else {
-    renderAll();
-  }
-}
 
 // ---------- Screens ----------
 
@@ -97,7 +77,6 @@ $('loginForm').addEventListener('submit', async (e) => {
 });
 
 const onLogout = async () => {
-  stopPolling();
   await sb.auth.signOut();
   state.user = null;
   show('screenLogin');
@@ -119,7 +98,6 @@ async function loadDashboard() {
   await loadDiscTest();
   await Promise.all([loadSessions(), loadSubmissions()]);
   renderAll();
-  startPolling();
 }
 
 async function loadDiscTest() {
@@ -177,14 +155,18 @@ function slugify(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 
+// Strip the page filename so links work whether this dashboard is served
+// as admin.html (game-hub) or disc-admin.html (flag-retrieval public/).
+function pageBase() {
+  return `${location.origin}${location.pathname.replace(/[^/]*$/, '')}`;
+}
+
 function shareLinkForSession(sess) {
-  const base = `${location.origin}${location.pathname.replace(/disc-admin\.html$/, '')}`;
-  return `${base}disc-quiz.html?s=${encodeURIComponent(sess.code)}`;
+  return `${pageBase()}disc-quiz.html?s=${encodeURIComponent(sess.code)}`;
 }
 
 function projectorLinkForSession(sess) {
-  const base = `${location.origin}${location.pathname.replace(/disc-admin\.html$/, '')}`;
-  return `${base}disc-projector.html?s=${encodeURIComponent(sess.code)}`;
+  return `${pageBase()}disc-projector.html?s=${encodeURIComponent(sess.code)}`;
 }
 
 function renderSessionsTable() {
@@ -318,11 +300,11 @@ function renderDiscSummary(subs) {
   ['D', 'I', 'S', 'C'].forEach(k => {
     const row = document.createElement('div');
     row.className = 'admin-disc-bar';
-    const pct = Math.round(((avg[k] - 10) / 40) * 100);
+    const pct = Math.round(((avg[k] - AXIS_MIN) / (AXIS_MAX - AXIS_MIN)) * 100);
     row.innerHTML = `
       <span class="admin-disc-bar-key disc-stat-${k}">${k}</span>
       <span class="admin-disc-bar-track"><span class="admin-disc-bar-fill" style="width: ${Math.max(2, pct)}%; background: ${DISC_COLORS[k]};"></span></span>
-      <span class="admin-disc-bar-val">${avg[k].toFixed(1)} / 50</span>`;
+      <span class="admin-disc-bar-val">${avg[k].toFixed(1)} / ${AXIS_MAX}</span>`;
     barsEl.appendChild(row);
   });
 
@@ -358,7 +340,8 @@ function renderSessionSubmissionsTable(subs) {
       <td>${resultBadge}</td>
       <td class="admin-mono">${scoreCell}</td>
       <td class="admin-muted-sm">${new Date(sub.submitted_at).toLocaleString()}</td>`;
-    tr.children[0].querySelector('strong').textContent = sub.full_name;
+    tr.children[0].querySelector('strong').textContent =
+      (sub.emoji ? sub.emoji + ' ' : '') + sub.full_name;
     tr.children[1].textContent = sub.age || '—';
     tr.children[2].textContent = sub.position || '—';
     tr.children[3].textContent = sub.email || '—';
@@ -370,7 +353,7 @@ function renderSessionSubmissionsTable(subs) {
 
 function exportSessionCsv(sess, subs) {
   if (subs.length === 0) { toast('Nothing to export.', 'error'); return; }
-  const header = ['full_name','age','position','email','primary_type','d_score','i_score','s_score','c_score','submitted_at'];
+  const header = ['full_name','emoji','age','position','email','primary_type','d_score','i_score','s_score','c_score','submitted_at'];
   const esc = (v) => {
     if (v == null) return '';
     const s = String(v);
@@ -379,7 +362,7 @@ function exportSessionCsv(sess, subs) {
   const lines = [header.join(',')];
   subs.forEach(sub => {
     const row = [
-      sub.full_name, sub.age || '', sub.position || '', sub.email || '',
+      sub.full_name, sub.emoji || '', sub.age || '', sub.position || '', sub.email || '',
       sub.primary_type || '', sub.d_score || 0, sub.i_score || 0, sub.s_score || 0, sub.c_score || 0,
       sub.submitted_at
     ];
@@ -470,14 +453,14 @@ function addDiscReportContent(doc, subs, margin, startY, pageW, pageH) {
   doc.text('Average scores', margin, y); y += 18;
   const drawBar = (label, value, color) => {
     const barW = pageW - margin * 2 - 100;
-    const pct = (value - 10) / 40;
+    const pct = (value - AXIS_MIN) / (AXIS_MAX - AXIS_MIN);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(40);
     doc.text(label, margin, y + 10);
     doc.setFillColor(230, 232, 236);
     doc.rect(margin + 30, y, barW, 12, 'F');
     doc.setFillColor(...hexToRgb(color));
     doc.rect(margin + 30, y, Math.max(2, barW * pct), 12, 'F');
-    doc.text(`${value.toFixed(1)} / 50`, margin + 30 + barW + 8, y + 10);
+    doc.text(`${value.toFixed(1)} / ${AXIS_MAX}`, margin + 30 + barW + 8, y + 10);
     y += 20;
   };
   drawBar('D', dSum / n, DISC_COLORS.D);

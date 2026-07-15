@@ -1,11 +1,18 @@
 /*
  * DISC Projector — live big-screen view of where every participant
- * sits on the DISC quadrant. Polls Supabase every 5 seconds, redraws.
+ * sits on the DISC quadrant.
  *
- * URL: disc-projector.html?s=<session-code>
+ * URL: disc-projector.html            → session picker
+ *      disc-projector.html?s=<code>   → live view for that session
+ *
+ * The live view shows a join QR (participants scan it, enter their
+ * name and pick an emoji on the quiz landing page) and reads the
+ * public `disc_live` table — no admin login required. Each finished
+ * participant appears as their emoji on the quadrant, with a legend
+ * on the side mapping emoji → name.
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { drawQuadrant } from './disc-chart.js?v=20260505b';
+import { drawQuadrant, quadrantColor } from './disc-chart.js?v=20260715a';
 
 const $ = (id) => document.getElementById(id);
 const qs = new URLSearchParams(window.location.search);
@@ -13,25 +20,108 @@ const sessionCode = (qs.get('s') || '').trim().toLowerCase();
 
 const sb = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
+const DISC_SLUG = 'disc-personality';
+
 const state = {
   session: null,
-  rows: []
+  entries: []
 };
 
+function showScreen(id) {
+  ['screenLoading', 'screenPicker', 'screenError', 'screenLive'].forEach(s => {
+    $(s).hidden = s !== id;
+  });
+}
+
 function showError(title, detail) {
-  $('screenLoading').hidden = true;
-  $('screenLive').hidden = true;
-  $('screenError').hidden = false;
+  showScreen('screenError');
   $('errTitle').textContent = title;
   $('errDetail').textContent = detail || '';
 }
 
-async function bootstrap() {
-  if (!sessionCode) {
-    showError('No session link', 'Open this page with ?s=<session-code> to project a live DISC map.');
+// ---------------------------------------------------------------
+// Session picker (no ?s= in the URL)
+// ---------------------------------------------------------------
+
+async function loadPicker() {
+  const { data: test, error: tErr } = await sb
+    .from('tests').select('id')
+    .eq('slug', DISC_SLUG).maybeSingle();
+  if (tErr || !test) {
+    showError('DISC test not found', tErr ? tErr.message : 'The DISC test is not seeded in the database.');
     return;
   }
 
+  const { data: sessions, error: sErr } = await sb
+    .from('sessions')
+    .select('code, company_name, event_date, is_active, created_at')
+    .eq('test_id', test.id)
+    .order('created_at', { ascending: false });
+  if (sErr) {
+    showError('Couldn’t load sessions', sErr.message);
+    return;
+  }
+
+  const list = $('pickerList');
+  list.innerHTML = '';
+  if (!sessions || sessions.length === 0) {
+    list.innerHTML = '<p class="disc-projector-picker-empty">No sessions yet. Create one in the DISC Admin dashboard first.</p>';
+  } else {
+    // Active sessions first, then most recent.
+    sessions.sort((a, b) => (b.is_active - a.is_active));
+    sessions.forEach(s => {
+      const a = document.createElement('a');
+      a.className = 'disc-projector-picker-item';
+      a.href = `disc-projector.html?s=${encodeURIComponent(s.code)}`;
+      a.innerHTML = `
+        <span class="disc-projector-picker-name"></span>
+        <span class="disc-projector-picker-meta"></span>
+        <span class="admin-pill ${s.is_active ? 'admin-pill--green' : 'admin-pill--grey'}">${s.is_active ? 'Active' : 'Closed'}</span>`;
+      a.querySelector('.disc-projector-picker-name').textContent = s.company_name;
+      a.querySelector('.disc-projector-picker-meta').textContent =
+        `${s.code}${s.event_date ? '  ·  ' + s.event_date : ''}`;
+      list.appendChild(a);
+    });
+  }
+  showScreen('screenPicker');
+}
+
+// ---------------------------------------------------------------
+// Live view
+// ---------------------------------------------------------------
+
+function joinLink() {
+  const base = `${location.origin}${location.pathname.replace(/disc-projector\.html$/, '')}`;
+  return `${base}disc-quiz.html?s=${encodeURIComponent(state.session.code)}`;
+}
+
+function drawJoinQr() {
+  const link = joinLink();
+  const qr = window.qrcode(0, 'M');
+  qr.addData(link);
+  qr.make();
+  const canvas = $('joinQrCanvas');
+  const ctx = canvas.getContext('2d');
+  const moduleCount = qr.getModuleCount();
+  const cellSize = 8;
+  const margin = 3;
+  const size = (moduleCount + margin * 2) * cellSize;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#0b0f1a';
+  for (let r = 0; r < moduleCount; r++) {
+    for (let c = 0; c < moduleCount; c++) {
+      if (qr.isDark(r, c)) {
+        ctx.fillRect((c + margin) * cellSize, (r + margin) * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+  $('joinLinkText').textContent = link.replace(/^https?:\/\//, '');
+}
+
+async function loadLive() {
   const { data: session, error } = await sb
     .from('sessions')
     .select('id, code, company_name, event_date')
@@ -46,87 +136,104 @@ async function bootstrap() {
   state.session = session;
   $('sessionTitle').textContent =
     `${session.company_name}${session.event_date ? '  ·  ' + session.event_date : ''}`;
-
-  const joinUrl = `${location.origin}/disc-quiz.html?s=${encodeURIComponent(session.code)}`;
-  $('joinQr').src = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&bgcolor=ffffff&color=0F172A&data=${encodeURIComponent(joinUrl)}`;
-  $('joinUrl').textContent = joinUrl.replace(/^https?:\/\//, '');
-  $('joinCode').textContent = session.code;
-
-  $('screenLoading').hidden = true;
-  $('screenLive').hidden = false;
+  showScreen('screenLive');
+  drawJoinQr();
 
   await refresh();
-  setInterval(refresh, 5000);
+  setInterval(refresh, 4000);
 }
 
 async function refresh() {
-  // Note: the public anon key only allows SELECT on submissions for
-  // admins. Projector pages must therefore be opened by an admin who's
-  // already logged in via the admin dashboard (same browser session),
-  // OR you can open up a read-only RLS policy for projector use.
   const { data, error } = await sb
-    .from('submissions')
-    .select('full_name, primary_type, d_score, i_score, s_score, c_score, answers, submitted_at')
+    .from('disc_live')
+    .select('full_name, emoji, x, y, primary_type, created_at, finished_at')
     .eq('session_id', state.session.id)
-    .order('submitted_at', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.warn('projector load error', error.message);
+    showError('Live board unavailable',
+      `${error.message} — has supabase/disc-live-schema.sql been run in this project?`);
     return;
   }
-  state.rows = data || [];
+  state.entries = data || [];
 
   renderStats();
+  renderLegend();
   renderCanvas();
   $('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
 }
 
 function renderStats() {
-  const counts = { total: state.rows.length, D: 0, I: 0, S: 0, C: 0 };
-  state.rows.forEach(r => {
-    const t = (r.primary_type || '')[0];
+  const done = state.entries.filter(e => e.finished_at);
+  const counts = { D: 0, I: 0, S: 0, C: 0 };
+  done.forEach(e => {
+    const t = (e.primary_type || '')[0];
     if (counts[t] != null) counts[t]++;
   });
-  $('countTotal').textContent = counts.total;
+  $('countTotal').textContent = state.entries.length;
+  $('countDone').textContent = done.length;
   $('countD').textContent = counts.D;
   $('countI').textContent = counts.I;
   $('countS').textContent = counts.S;
   $('countC').textContent = counts.C;
 }
 
+function renderLegend() {
+  const list = $('legendList');
+  list.innerHTML = '';
+  $('legendCount').textContent = state.entries.length ? `(${state.entries.length})` : '';
+  if (state.entries.length === 0) {
+    list.innerHTML = '<li class="disc-projector-legend-empty">Nobody has joined yet — scan the QR to be first!</li>';
+    return;
+  }
+  state.entries.forEach(e => {
+    const li = document.createElement('li');
+    li.className = e.finished_at ? 'is-done' : 'is-pending';
+    const type = e.finished_at ? (e.primary_type || '') : '';
+    li.innerHTML = `
+      <span class="disc-legend-emoji"></span>
+      <span class="disc-legend-name"></span>
+      <span class="disc-legend-type"></span>`;
+    li.querySelector('.disc-legend-emoji').textContent = e.emoji;
+    li.querySelector('.disc-legend-name').textContent = e.full_name;
+    const typeEl = li.querySelector('.disc-legend-type');
+    if (e.finished_at) {
+      typeEl.textContent = type === 'BALANCED' ? '✨' : type;
+      typeEl.style.color = quadrantColor(e.primary_type);
+    } else {
+      typeEl.textContent = '…';
+      typeEl.title = 'Still taking the test';
+    }
+    list.appendChild(li);
+  });
+}
+
 function renderCanvas() {
   const canvas = $('projCanvas');
-  const dots = state.rows.map(r => {
-    const pos = (r.answers && r.answers.position) || computePos(r);
-    return {
-      label: r.full_name,
-      x: pos.x,
-      y: pos.y,
-      primary: r.primary_type,
+  const dots = state.entries
+    .filter(e => e.finished_at && e.x != null && e.y != null)
+    .map(e => ({
+      emoji: e.emoji,
+      x: Number(e.x),
+      y: Number(e.y),
+      primary: e.primary_type,
       isYou: false
-    };
-  });
+    }));
 
-  // De-overlap labels by jittering coincident points slightly
+  // De-overlap coincident markers by jittering slightly
   const seen = new Map();
   dots.forEach(d => {
-    const key = `${Math.round(d.x)}|${Math.round(d.y)}`;
+    const key = `${Math.round(d.x / 4)}|${Math.round(d.y / 4)}`;
     const n = seen.get(key) || 0;
     if (n > 0) {
-      d.x += (n % 2 === 0 ? 1 : -1) * (1.6 + Math.floor(n / 2));
-      d.y += (n % 3 === 0 ? -1 : 1) * (1.6 + Math.floor(n / 3));
+      d.x += (n % 2 === 0 ? 1 : -1) * (4 + Math.floor(n / 2) * 3);
+      d.y += (n % 3 === 0 ? -1 : 1) * (4 + Math.floor(n / 3) * 3);
     }
     seen.set(key, n + 1);
   });
 
   drawQuadrant(canvas, dots);
-}
-
-function computePos(r) {
-  return {
-    x: (r.i_score + r.s_score) - (r.d_score + r.c_score),
-    y: (r.d_score + r.i_score) - (r.s_score + r.c_score)
-  };
 }
 
 // Fullscreen on F
@@ -137,4 +244,11 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-bootstrap();
+// ---------------------------------------------------------------
+// Go
+// ---------------------------------------------------------------
+
+(sessionCode ? loadLive() : loadPicker()).catch(err => {
+  console.error(err);
+  showError('Something went wrong', err.message || String(err));
+});

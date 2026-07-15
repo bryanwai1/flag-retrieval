@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20260505b">
+  <link rel="stylesheet" href="css/styles.css?v=20260715a">
 </head>
 <body class="disc-projector-body">
 
@@ -17,13 +17,22 @@
     <!-- Loading -->
     <section class="disc-projector-loading" id="screenLoading">
       <div class="quiz-loader"></div>
-      <p>Connecting to session&hellip;</p>
+      <p>Connecting&hellip;</p>
+    </section>
+
+    <!-- Session picker (no ?s= in URL) -->
+    <section class="disc-projector-picker" id="screenPicker" hidden>
+      <span class="disc-projector-eyebrow">DISC Live Map</span>
+      <h1>Choose a session to project</h1>
+      <p class="disc-projector-picker-sub">Pick the session for today&rsquo;s event. Participants will scan the QR on the next screen to join.</p>
+      <div class="disc-projector-picker-list" id="pickerList"></div>
     </section>
 
     <!-- Error -->
     <section class="disc-projector-error" id="screenError" hidden>
       <h1 id="errTitle">Session not found</h1>
       <p id="errDetail"></p>
+      <a class="btn btn-outline" href="disc-projector.html">&#x2190; Choose a session</a>
     </section>
 
     <!-- Live -->
@@ -34,7 +43,8 @@
           <h1 id="sessionTitle">&mdash;</h1>
         </div>
         <div class="disc-projector-stats">
-          <div><strong id="countTotal">0</strong><span>People</span></div>
+          <div><strong id="countTotal">0</strong><span>Joined</span></div>
+          <div><strong id="countDone">0</strong><span>Done</span></div>
           <div class="disc-stat-D"><strong id="countD">0</strong><span>D</span></div>
           <div class="disc-stat-I"><strong id="countI">0</strong><span>I</span></div>
           <div class="disc-stat-S"><strong id="countS">0</strong><span>S</span></div>
@@ -42,28 +52,35 @@
         </div>
       </header>
 
-      <div class="disc-projector-canvas-row">
+      <div class="disc-projector-main">
         <div class="disc-projector-canvas-wrap">
           <canvas id="projCanvas" width="1100" height="1100"></canvas>
         </div>
-        <aside class="disc-projector-join" id="joinPanel">
-          <span class="disc-projector-join-eyebrow">Scan to join</span>
-          <img id="joinQr" class="disc-projector-join-qr" alt="QR code to join the DISC test">
-          <div class="disc-projector-join-code">Session code: <strong id="joinCode">&mdash;</strong></div>
-          <code class="disc-projector-join-url" id="joinUrl">&mdash;</code>
+
+        <aside class="disc-projector-side">
+          <div class="disc-projector-qr-card">
+            <h2>Scan to join</h2>
+            <canvas id="joinQrCanvas"></canvas>
+            <p class="disc-projector-qr-link" id="joinLinkText"></p>
+          </div>
+          <div class="disc-projector-legend-card">
+            <h2>Who&rsquo;s who <span id="legendCount"></span></h2>
+            <ul class="disc-projector-legend" id="legendList"></ul>
+          </div>
         </aside>
       </div>
 
       <footer class="disc-projector-footer">
-        <span>Auto-updating every <strong>5s</strong></span>
+        <span>Auto-updating every <strong>4s</strong></span>
         <span id="lastUpdate"></span>
         <span>Press <kbd>F</kbd> for fullscreen</span>
       </footer>
     </section>
   </main>
 
-  <script src="js/main.js?v=20260505b"></script>
-  <script src="js/supabase-config.js?v=20260505b"></script>
-  <script type="module" src="js/disc-projector.js?v=20260505b"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="js/main.js?v=20260715a"></script>
+  <script src="js/supabase-config.js?v=20260715a"></script>
+  <script type="module" src="js/disc-projector.js?v=20260715a"></script>
 </body>
 </html>
