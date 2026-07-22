@@ -5,6 +5,9 @@ import { aitbActivity, AITB_POINTS, aitbSpeedBonus, aitbProgressPoints } from '.
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const TEAM_KEY = 'aitb_my_team'
+// Same key the admin page sets on unlock — players never have it, so they
+// stay locked to the single activity their QR opened (scan again = next game).
+const ADMIN_UNLOCK_KEY = 'aitb_admin_unlocked'
 
 export function AitbMission() {
   const { activityId } = useParams<{ activityId: string }>()
@@ -134,8 +137,18 @@ export function AitbMission() {
     return <div className="min-h-screen bg-gray-950 text-gray-400 flex items-center justify-center">Loading…</div>
   }
 
+  const isAdmin = sessionStorage.getItem(ADMIN_UNLOCK_KEY) === '1'
+
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-24">
+      {/* Admin-only back button — players scan a QR per activity, no browsing */}
+      {isAdmin && (
+        <a href="/aitb/admin"
+          className="fixed top-3 left-3 z-40 px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
+          style={{ background: 'rgba(17,24,39,0.75)', color: '#2dd4bf', border: '1.5px solid #2dd4bf66' }}>
+          ← Admin
+        </a>
+      )}
       {/* Hero */}
       <div className="relative">
         <img src={activity.hero} alt="" className="w-full aspect-video object-cover" />

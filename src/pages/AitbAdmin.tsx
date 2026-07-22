@@ -142,6 +142,9 @@ export function AitbAdmin() {
     <div className="min-h-screen bg-gray-950 text-white p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8 flex-wrap">
+          <a href="/" className="px-4 py-2 rounded-xl font-bold text-sm text-gray-400" style={{ border: '1.5px solid rgba(255,255,255,0.15)' }}>
+            ← Hub
+          </a>
           <h1 className="text-3xl font-black">🤖 AI Team Building — Admin</h1>
           <div className="flex-1" />
           <a href="/aitb" className="px-4 py-2 rounded-xl font-bold text-sm" style={{ background: '#2dd4bf22', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
