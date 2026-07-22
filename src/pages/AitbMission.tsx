@@ -96,7 +96,7 @@ export function AitbMission() {
     if (!progress?.scanned_at || !activity) return
     const { data: settings } = await supabase.from('aitb_settings').select('admin_password').eq('id', 1).maybeSingle()
     if (!settings || pw !== settings.admin_password) {
-      setPwError('Wrong password — ask the game master!')
+      setPwError('Wrong password — ask the marshal!')
       return
     }
     const elapsed = Date.now() - new Date(progress.scanned_at).getTime()
@@ -149,7 +149,7 @@ export function AitbMission() {
       </div>
 
       <div className="px-4 pt-4 max-w-lg mx-auto">
-        <p className="text-gray-300 text-base mb-4">{activity.desc}</p>
+        <p className="text-gray-300 text-base mb-4">{activity.tagline}</p>
 
         {/* Team picker */}
         {!team && (
@@ -231,13 +231,33 @@ export function AitbMission() {
 
             {/* Apps */}
             <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 AI apps to use</div>
-            <div className="flex flex-wrap gap-2 mb-6">
+            <div className="flex flex-wrap gap-2 mb-5">
               {activity.apps.map(a => (
                 <span key={a} className="px-3 py-1.5 rounded-full text-sm font-bold"
                   style={{ background: `${activity.color}22`, color: activity.color, border: `1.5px solid ${activity.color}55` }}>
                   {a}
                 </span>
               ))}
+            </div>
+
+            {/* Full game details */}
+            <div className="rounded-2xl p-4 mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+              <div className="text-xs font-black tracking-widest uppercase mb-2" style={{ color: activity.color }}>📖 Game details</div>
+              <p className="text-gray-300 text-sm leading-relaxed mb-3">{activity.desc}</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">🎁 You will make</div>
+                  <div className="font-bold" style={{ color: activity.color }}>{activity.outType}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">⏱ Time</div>
+                  <div className="font-bold">{activity.mins} minutes</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">🧠 Team skills</div>
+                <div className="text-gray-400 text-sm">{activity.learning}</div>
+              </div>
             </div>
 
             {/* Complete */}
@@ -251,7 +271,7 @@ export function AitbMission() {
               <button onClick={() => { setPwOpen(true); setPwError('') }}
                 className="w-full py-4 rounded-2xl font-black text-lg transition-all active:scale-95"
                 style={{ background: 'rgba(52,211,153,0.15)', border: '2px solid #34d399', color: '#34d399' }}>
-                🏁 MARK COMPLETE (game master only)
+                🏁 MARK COMPLETE (marshal password)
               </button>
             ) : null}
           </>
@@ -264,13 +284,13 @@ export function AitbMission() {
           <div className="bg-gray-900 rounded-3xl p-6 w-full max-w-sm" style={{ border: '2px solid rgba(52,211,153,0.4)' }}
             onClick={e => e.stopPropagation()}>
             <div className="text-center text-4xl mb-2">🔒</div>
-            <div className="font-black text-xl text-center mb-1">Game master check</div>
-            <p className="text-gray-400 text-sm text-center mb-4">Hand the phone to the game master to confirm your mission is complete!</p>
+            <div className="font-black text-xl text-center mb-1">Marshal check</div>
+            <p className="text-gray-400 text-sm text-center mb-4">Hand the phone to the marshal to confirm your mission is complete!</p>
             <input
               type="password" inputMode="numeric" autoFocus value={pw}
               onChange={e => { setPw(e.target.value); setPwError('') }}
               onKeyDown={e => { if (e.key === 'Enter') tryComplete() }}
-              placeholder="Admin password"
+              placeholder="Marshal password"
               className="w-full bg-gray-800 rounded-xl px-4 py-3 font-bold text-center text-lg outline-none mb-2"
               style={{ border: pwError ? '2px solid #f87171' : '2px solid rgba(255,255,255,0.15)' }}
             />

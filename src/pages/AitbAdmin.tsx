@@ -177,8 +177,8 @@ export function AitbAdmin() {
 
           {/* Password + QR */}
           <div className="rounded-3xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
-            <h2 className="font-black text-lg mb-3">🔑 Completion password</h2>
-            <p className="text-gray-400 text-sm mb-3">Participants hand you their phone — you type this to mark a mission complete. Current: <b className="text-white">{settings?.admin_password}</b></p>
+            <h2 className="font-black text-lg mb-3">🔑 Marshal password</h2>
+            <p className="text-gray-400 text-sm mb-3">Participants hand their phone to a marshal — the marshal types this to mark a mission complete. It also unlocks this admin page. Current: <b className="text-white">{settings?.admin_password}</b></p>
             <div className="flex gap-2 mb-6">
               <input value={newPw} onChange={e => setNewPw(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') savePassword() }} placeholder="New password"
@@ -196,6 +196,48 @@ export function AitbAdmin() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Game details */}
+        <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+          <h2 className="font-black text-lg mb-1">📖 Game details</h2>
+          <p className="text-gray-400 text-sm mb-4">Everything the participants see on their mission page. Tap a game to expand.</p>
+          {AITB_ACTIVITIES.map(a => (
+            <details key={a.id} className="mb-2 rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${a.color}33` }}>
+              <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none font-black"
+                style={{ background: `${a.color}11` }}>
+                <span className="text-2xl">{a.emoji}</span>
+                <span style={{ color: a.color }}>Activity {a.act} — {a.name}</span>
+                <span className="text-gray-500 font-bold text-sm">· {a.mins} min · {a.outType}</span>
+                <span className="flex-1" />
+                <button onClick={e => { e.preventDefault(); setQrActivity(a.id) }}
+                  className="px-3 py-1 rounded-lg font-bold text-xs"
+                  style={{ background: `${a.color}22`, color: a.color, border: `1.5px solid ${a.color}55` }}>
+                  📱 QR
+                </button>
+              </summary>
+              <div className="p-4 grid md:grid-cols-[200px_1fr] gap-4">
+                <img src={a.hero} alt="" className="rounded-xl w-full object-cover aspect-video" />
+                <div>
+                  <p className="text-gray-300 text-sm leading-relaxed mb-2">{a.desc}</p>
+                  <p className="text-gray-500 text-sm mb-3">🧠 {a.learning}</p>
+                  <ol className="text-sm text-gray-300 mb-3">
+                    {a.steps.map((s, i) => (
+                      <li key={i} className="mb-1">{a.stepEmojis[i]} <b>{i + 1}.</b> {s}</li>
+                    ))}
+                  </ol>
+                  <div className="flex flex-wrap gap-2">
+                    {a.apps.map(x => (
+                      <span key={x} className="px-2.5 py-1 rounded-full text-xs font-bold"
+                        style={{ background: `${a.color}22`, color: a.color, border: `1px solid ${a.color}55` }}>
+                        {x}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </details>
+          ))}
         </div>
 
         {/* Progress matrix */}

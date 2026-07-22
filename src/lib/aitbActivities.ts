@@ -1,6 +1,7 @@
 // AI Team Building — the 10 activities, ported from the offline Game System app
 // (D:\4. Team Building Activities\25. Game library\Game System\index.html).
 // Steps are written so "a 6-year-old understands" — keep them short and fun.
+// tagline = one punchy line; desc = full facilitator description; learning = outcome.
 
 export type AitbActivity = {
   id: number
@@ -9,7 +10,9 @@ export type AitbActivity = {
   color: string
   name: string
   outType: string
+  tagline: string
   desc: string
+  learning: string
   steps: string[]
   stepEmojis: string[]
   apps: string[]
@@ -21,7 +24,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 1, act: '01', emoji: '🎯', color: '#fb7185', name: 'Nerf Prompt Cups',
     outType: 'AI Image',
-    desc: 'Shoot cups, reveal secret words, turn them into a wild AI picture!',
+    tagline: 'Shoot cups, reveal secret words, turn them into a wild AI picture!',
+    desc: 'Three separate sets of coloured cups — Red = Character, Blue = Action, Yellow = Scene. Teams shoot one cup from each set and reveal a hidden slip inside. The combination becomes their prompt for a wild AI image.',
+    learning: 'Precision, role delegation, and reveal-based creative problem-solving.',
     steps: [
       'Shoot 1 red, 1 blue and 1 yellow cup.',
       'Shout the cup numbers to the host!',
@@ -35,7 +40,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 2, act: '02', emoji: '🕹️', color: '#22d3ee', name: 'Retro Game Speed Build',
     outType: '3 Playable Browser Games',
-    desc: 'Fastest team to build 3 working retro games with AI wins!',
+    tagline: 'Fastest team to build 3 working retro games with AI wins!',
+    desc: 'Fastest team to build 3 working browser games — Super Mario, Pac-Man, Donkey Kong — wins. Teams choose which AI tool for each game and work in parallel. A game only counts if it actually plays.',
+    learning: 'Parallel workflow, tool selection strategy, and rapid QA under pressure.',
     steps: [
       'Pick 1 builder for each game + 1 tester.',
       'Ask AI to build Mario, Pac-Man and Donkey Kong.',
@@ -49,7 +56,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 3, act: '03', emoji: '🏰', color: '#a78bfa', name: 'Rubber Band Castle',
     outType: 'AI Castle + Team Composite',
-    desc: 'Stack ALL the cups into a castle — no hands, only strings!',
+    tagline: 'Stack ALL the cups into a castle — no hands, only strings!',
+    desc: 'One rubber band with 6-8 strings tied around it — each team member holds ONE string. No hands may touch the cups. ALL cups must be stacked into the castle. AI then transforms the cup castle into a real one with the team on top.',
+    learning: 'Non-verbal coordination, tension calibration, and full-team completion under constraint.',
     steps: [
       'Everyone holds ONE string on the rubber band.',
       'Pull together to grab cups — NO hands!',
@@ -63,7 +72,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 4, act: '04', emoji: '🌳', color: '#34d399', name: 'Resort Tree App Sprint',
     outType: 'Interactive Web App',
-    desc: 'Photograph 6 trees, then build a real tree app with AI!',
+    tagline: 'Photograph 6 trees, then build a real tree app with AI!',
+    desc: 'Team splits up to photograph 6 pre-marked trees around the resort, then races back to build a real, deployable interactive web app showcasing all 6 trees with facts, photos, and one interactive element.',
+    learning: 'Distributed exploration, focused technical collaboration, and shipping real products fast.',
     steps: [
       'Find the 6 marked trees around the resort.',
       'Split up and snap photos of each tree.',
@@ -77,7 +88,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 5, act: '05', emoji: '🎶', color: '#f472b6', name: 'Roulette Jingle & Dance Off',
     outType: 'AI Song + Live Dance',
-    desc: 'Spin the wheels, make an AI song, dance it live!',
+    tagline: 'Spin the wheels, make an AI song, dance it live!',
+    desc: 'Two roulette wheels: one picks the genre (K-pop, dangdut, Bollywood...), one picks the mandatory topic (nasi lemak, KPI targets, the boss). Team writes lyrics, generates the song in Suno, then choreographs a live team dance.',
+    learning: 'Creative negotiation, vulnerability unlock, and shared physical expression.',
     steps: [
       'Spin both wheels — keep what you get!',
       'Write a song about your two words.',
@@ -91,7 +104,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 6, act: '06', emoji: '🎬', color: '#fbbf24', name: 'Random Card Cinematic',
     outType: 'Cinematic Video',
-    desc: '4 surprise cards become one epic AI movie scene!',
+    tagline: '4 surprise cards become one epic AI movie scene!',
+    desc: 'A digital random card app deals 4 wildcards to each team — Country/Civilization, Character, Scene, Cinematic Style. No re-draws. Team assembles the four elements into a cinematic prompt and generates a short historical epic movie scene.',
+    learning: 'Collective decision-making, negotiation, and creative reconciliation of random constraints.',
     steps: [
       'Tap DRAW and get 4 surprise cards.',
       'No swapping — keep what you get!',
@@ -105,7 +120,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 7, act: '07', emoji: '🏓', color: '#60a5fa', name: 'Ping Pong Alphabet Pitch',
     outType: 'AI Ad Campaign + Pitch',
-    desc: 'Bounce balls into letter cups, make 7 words, pitch a crazy AI ad!',
+    tagline: 'Bounce balls into letter cups, make 7 words, pitch a crazy AI ad!',
+    desc: '26 cups labelled A–Z. Teams bounce ping pong balls into the cups — must land in at least 7 different cups. Team then builds 7 words that together include ALL 7 collected letters. Those words become mandatory ingredients for a wild AI ad campaign, pitched live Shark-Tank style.',
+    learning: 'Constraint-driven creativity, prompt engineering under limits, and live pitch performance.',
     steps: [
       'Bounce balls into the letter cups — 90 seconds!',
       'Collect at least 7 different letters.',
@@ -119,7 +136,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 8, act: '08', emoji: '👁️', color: '#f59e0b', name: 'Speed Edit Showdown',
     outType: 'Image Recreation',
-    desc: 'Relay-race to recreate the picture on the big screen with AI!',
+    tagline: 'Relay-race to recreate the picture on the big screen with AI!',
+    desc: 'A target image goes up on the big screen. Team members take turns — relay style — each writing the next prompt to recreate it with AI. Race to submit: the faster your picture gets the marshal’s ✅, the more points you score.',
+    learning: 'Turn-taking, observation, and reverse prompt engineering under time pressure.',
     steps: [
       'Look at the target picture on the big screen.',
       'Take turns — each member writes the next prompt!',
@@ -133,7 +152,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 9, act: '09', emoji: '🐘', color: '#2dd4bf', name: 'Found Object Animals',
     outType: 'Animated Interaction Video',
-    desc: 'Build animals from random stuff — AI makes them come ALIVE!',
+    tagline: 'Build animals from random stuff — AI makes them come ALIVE!',
+    desc: 'Each team gets 2 animal archetypes. Teams gather random found objects and arrange them flat on the ground to form the shape of each animal. Photograph, use AI to bring the shape to life as a realistic animal, then animate the two animals interacting.',
+    learning: 'Creative resourcefulness, spatial composition, and full AI pipeline from flat-lay to motion.',
     steps: [
       'Get your 2 animals (like Tiger + Elephant).',
       'Collect stuff — leaves, shoes, spoons, anything!',
@@ -147,7 +168,9 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 10, act: '10', emoji: '🧭', color: '#c084fc', name: 'Resort Character Journey',
     outType: '10-Scene Travelogue',
-    desc: 'One mascot, 10 real resort spots — tell A Day in the Life!',
+    tagline: 'One mascot, 10 real resort spots — tell A Day in the Life!',
+    desc: 'Team designs ONE cartoon mascot character. Split up to photograph 10 real resort locations. Use AI to place the SAME cartoon character into each REAL background photo. Present as a “Day in the Life” resort marketing campaign.',
+    learning: 'Grand finale synthesis — storytelling, character consistency, and real-world compositing.',
     steps: [
       'Create ONE cartoon mascot character.',
       'Photo 10 real spots — pool, lobby, spa...',
@@ -168,7 +191,7 @@ export function aitbActivity(id: number): AitbActivity | undefined {
    Timer starts the moment the team checks in (scans the QR and taps start).
    +100  check-in (scan)
    +100  per step ticked (5 steps = 500)
-   +300  activity completed (admin password)
+   +300  activity completed (marshal password)
    +bonus speed bonus on completion, based on elapsed vs the activity's minutes:
          ≤50% time → +500 · ≤75% → +400 · ≤100% → +300 · ≤125% → +200 · else +100
    Max per activity: 1400 pts                                            */

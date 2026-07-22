@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { AITB_ACTIVITIES, aitbProgressPoints } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 export function AitbProjector() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
   const [now, setNow] = useState(Date.now())
+  const [view, setView] = useState<number | null>(null) // null = scoreboard, 1-10 = game briefing slide
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return
@@ -54,11 +55,55 @@ export function AitbProjector() {
   const maxTotal = Math.max(1, ranked[0]?.total ?? 0)
   const medals = ['🥇', '🥈', '🥉']
 
+  // Game briefing slide — full details on the big screen
+  if (view !== null) {
+    const a = aitbActivity(view)!
+    return (
+      <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img src={a.hero} alt="" className="w-full h-full object-cover opacity-25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-gray-950/40" />
+        </div>
+        <div className="relative z-10 max-w-7xl mx-auto p-12 min-h-screen flex flex-col">
+          <GameNav view={view} setView={setView} />
+          <div className="flex-1 grid lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <div className="text-xl font-black tracking-widest uppercase mb-2" style={{ color: a.color }}>
+                Activity {a.act} · ⏱ {a.mins} min · 🎁 {a.outType}
+              </div>
+              <h1 className="text-6xl font-black leading-tight mb-5">{a.emoji} {a.name}</h1>
+              <p className="text-gray-200 text-2xl leading-relaxed mb-5">{a.desc}</p>
+              <div className="text-gray-400 text-xl mb-6">🧠 {a.learning}</div>
+              <div className="flex flex-wrap gap-3">
+                {a.apps.map(x => (
+                  <span key={x} className="px-5 py-2 rounded-full text-xl font-bold"
+                    style={{ background: `${a.color}22`, color: a.color, border: `2px solid ${a.color}66` }}>
+                    {x}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-4">
+              {a.steps.map((s, i) => (
+                <div key={i} className="flex items-center gap-5 rounded-3xl px-7 py-5"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: `2px solid ${a.color}44` }}>
+                  <span className="text-5xl">{a.stepEmojis[i]}</span>
+                  <span className="text-2xl font-bold">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden p-10">
       <ParticleBackground />
 
       <div className="relative z-10 max-w-7xl mx-auto">
+        <GameNav view={view} setView={setView} />
         <div className="text-center mb-10">
           <h1 className="text-6xl font-black tracking-tight animate-slide-up">🤖 AI TEAM BUILDING</h1>
           <p className="text-gray-400 text-2xl mt-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
@@ -137,4 +182,29 @@ function fmtElapsed(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
   const m = Math.floor(s / 60)
   return `${m}:${String(s % 60).padStart(2, '0')}`
+}
+
+/* Top nav: 🏆 scoreboard + one button per game, so the host can flash any
+   game's full briefing on the projector, then flip back to live scores. */
+function GameNav({ view, setView }: { view: number | null; setView: (v: number | null) => void }) {
+  return (
+    <div className="flex gap-2 justify-center flex-wrap mb-8">
+      <button onClick={() => setView(null)}
+        className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+        style={view === null
+          ? { background: '#2dd4bf', color: '#000' }
+          : { background: 'rgba(255,255,255,0.06)', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
+        🏆 Scores
+      </button>
+      {AITB_ACTIVITIES.map(a => (
+        <button key={a.id} onClick={() => setView(a.id)}
+          className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+          style={view === a.id
+            ? { background: a.color, color: '#000' }
+            : { background: 'rgba(255,255,255,0.06)', color: a.color, border: `1.5px solid ${a.color}55` }}>
+          {a.emoji} {a.act}
+        </button>
+      ))}
+    </div>
+  )
 }
