@@ -178,7 +178,7 @@ export function AitbAdmin() {
           {/* Password + QR */}
           <div className="rounded-3xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
             <h2 className="font-black text-lg mb-3">🔑 Marshal password</h2>
-            <p className="text-gray-400 text-sm mb-3">Participants hand their phone to a marshal — the marshal types this to mark a mission complete. It also unlocks this admin page. Current: <b className="text-white">{settings?.admin_password}</b></p>
+            <p className="text-gray-400 text-sm mb-3">Marshals type this to mark missions complete. Current: <b className="text-white">{settings?.admin_password}</b></p>
             <div className="flex gap-2 mb-6">
               <input value={newPw} onChange={e => setNewPw(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') savePassword() }} placeholder="New password"
@@ -201,7 +201,7 @@ export function AitbAdmin() {
         {/* Game details */}
         <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
           <h2 className="font-black text-lg mb-1">📖 Game details</h2>
-          <p className="text-gray-400 text-sm mb-4">Everything the participants see on their mission page. Tap a game to expand.</p>
+          <p className="text-gray-400 text-sm mb-4">Tap a game to expand.</p>
           {AITB_ACTIVITIES.map(a => (
             <details key={a.id} className="mb-2 rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${a.color}33` }}>
               <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none font-black"
@@ -243,7 +243,7 @@ export function AitbAdmin() {
         {/* Progress matrix */}
         <div className="rounded-3xl p-6 overflow-x-auto" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
           <h2 className="font-black text-lg mb-1">📊 Live progress</h2>
-          <p className="text-gray-400 text-sm mb-4">⚪ not scanned · 🕐 running (steps ticked) · ✅ complete. Click a cell to force-complete, right-click to reset.</p>
+          <p className="text-gray-400 text-sm mb-4">⚪ waiting · 🕐 playing · ✅ done — click = complete · right-click = reset</p>
           <table className="w-full text-center">
             <thead>
               <tr>

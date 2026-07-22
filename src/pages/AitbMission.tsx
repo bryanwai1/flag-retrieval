@@ -207,7 +207,7 @@ export function AitbMission() {
 
             {/* Steps — fun point form */}
             <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
-              Your mission — tick as you go! (+{AITB_POINTS.step} pts each)
+              ✅ Tick as you go — +{AITB_POINTS.step} each!
             </div>
             <div className="flex flex-col gap-2 mb-5">
               {activity.steps.map((s, i) => {
@@ -230,7 +230,7 @@ export function AitbMission() {
             </div>
 
             {/* Apps */}
-            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 AI apps to use</div>
+            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 Your AI tools</div>
             <div className="flex flex-wrap gap-2 mb-5">
               {activity.apps.map(a => (
                 <span key={a} className="px-3 py-1.5 rounded-full text-sm font-bold"
@@ -240,25 +240,16 @@ export function AitbMission() {
               ))}
             </div>
 
-            {/* Full game details */}
-            <div className="rounded-2xl p-4 mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
-              <div className="text-xs font-black tracking-widest uppercase mb-2" style={{ color: activity.color }}>📖 Game details</div>
-              <p className="text-gray-300 text-sm leading-relaxed mb-3">{activity.desc}</p>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">🎁 You will make</div>
-                  <div className="font-bold" style={{ color: activity.color }}>{activity.outType}</div>
-                </div>
-                <div>
-                  <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">⏱ Time</div>
-                  <div className="font-bold">{activity.mins} minutes</div>
-                </div>
+            {/* Full details — tucked away so the page stays fun */}
+            <details className="rounded-2xl mb-6 overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.08)' }}>
+              <summary className="px-4 py-3 cursor-pointer list-none font-black text-sm" style={{ background: 'rgba(255,255,255,0.04)', color: activity.color }}>
+                📖 More info
+              </summary>
+              <div className="px-4 py-3">
+                <p className="text-gray-300 text-sm leading-relaxed mb-2">{activity.desc}</p>
+                <p className="text-gray-500 text-sm">🧠 {activity.learning}</p>
               </div>
-              <div className="mt-3">
-                <div className="text-gray-500 text-[10px] font-black uppercase tracking-wider">🧠 Team skills</div>
-                <div className="text-gray-400 text-sm">{activity.learning}</div>
-              </div>
-            </div>
+            </details>
 
             {/* Complete */}
             {progress?.completed_at ? (
@@ -271,7 +262,7 @@ export function AitbMission() {
               <button onClick={() => { setPwOpen(true); setPwError('') }}
                 className="w-full py-4 rounded-2xl font-black text-lg transition-all active:scale-95"
                 style={{ background: 'rgba(52,211,153,0.15)', border: '2px solid #34d399', color: '#34d399' }}>
-                🏁 MARK COMPLETE (marshal password)
+                🏁 DONE? CALL THE MARSHAL!
               </button>
             ) : null}
           </>
@@ -285,7 +276,7 @@ export function AitbMission() {
             onClick={e => e.stopPropagation()}>
             <div className="text-center text-4xl mb-2">🔒</div>
             <div className="font-black text-xl text-center mb-1">Marshal check</div>
-            <p className="text-gray-400 text-sm text-center mb-4">Hand the phone to the marshal to confirm your mission is complete!</p>
+            <p className="text-gray-400 text-sm text-center mb-4">Hand your phone to the marshal! 🙌</p>
             <input
               type="password" inputMode="numeric" autoFocus value={pw}
               onChange={e => { setPw(e.target.value); setPwError('') }}
