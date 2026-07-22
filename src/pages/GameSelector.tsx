@@ -71,6 +71,16 @@ export function GameSelector() {
           primaryLabel="RESULTS DISPLAY"
         />
         <GameCard
+          href="/aitb"
+          adminHref="/aitb/admin"
+          icon="🤖"
+          title="AI TEAM BUILDING"
+          description="10 AI missions · Scan QR to play · Live scoring with speed bonus"
+          accent="#2dd4bf"
+          delay="0.75s"
+          primaryLabel="PROJECTOR MODE"
+        />
+        <GameCard
           href="/disc-quiz.html"
           adminHref="/disc-admin.html"
           projectorHref="/disc-projector.html"

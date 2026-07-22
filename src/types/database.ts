@@ -368,3 +368,30 @@ export interface ChainStationScan {
   scanner_id: string | null
   scanned_at: string
 }
+
+/* ---------- AI Team Building ---------- */
+
+export interface AitbSettings {
+  id: number
+  admin_password: string
+  updated_at: string
+}
+
+export interface AitbTeam {
+  id: string
+  name: string
+  color: string
+  sort_order: number
+  created_at: string
+}
+
+export interface AitbProgress {
+  id: string
+  team_id: string
+  activity_id: number
+  scanned_at: string | null
+  steps_done: number[]
+  completed_at: string | null
+  bonus: number
+  created_at: string
+}
