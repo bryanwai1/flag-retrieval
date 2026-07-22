@@ -74,7 +74,7 @@ export function AitbProjector() {
               <h1 className="text-6xl font-black leading-tight mb-5">{a.emoji} {a.name}</h1>
               <p className="text-3xl font-bold leading-snug mb-5" style={{ color: a.color }}>{a.tagline}</p>
               <p className="text-gray-400 text-lg leading-relaxed mb-6">{a.desc}</p>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 mb-8">
                 {a.apps.map(x => (
                   <span key={x} className="px-5 py-2 rounded-full text-xl font-bold"
                     style={{ background: `${a.color}22`, color: a.color, border: `2px solid ${a.color}66` }}>
@@ -82,6 +82,13 @@ export function AitbProjector() {
                   </span>
                 ))}
               </div>
+              {/* Opens the interactive game screen (cup board, roulette wheels,
+                  card draw, arcade...) from the embedded Game System app */}
+              <a href={`/gamesystem/index.html#/game/${a.id}`} target="_blank" rel="noopener noreferrer"
+                className="inline-block px-8 py-4 rounded-2xl font-black text-2xl transition-all hover:scale-105"
+                style={{ background: a.color, color: '#000' }}>
+                🎮 SHOW THE GAME
+              </a>
             </div>
             <div className="flex flex-col gap-4">
               {a.steps.map((s, i) => (

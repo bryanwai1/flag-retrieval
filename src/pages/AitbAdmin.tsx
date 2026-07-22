@@ -213,6 +213,12 @@ export function AitbAdmin() {
                 <span style={{ color: a.color }}>Activity {a.act} — {a.name}</span>
                 <span className="text-gray-500 font-bold text-sm">· {a.mins} min · {a.outType}</span>
                 <span className="flex-1" />
+                <a href={`/gamesystem/index.html#/game/${a.id}`} target="_blank" rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="px-3 py-1 rounded-lg font-bold text-xs"
+                  style={{ background: `${a.color}22`, color: a.color, border: `1.5px solid ${a.color}55` }}>
+                  🎮 Demo
+                </a>
                 <button onClick={e => { e.preventDefault(); setQrActivity(a.id) }}
                   className="px-3 py-1 rounded-lg font-bold text-xs"
                   style={{ background: `${a.color}22`, color: a.color, border: `1.5px solid ${a.color}55` }}>

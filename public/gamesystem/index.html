@@ -1,0 +1,2214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AI Team Building — Game System</title>
+<style>
+:root{
+  --bg:#0a0a12; --bg2:#12122099; --panel:#15152a; --panel2:#1d1d3a;
+  --ink:#eef0ff; --muted:#9aa0c8; --line:#2a2a4d;
+  --p:#7c3aed;      /* purple */
+  --a:#22d3ee;      /* cyan */
+  --y:#fbbf24;      /* amber */
+  --g:#34d399;      /* green */
+  --r:#fb7185;      /* red/pink */
+  --shadow:0 10px 40px rgba(0,0,0,.5);
+  --radius:18px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:
+    radial-gradient(1200px 700px at 80% -10%, #241b4d55, transparent),
+    radial-gradient(900px 600px at -10% 110%, #0e3a4655, transparent),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Segoe UI",system-ui,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:var(--a)}
+button{font-family:inherit;cursor:pointer;border:0;outline:0}
+.mono{font-family:"Consolas","Courier New",monospace}
+
+/* Layout */
+#app{min-height:100vh;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:12px 20px;background:#0a0a12dd;backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.logo{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--p),var(--a));font-size:22px;box-shadow:var(--shadow)}
+.brand b{font-size:16px;letter-spacing:.5px}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase}
+.spacer{flex:1}
+.navbtn{
+  background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  padding:9px 15px;border-radius:11px;font-size:13px;font-weight:600;display:inline-flex;gap:7px;align-items:center;
+  transition:.15s;
+}
+.navbtn:hover{border-color:var(--p);background:var(--panel2)}
+.navbtn.solid{background:linear-gradient(135deg,var(--p),#a855f7);border-color:transparent}
+main{flex:1;max-width:1180px;width:100%;margin:0 auto;padding:26px 20px 80px}
+
+/* Generic */
+.h1{font-size:30px;font-weight:800;letter-spacing:.3px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+.grid{display:grid;gap:16px}
+.card{background:linear-gradient(180deg,var(--panel),#101024);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow)}
+.pad{padding:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  padding:5px 10px;border-radius:999px;background:#ffffff10;border:1px solid var(--line);color:var(--muted)}
+.tag{font-size:12px;font-weight:600;padding:5px 11px;border-radius:8px;background:#ffffff0d;border:1px solid var(--line)}
+.btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);padding:10px 16px;border-radius:11px;font-weight:700;font-size:14px;transition:.15s}
+.btn:hover{border-color:var(--p)}
+.btn.primary{background:linear-gradient(135deg,var(--p),#a855f7);border-color:transparent}
+.btn.cyan{background:linear-gradient(135deg,#0891b2,var(--a));border-color:transparent;color:#04121a}
+.btn.green{background:linear-gradient(135deg,#059669,var(--g));border-color:transparent;color:#04140d}
+.btn.ghost{background:transparent}
+.btn.sm{padding:7px 11px;font-size:12px;border-radius:9px}
+.btn.lg{padding:15px 26px;font-size:17px;border-radius:14px}
+.btn:active{transform:translateY(1px)}
+input,select,textarea{background:#0c0c1a;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit}
+input:focus,textarea:focus,select:focus{border-color:var(--p)}
+.muted{color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+
+/* Hero banner */
+.hero{position:relative;border-radius:22px;overflow:hidden;margin-bottom:24px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.hero video,.hero img{display:block;width:100%;max-height:340px;object-fit:cover}
+.hero .ov{position:absolute;inset:0;background:linear-gradient(180deg,#0a0a1200 40%,#0a0a12f2);display:flex;flex-direction:column;justify-content:flex-end;padding:22px 26px}
+.hero .ht{font-size:clamp(22px,3.4vw,34px);font-weight:900;letter-spacing:.5px;line-height:1.1;text-shadow:0 2px 12px #000}
+.hero .hs{color:#c9cdf0;font-size:13.5px;margin-top:5px;text-shadow:0 1px 6px #000}
+.hero.slim{margin-bottom:18px}
+.hero.slim>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-height:none}
+.hero.slim .ovs{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:250px;
+  background:linear-gradient(180deg,#0a0a1200 42%,#0a0a12f0);padding:16px 22px}
+.hero.slim .ghead{margin:0}
+.hero.slim h1{text-shadow:0 2px 12px #000}
+@media(max-width:560px){.hero.slim .ovs{min-height:195px}}
+@media(min-width:1200px){.hero.slim .ovs{min-height:300px}}
+
+/* Home dashboard */
+.dashgrid{grid-template-columns:1fr;gap:22px}
+@media(min-width:900px){.dashgrid{grid-template-columns:1.55fr 1fr}}
+.gamegrid{grid-template-columns:repeat(2,1fr)}
+@media(min-width:640px){.gamegrid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1000px){.gamegrid{grid-template-columns:repeat(5,1fr)}}
+.gtile{position:relative;background:linear-gradient(180deg,var(--panel2),#12122a);border:1px solid var(--line);
+  border-radius:16px;padding:14px;cursor:pointer;transition:.15s;min-height:132px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.gtile:hover{transform:translateY(-3px);border-color:var(--accent,var(--p));box-shadow:0 14px 30px #0008}
+.gtile .act{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--muted)}
+.gtile .emoji{font-size:26px}
+.gtile .gn{font-size:13px;font-weight:800;line-height:1.15}
+.gtile .ot{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent,var(--a));font-weight:700;margin-top:auto}
+.gtile .done{position:absolute;top:8px;right:8px;font-size:11px;background:#0009;border:1px solid var(--line);border-radius:8px;padding:2px 6px;color:var(--g);font-weight:700}
+
+/* Leaderboard */
+.lb-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;background:#ffffff07;margin-bottom:8px;border:1px solid transparent}
+.lb-row:first-child{background:linear-gradient(90deg,#fbbf2422,transparent);border-color:#fbbf2455}
+.rank{width:30px;text-align:center;font-weight:900;font-size:18px;color:var(--muted)}
+.rank.g{color:var(--y)}
+.dot{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+.lb-name{font-weight:700;flex:1}
+.lb-score{font-weight:900;font-size:20px;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px}
+
+/* Game screen header */
+.ghead{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+.ghead .em{font-size:52px;line-height:1;filter:drop-shadow(0 6px 12px #0008)}
+.ghead h1{margin:0;font-size:28px;font-weight:800}
+.ghead .otag{display:inline-block;margin-top:6px;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+  padding:5px 12px;border-radius:999px;color:#04121a}
+.cols{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:860px){.cols{grid-template-columns:1.35fr 1fr}}
+.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:9px 0 9px 40px;border-bottom:1px dashed var(--line);font-size:14px;line-height:1.45}
+.steps li:last-child{border-bottom:0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:8px;width:26px;height:26px;border-radius:8px;
+  background:linear-gradient(135deg,var(--p),#a855f7);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center}
+.section-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:800;margin:0 0 8px}
+
+/* Timer */
+.timer{display:flex;flex-direction:column;align-items:center;gap:12px}
+.tdisplay{font-family:"Consolas",monospace;font-weight:800;font-size:64px;letter-spacing:2px;line-height:1;
+  font-variant-numeric:tabular-nums;text-shadow:0 0 24px #7c3aed66}
+.tdisplay.warn{color:var(--y);text-shadow:0 0 24px #fbbf2466}
+.tdisplay.crit{color:var(--r);animation:pulse .8s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.tbar{height:8px;border-radius:999px;background:#ffffff12;overflow:hidden;width:100%}
+.tbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--g),var(--a));transition:width .3s linear}
+.chips .btn{margin:3px}
+
+/* score entry */
+.score-team{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;background:#ffffff07;margin-bottom:8px}
+.stepper{display:flex;align-items:center;gap:6px;margin-left:auto}
+.stepper button{width:34px;height:34px;border-radius:9px;font-size:18px;font-weight:900;background:var(--panel2);border:1px solid var(--line);color:var(--ink)}
+.stepper .val{min-width:52px;text-align:center;font-weight:900;font-size:19px;font-variant-numeric:tabular-nums}
+.awardbtns .btn{margin:3px}
+
+/* Randomizers */
+.reveal-wrap{display:grid;gap:14px;grid-template-columns:1fr;margin:8px 0 18px}
+@media(min-width:720px){.reveal-wrap.three{grid-template-columns:repeat(3,1fr)}
+  .reveal-wrap.four{grid-template-columns:repeat(4,1fr)}
+  .reveal-wrap.two{grid-template-columns:repeat(2,1fr)}}
+.cupgroup{margin:12px 0}
+.cglab{font-weight:800;font-size:12px;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px}
+.cupgrid{display:flex;flex-wrap:wrap;gap:8px}
+.cupbtn{min-width:56px;padding:12px 0;border-radius:12px;border:2px solid var(--cupc);background:#12122a;color:#fff;font-weight:900;font-size:15px;cursor:pointer;transition:.15s;position:relative}
+.cupbtn:hover{transform:translateY(-2px);box-shadow:0 0 14px var(--cupc)}
+.cupbtn.used{opacity:.5}
+.teamchips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+.teamchip{padding:8px 14px;border-radius:999px;border:2px solid var(--tc);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+.teamchip.active{background:var(--tc);color:#0a0a12;box-shadow:0 0 12px var(--tc)}
+.adminrow{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+.adminrow b{width:34px;flex:none}
+.adminrow input{flex:1;min-width:0}
+.playcards{display:grid;gap:12px;grid-template-columns:1fr;margin:10px 0 18px}
+@media(min-width:760px){.playcards{grid-template-columns:repeat(3,1fr)}}
+.playcard{background:linear-gradient(180deg,var(--panel),#101024);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.playcard .pemoji{font-size:34px}
+.playcard b{font-size:17px}
+.playcard span{color:var(--muted);font-size:12.5px}
+.playcard .btn{margin-top:8px}
+.arcade{position:fixed;inset:0;z-index:300;background:#04040c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.arcade canvas{background:#000;border-radius:14px;border:2px solid #2a2a4a;width:min(94vw,calc(78vh*var(--ar,1.6)));height:auto}
+.arcade .ahud{display:flex;gap:26px;font-weight:900;font-size:clamp(16px,2.6vh,30px);color:#fff;letter-spacing:1px}
+.arcade .akeys{color:var(--muted);font-size:clamp(11px,1.6vh,16px);letter-spacing:.5px}
+.arcade .aclose{position:absolute;top:14px;right:16px}
+.tctl{position:fixed;bottom:16px;z-index:320;display:none;user-select:none;-webkit-user-select:none;touch-action:none}
+.arcade.touch .tctl{display:grid}
+.tctl.tleft{left:14px;grid-template-columns:repeat(3,60px);grid-template-rows:repeat(3,60px);gap:4px}
+.tctl.tright{right:18px;grid-template-columns:88px}
+.tbtn{border-radius:50%;background:#ffffff1f;border:2px solid #ffffff4d;color:#fff;font-size:22px;
+  display:flex;align-items:center;justify-content:center;touch-action:none;-webkit-tap-highlight-color:transparent}
+.tbtn:active,.tbtn.on{background:#a855f766;border-color:#a855f7}
+.tbtn.tjump{width:88px;height:88px;font-weight:900;font-size:26px}
+.tctl .tspace{pointer-events:none}
+.treeapp{position:fixed;inset:0;z-index:300;background:#07071a;overflow-y:auto;padding:24px 4vw 70px}
+.treeapp .thead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.treeapp h1{margin:0;font-size:clamp(24px,3.4vw,44px);font-weight:900}
+.treeapp .tsub{color:var(--muted);font-size:clamp(12px,1.4vw,17px)}
+.tgrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.tcard{border-radius:18px;overflow:hidden;background:linear-gradient(180deg,var(--panel),#101024);border:1px solid var(--line);cursor:pointer;transition:.15s}
+.tcard:hover{transform:translateY(-4px);box-shadow:0 0 20px var(--tc)}
+.tcard img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#141432}
+.tcard .tinfo{padding:12px 15px}
+.tcard .tinfo b{font-size:clamp(16px,1.8vw,23px)}
+.tcard .tinfo span{display:block;color:var(--muted);font-size:clamp(12px,1.3vw,16px)}
+.tdetail img{width:100%;max-height:44vh;object-fit:cover;border-radius:18px;background:#141432}
+.tstats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.tstat{background:#141432;border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-weight:700;font-size:clamp(13px,1.6vw,19px)}
+.tfacts{margin:8px 0 0;padding-left:22px}
+.tfacts li{font-size:clamp(14px,1.8vw,22px);line-height:1.5;margin-bottom:8px}
+.twow{background:linear-gradient(135deg,#7c3aed33,#22d3ee22);border:1px solid #a855f7;border-radius:14px;padding:14px 18px;margin-top:16px;font-size:clamp(15px,1.9vw,23px);font-weight:700}
+.qopt{display:block;width:100%;text-align:left;padding:14px 18px;border-radius:14px;border:2px solid var(--line);background:#141432;color:#fff;font-weight:700;font-size:clamp(15px,1.9vw,22px);margin-bottom:10px;cursor:pointer}
+.qopt.correct{border-color:#34d399;background:#34d39926}
+.qopt.wrong{border-color:#f43f5e;background:#f43f5e26}
+.slot{border-radius:16px;border:2px solid var(--line);background:#0c0c1a;padding:20px 14px;text-align:center;min-height:150px;
+  display:flex;flex-direction:column;justify-content:center;gap:10px;position:relative;overflow:hidden;transition:.2s}
+.slot .lab{font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.slot .val{font-size:22px;font-weight:800;line-height:1.25;min-height:56px;display:flex;align-items:center;justify-content:center}
+.slot.spin{animation:jitter .4s infinite}
+.slot.locked{border-color:var(--slotc,var(--p));box-shadow:0 0 24px -6px var(--slotc,var(--p))}
+@keyframes jitter{25%{transform:translateY(-2px)}75%{transform:translateY(2px)}}
+.slot .val.blur{filter:blur(5px);opacity:.7}
+.combo{background:linear-gradient(135deg,#1a1a35,#12122a);border:1px solid var(--p);border-radius:16px;padding:18px;margin-top:6px}
+.combo .lab{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--a);font-weight:800;margin-bottom:6px}
+.combo .txt{font-size:19px;font-weight:700;line-height:1.4}
+
+/* Roulette wheel */
+.wheelbox{display:flex;flex-direction:column;align-items:center;gap:12px}
+.roulette-row{display:flex;gap:36px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin:6px 0 4px}
+.wheel-outer{position:relative;width:290px;height:290px}
+.wheel-ptr{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:3;
+  border-left:13px solid transparent;border-right:13px solid transparent;border-top:24px solid var(--y);filter:drop-shadow(0 2px 3px #000)}
+.wheel{width:290px;height:290px;border-radius:50%;border:5px solid #2a2a4d;
+  transition:transform 4.6s cubic-bezier(.12,.72,.05,1);position:relative;overflow:hidden;box-shadow:0 0 0 4px #0006 inset,var(--shadow)}
+.wheel svg{display:block;width:100%;height:100%}
+.wheel-hub{position:absolute;top:50%;left:50%;width:46px;height:46px;margin:-23px;border-radius:50%;
+  background:#0c0c1a;border:3px solid #2a2a4d;z-index:2;display:grid;place-items:center;font-size:19px;box-shadow:0 0 0 3px #0007}
+.wheel-result{font-size:21px;font-weight:800;text-align:center;min-height:27px}
+
+/* Cards */
+.pcard{perspective:900px}
+.pcard-inner{position:relative;width:100%;min-height:180px;transition:transform .7s;transform-style:preserve-3d}
+.pcard.flipped .pcard-inner{transform:rotateY(180deg)}
+.pcard-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:16px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;border:2px solid var(--line)}
+.pcard-back{background:repeating-linear-gradient(45deg,#1a1338,#1a1338 10px,#221845 10px,#221845 20px);
+  font-size:40px;color:#ffffff33}
+.pcard-front{background:#0c0c1a;transform:rotateY(180deg);border-color:var(--cc,var(--p));box-shadow:0 0 22px -8px var(--cc,var(--p))}
+
+/* templates */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tab{padding:9px 16px;border-radius:11px;background:var(--panel);border:1px solid var(--line);font-weight:700;font-size:13px;color:var(--muted)}
+.tab.active{background:linear-gradient(135deg,var(--p),#a855f7);color:#fff;border-color:transparent}
+pre.code{background:#07070f;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;font-size:12.5px;line-height:1.5;max-height:340px;white-space:pre-wrap;word-break:break-word}
+.copywrap{position:relative}
+.copybtn{position:absolute;top:10px;right:10px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--g);color:#04140d;font-weight:800;padding:11px 20px;border-radius:12px;z-index:200;transition:.25s;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* 📱 mobile optimiser — participant mission view (QR scan target) */
+.mission .steps li{font-size:15.5px}
+@media(max-width:560px){
+  main{padding:16px 14px 60px}
+  .mission .ghead .em{font-size:44px}
+  .mission h1{font-size:24px!important}
+  .mission .steps li{font-size:16.5px;line-height:1.5;padding:13px 0 13px 44px}
+  .mission .steps li::before{width:30px;height:30px;font-size:15px;top:11px}
+  .mission .tag{font-size:13px;padding:7px 13px}
+  .mission p{font-size:16px!important}
+}
+
+/* 🖥️ projector optimiser — big screen / landscape tablet */
+@media(min-width:1200px){
+  .ghead h1{font-size:34px}
+  .ghead .em{font-size:62px}
+  .steps li{font-size:17px;padding:12px 0 12px 48px}
+  .steps li::before{width:31px;height:31px;font-size:15px;top:10px}
+  .tdisplay{font-size:92px}
+  .card .pad,.pad{padding:22px}
+  .section-label{font-size:12px}
+  .combo .txt{font-size:23px}
+  .wheel-result{font-size:24px}
+  .slot .val{font-size:26px}
+}
+
+/* flag retrieval board */
+.flag-grid{display:grid;gap:16px;grid-template-columns:repeat(2,1fr)}
+@media(min-width:640px){.flag-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1000px){.flag-grid{grid-template-columns:repeat(5,1fr)}}
+.flagcard{perspective:900px;cursor:pointer}
+.flagcard-inner{position:relative;width:100%;aspect-ratio:3/4;transition:transform .65s;transform-style:preserve-3d}
+.flagcard:hover .flagcard-inner{transform:translateY(-4px)}
+.flagcard.revealed .flagcard-inner,.flagcard.revealed:hover .flagcard-inner{transform:rotateY(180deg)}
+.flagface{position:absolute;inset:0;backface-visibility:hidden;border-radius:18px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:9px;padding:14px;text-align:center;border:2px solid #ffffff22;box-shadow:var(--shadow)}
+.flagface.front{background:linear-gradient(160deg,#ffffff2e,#00000052),var(--fc)}
+.flagface.front .q{font-size:54px;font-weight:900;color:#ffffffe6;text-shadow:0 4px 14px #0007}
+.flagface.front .cn{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;font-weight:800;color:#ffffffd0}
+.flagface.back{background:#12122a;transform:rotateY(180deg);border-color:var(--fc)}
+.flagface.back .em{font-size:36px}
+.flagface.back .nm{font-weight:800;font-size:14px;line-height:1.25}
+.flagface.back .qrhint{font-size:11px;color:var(--muted)}
+.modal-ov{position:fixed;inset:0;background:#000b;backdrop-filter:blur(5px);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:linear-gradient(180deg,var(--panel2),#101024);border:1px solid var(--line);border-radius:22px;
+  max-width:760px;width:100%;padding:28px;display:flex;gap:28px;flex-wrap:wrap;justify-content:center;box-shadow:var(--shadow)}
+.qrbox{background:#fff;border-radius:16px;padding:12px;width:258px;height:258px;display:grid;place-items:center}
+.qrbox svg{display:block;width:100%;height:100%}
+
+/* misc */
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.kv:last-child{border:0}
+.team-edit{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.swatch{width:26px;height:26px;border-radius:8px;flex:none;cursor:pointer;border:2px solid #fff2}
+.iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:9px;width:36px;height:36px;font-size:16px}
+.iconbtn:hover{color:var(--r);border-color:var(--r)}
+.big-note{background:#fbbf2412;border:1px solid #fbbf2455;color:#fde68a;border-radius:12px;padding:12px 14px;font-size:13px}
+.role-grid{display:grid;grid-template-columns:1fr;gap:8px}
+@media(min-width:640px){.role-grid{grid-template-columns:1fr 1fr}}
+.role{background:#ffffff07;border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.role b{display:block;font-size:14px}.role span{font-size:12px;color:var(--muted)}
+.fs-hint{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>/* qrcode-generator 1.4.4 (MIT) - Kazuhiko Arase - embedded for offline use */
+/**
+ * Minified by jsDelivr using Terser v5.37.0.
+ * Original file: /npm/qrcode-generator@1.4.4/qrcode.js
+ *
+ * Do NOT use SRI with dynamically generated files! More information: https://www.jsdelivr.com/using-sri-with-dynamic-files
+ */
+var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,(function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1}))},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(n*r,o*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}((function(){return qrcode}));
+//# sourceMappingURL=/sm/26b4b0d0b1e283d6b3ec9857ac597d7a60c76ac17be1ef4c965f03086de426bb.map
+</script>
+
+<script>
+/* =========================================================================
+   AI TEAM BUILDING — GAME SYSTEM  (single-file, offline, projector-ready)
+   ========================================================================= */
+
+/* ---------- Data: the 10 games ---------- */
+const GAMES = [
+  { id:1, act:"01", emoji:"🎯", color:"#fb7185", name:"Nerf Prompt Cups", outType:"AI Image", outCol:"#fb7185",
+    desc:"Three separate sets of coloured cups — Red = Character, Blue = Action, Yellow = Scene. Teams shoot one cup from each set and reveal a hidden slip inside. The combination becomes their prompt for a wild AI image.",
+    learning:"Precision, role delegation, and reveal-based creative problem-solving.",
+    steps:["Shoot 1 red, 1 blue and 1 yellow cup.","Shout the cup numbers to the host!","Watch the big screen — your secret words appear!","Put the 3 words together — that's your prompt!","Ask AI to make the picture and score points!"],
+    apps:["Ideogram","NanoBanana","ChatGPT"], mins:10, module:"cups" },
+  { id:2, act:"02", emoji:"🕹️", color:"#22d3ee", name:"Retro Game Speed Build", outType:"3 Playable Browser Games", outCol:"#22d3ee",
+    desc:"Fastest team to build 3 working browser games — Super Mario, Pac-Man, Donkey Kong — wins. Teams choose which AI tool for each game and work in parallel. A game only counts if it actually plays.",
+    learning:"Parallel workflow, tool selection strategy, and rapid QA under pressure.",
+    steps:["Pick 1 builder for each game + 1 tester.","Ask AI to build Mario, Pac-Man and Donkey Kong.","You have 15 minutes — go go go!","Test every game — it must really play!","Other team tries your games. Best games win!"],
+    apps:["AI Studio","Canva","Antigravity"], mins:15, module:"builder" },
+  { id:3, act:"03", emoji:"🏰", color:"#a78bfa", name:"Rubber Band Castle", outType:"AI Castle + Team Composite", outCol:"#a78bfa",
+    desc:"One rubber band with 6-8 strings tied around it — each team member holds ONE string. No hands may touch the cups. ALL cups must be stacked into the castle. AI then transforms the cup castle into a real one with the team on top.",
+    learning:"Non-verbal coordination, tension calibration, and full-team completion under constraint.",
+    steps:["Everyone holds ONE string on the rubber band.","Pull together to grab cups — NO hands!","Stack ALL the cups into one castle.","Take a photo of your cup castle.","AI turns it into a REAL castle — with your team on top!"],
+    apps:["NanoBanana","ChatGPT","Ideogram"], mins:12, module:null },
+  { id:4, act:"04", emoji:"🌳", color:"#34d399", name:"Resort Tree App Sprint", outType:"Interactive Web App", outCol:"#34d399",
+    desc:"Team splits up to photograph 6 pre-marked trees around the resort, then races back to build a real, deployable interactive web app showcasing all 6 trees with facts, photos, and one interactive element.",
+    learning:"Distributed exploration, focused technical collaboration, and shipping real products fast.",
+    steps:["Find the 6 marked trees around the resort.","Split up and snap photos of each tree.","Run back and build a tree app with AI.","Add fun facts + 1 mini game or quiz.","Share your app with a QR code!"],
+    apps:["Claude","Lovable","Bolt"], mins:20, module:"trees" },
+  { id:5, act:"05", emoji:"🎶", color:"#f472b6", name:"Roulette Jingle & Dance Off", outType:"AI Song + Live Dance", outCol:"#f472b6",
+    desc:"Two roulette wheels: one picks the genre (K-pop, dangdut, Bollywood...), one picks the mandatory topic (nasi lemak, KPI targets, the boss). Team writes lyrics, generates the song in Suno, then choreographs a live team dance.",
+    learning:"Creative negotiation, vulnerability unlock, and shared physical expression.",
+    steps:["Spin both wheels — keep what you get!","Write a song about your two words.","Make the song with AI (60 seconds).","Invent a dance — EVERYONE joins in.","Perform it live for the crowd!"],
+    apps:["Suno","Claude","ChatGPT"], mins:15, module:"roulette" },
+  { id:6, act:"06", emoji:"🎬", color:"#fbbf24", name:"Random Card Cinematic", outType:"Cinematic Video", outCol:"#fbbf24",
+    desc:"A digital random card app deals 4 wildcards to each team — Country/Civilization, Character, Scene, Cinematic Style. No re-draws. Team assembles the four elements into a cinematic prompt and generates a short historical epic movie scene.",
+    learning:"Collective decision-making, negotiation, and creative reconciliation of random constraints.",
+    steps:["Tap DRAW and get 4 surprise cards.","No swapping — keep what you get!","Mix all 4 cards into one movie idea.","Ask AI to make your movie scene.","Watch it together on the big screen!"],
+    apps:["Kling","Veo","Hailuo"], mins:15, module:"cards" },
+  { id:7, act:"07", emoji:"🏓", color:"#60a5fa", name:"Ping Pong Alphabet Pitch", outType:"AI Ad Campaign + Pitch", outCol:"#60a5fa",
+    desc:"26 cups labelled A–Z. Teams bounce ping pong balls into the cups — must land in at least 7 different cups. Team then builds 7 words that together include ALL 7 collected letters. Those words become mandatory ingredients for a wild AI ad campaign, pitched live Shark-Tank style.",
+    learning:"Constraint-driven creativity, prompt engineering under limits, and live pitch performance.",
+    steps:["Bounce balls into the letter cups — 90 seconds!","Collect at least 7 different letters.","Make 7 words using ALL your letters.","Give the words to AI — it makes a crazy ad!","Pitch your ad like a TV star!"],
+    apps:["Claude","ChatGPT","Ideogram"], mins:12, module:null },
+  { id:8, act:"08", emoji:"👁️", color:"#f59e0b", name:"Speed Edit Showdown", outType:"Image Recreation", outCol:"#f59e0b",
+    desc:"A target image goes up on the big screen. Team members take turns — relay style — each writing the next prompt to recreate it with AI. Race to submit: the faster your picture gets the marshal's ✅, the more points you score.",
+    learning:"Turn-taking, observation, and reverse prompt engineering under time pressure.",
+    steps:["Look at the target picture on the big screen.","Take turns — each member writes the next prompt!","Keep regenerating until it matches.","Show your best picture to the marshal.","Faster ✅ from the marshal = more points!"],
+    apps:["NanoBanana","Ideogram","ChatGPT"], mins:12, module:"showdown" },
+  { id:9, act:"09", emoji:"🐘", color:"#2dd4bf", name:"Found Object Animals", outType:"Animated Interaction Video", outCol:"#2dd4bf",
+    desc:"Each team gets 2 animal archetypes. Teams gather random found objects and arrange them flat on the ground to form the shape of each animal. Photograph, use AI to bring the shape to life as a realistic animal, then animate the two animals interacting.",
+    learning:"Creative resourcefulness, spatial composition, and full AI pipeline from flat-lay to motion.",
+    steps:["Get your 2 animals (like Tiger + Elephant).","Collect stuff — leaves, shoes, spoons, anything!","Arrange it all into animal shapes on the floor.","Photo it — AI makes them REAL animals!","AI animates your 2 animals playing together."],
+    apps:["NanoBanana","Kling","Higgsfield"], mins:15, module:null },
+  { id:10, act:"10", emoji:"🧭", color:"#c084fc", name:"Resort Character Journey", outType:"10-Scene Travelogue", outCol:"#c084fc",
+    desc:"Team designs ONE cartoon mascot character. Split up to photograph 10 real resort locations. Use AI to place the SAME cartoon character into each REAL background photo. Present as a 'Day in the Life' resort marketing campaign.",
+    learning:"Grand finale synthesis — storytelling, character consistency, and real-world compositing.",
+    steps:["Create ONE cartoon mascot character.","Photo 10 real spots — pool, lobby, spa...","AI puts your mascot in every photo.","Same mascot in all 10 — don't change it!","Tell the story: A Day in the Life!"],
+    apps:["NanoBanana","ChatGPT","Ideogram"], mins:20, module:null },
+];
+
+/* ---------- Randomizer content pools ---------- */
+const POOL = {
+  cupCharacter:["A grumpy astronaut","A disco unicorn","A samurai chef","A robot grandma","A ninja penguin","A wizard toddler","A pirate librarian","A cyborg cat","A viking ballerina","A detective sloth","A superhero janitor","A vampire barista"],
+  cupAction:["riding a rocket","breakdancing","brewing potions","surfing on lava","juggling planets","escaping a maze","taming a dragon","stealing a giant cookie","arm-wrestling a bear","painting the sky","deep-sea diving","racing a cheetah"],
+  cupScene:["in a neon jungle","on the moon","inside a volcano","in a candy kingdom","in an underwater city","in a haunted mansion","atop a skyscraper","in a desert oasis","in a cyberpunk market","in an ancient temple","on a floating island","in a frozen tundra"],
+  genre:["K-Pop","Dangdut","Bollywood","EDM Anthem","Country Ballad","Opera","Hip-Hop","Reggae","Smooth Jazz","70s Disco","Lo-fi Chill","Broadway Musical","Acoustic Café","Joget","Nursery Rhyme"],
+  topic:["Nasi Lemak","KPI Targets","The Boss","Monday Mornings","The Office Coffee","Traffic Jams","The Team WhatsApp Group","The Broken Printer","Working Overtime","Annual Leave","Endless Zoom Calls","The Company Canteen","Impossible Deadlines","Teh Tarik"],
+  country:["Ancient Egypt","The Roman Empire","Feudal Japan","The Aztec Empire","Viking Norse","Ancient Greece","Mughal India","Ming Dynasty China","The Ottoman Empire","The Mali Empire","Babylon","The Inca Empire"],
+  cardChar:["A Warrior Queen","An Exiled Prince","A Blind Prophet","A Rogue General","A Young Blacksmith","A Court Jester","A Masked Assassin","A Wandering Monk","A Pirate Captain","A Fallen Knight","A Street Orphan","A High Priestess"],
+  cardScene:["A burning city","A royal coronation","A desert ambush","A stormy sea battle","A secret tunnel escape","A grand feast betrayal","A duel at dawn","A sacred temple ritual","A crowded market chase","A frozen mountain pass"],
+  style:["Slow-motion epic","Cartoon / animated","Horror movie","Old-school black & white"],
+};
+
+/* ---------- State + persistence ---------- */
+const LS_KEY = "aitb_gamesystem_v1";
+const TEAM_COLORS = ["#fb7185","#22d3ee","#fbbf24","#34d399","#a78bfa","#f472b6","#60a5fa","#f59e0b"];
+let state = load();
+ensureCups();
+
+function ensureCups(){
+  if(!state.cups) state.cups = {
+    C: POOL.cupCharacter.slice(0,10),
+    A: POOL.cupAction.slice(0,10),
+    S: POOL.cupScene.slice(0,10),
+    used:{}, current:{C:null,A:null,S:null}
+  };
+  if(!state.scan3) state.scan3={};
+  if(!state.g7) state.g7={};
+  if(!state.g8) state.g8={};
+}
+
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if(s && s.teams) return s;
+  }catch(e){}
+  return { teams:[
+    {id:uid(),name:"Team 1",color:TEAM_COLORS[0],scores:{}},
+    {id:uid(),name:"Team 2",color:TEAM_COLORS[1],scores:{}},
+  ]};
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function teamTotal(t){ return Object.values(t.scores||{}).reduce((a,b)=>a+(+b||0),0); }
+function rankedTeams(){ return [...state.teams].sort((a,b)=>teamTotal(b)-teamTotal(a)); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* ---------- Router ---------- */
+window.addEventListener("hashchange", render);
+window.addEventListener("DOMContentLoaded", render);
+// live-sync across tabs on the same device (e.g. projector tab + admin tab)
+window.addEventListener("storage", e=>{ if(e.key===LS_KEY){ state=load(); ensureCups(); render(); } });
+function go(h){ location.hash = h; }
+
+function render(){
+  clearTimers();
+  const h = location.hash || "#/";
+  const app = document.getElementById("app");
+  let body="";
+  if(h.startsWith("#/game/")){
+    const id = +h.split("/")[2];
+    body = viewGame(GAMES.find(g=>g.id===id));
+  } else if(h.startsWith("#/m/")){
+    const id = +h.split("/")[2];
+    body = viewMission(GAMES.find(g=>g.id===id));
+  }
+  else if(h==="#/teams"){ body = viewTeams(); }
+  else if(h==="#/score"){ body = viewScore(); }
+  else if(h==="#/flags"){ body = viewFlags(); }
+  else if(h==="#/admin"){ body = viewAdmin(); }
+  else { body = viewHome(); }
+
+  app.innerHTML = topbar(h.startsWith("#/m/")) + `<main>${body}</main>`;
+  bindCommon();
+  if(h.startsWith("#/game/")) mountGame(GAMES.find(g=>g.id===+h.split("/")[2]));
+  if(h==="#/teams") bindTeams();
+  if(h==="#/admin"){ const p=document.getElementById("adminPw"); if(p)p.focus(); }
+  window.scrollTo(0,0);
+}
+
+function topbar(slim){
+  // slim = participant mission view (opened from a QR scan on a phone): brand only, no facilitator nav
+  if(slim) return `<div class="topbar">
+    <div class="brand">
+      <div class="logo">🎮</div>
+      <div><b>AI TEAM BUILDING</b><small>Mission Brief</small></div>
+    </div>
+  </div>`;
+  return `<div class="topbar">
+    <div class="brand" onclick="go('#/')">
+      <div class="logo">🎮</div>
+      <div><b>AI TEAM BUILDING</b><small>Game Control System</small></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="navbtn" onclick="go('#/')">🏠 Home</button>
+    <button class="navbtn" onclick="go('#/flags')">🚩 Flags</button>
+    <button class="navbtn" onclick="go('#/teams')">👥 Teams</button>
+    <button class="navbtn solid" onclick="go('#/score')">🏆 Scoreboard</button>
+    <button class="navbtn" onclick="go('#/admin')" title="Admin">🔒</button>
+  </div>`;
+}
+
+/* ---------- Home ---------- */
+function viewHome(){
+  const tiles = GAMES.map(g=>{
+    const played = state.teams.some(t=>t.scores[g.id]!=null);
+    return `<div class="gtile" style="--accent:${g.color}" onclick="go('#/game/${g.id}')">
+      ${played?`<div class="done">✓ scored</div>`:""}
+      <div class="act">ACT ${g.act}</div>
+      <div class="emoji">${g.emoji}</div>
+      <div class="gn">${esc(g.name)}</div>
+      <div class="ot" style="--accent:${g.outCol}">${esc(g.outType)}</div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div class="hero">
+    <video autoplay muted loop playsinline poster="hero.png"><source src="hero.mp4" type="video/mp4"></video>
+    <div class="ov">
+      <div class="ht">AI TEAM BUILDING <span style="color:var(--a)">GAME LIBRARY</span></div>
+      <div class="hs">10 activities · 10 AI outputs · 1 unforgettable marathon</div>
+    </div>
+  </div>
+  <div class="grid dashgrid">
+    <div>
+      <div class="row" style="justify-content:space-between">
+        <div><div class="h1">Marathon Control</div><p class="sub">Tap a game to launch its screen, timer &amp; scoring.</p></div>
+      </div>
+      <div class="grid gamegrid">${tiles}</div>
+    </div>
+    <div>
+      ${leaderboardCard()}
+      <div class="card pad" style="margin-top:16px">
+        <p class="section-label">Quick actions</p>
+        <div class="row">
+          <button class="btn primary" onclick="go('#/flags')">🚩 Flag retrieval board</button>
+          <button class="btn" onclick="go('#/teams')">👥 Set up teams</button>
+          <button class="btn" onclick="go('#/score')">🏆 Full scoreboard</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function leaderboardCard(){
+  const teams = rankedTeams();
+  const rows = teams.length ? teams.map((t,i)=>`
+    <div class="lb-row">
+      <div class="rank ${i===0&&teamTotal(t)>0?'g':''}">${i===0&&teamTotal(t)>0?'👑':i+1}</div>
+      <span class="dot" style="color:${t.color};background:${t.color}"></span>
+      <div class="lb-name">${esc(t.name)}</div>
+      <div class="lb-score">${teamTotal(t)}</div>
+    </div>`).join("") : `<div class="empty">No teams yet — add some in the Teams tab.</div>`;
+  return `<div class="card pad">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <p class="section-label" style="margin:0">🏆 Live Leaderboard</p>
+      <button class="btn sm ghost" onclick="go('#/score')">Manage →</button>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+/* ---------- Teams ---------- */
+function viewTeams(){
+  const rows = state.teams.map((t,i)=>`
+    <div class="team-edit" data-id="${t.id}">
+      <div class="swatch" style="background:${t.color}" onclick="cycleColor('${t.id}')" title="Tap to change colour"></div>
+      <input value="${esc(t.name)}" oninput="renameTeam('${t.id}',this.value)" style="flex:1" />
+      <span class="tag">${teamTotal(t)} pts</span>
+      <button class="iconbtn" onclick="removeTeam('${t.id}')" title="Remove">✕</button>
+    </div>`).join("");
+  return `
+  <div class="h1">Teams</div>
+  <p class="sub">Add your teams once — they carry through every game and the leaderboard.</p>
+  <div class="card pad" style="max-width:620px">
+    ${rows || `<div class="empty">No teams yet.</div>`}
+    <hr/>
+    <div class="row">
+      <button class="btn primary" onclick="addTeam()">＋ Add team</button>
+      <button class="btn ghost" onclick="resetScores()">↺ Reset all scores</button>
+    </div>
+  </div>`;
+}
+function bindTeams(){}
+function addTeam(){
+  if(state.teams.length>=12) return toast("Max 12 teams");
+  const i = state.teams.length;
+  state.teams.push({id:uid(),name:"Team "+(i+1),color:TEAM_COLORS[i%TEAM_COLORS.length],scores:{}});
+  save(); render();
+}
+function removeTeam(id){ state.teams = state.teams.filter(t=>t.id!==id); save(); render(); }
+function renameTeam(id,v){ const t=state.teams.find(x=>x.id===id); if(t){t.name=v; save();} }
+function cycleColor(id){ const t=state.teams.find(x=>x.id===id); if(!t)return;
+  const i=TEAM_COLORS.indexOf(t.color); t.color=TEAM_COLORS[(i+1)%TEAM_COLORS.length]; save(); render(); }
+function resetScores(){ if(!confirm("Clear ALL scores for every team?"))return;
+  state.teams.forEach(t=>t.scores={}); save(); render(); toast("Scores reset"); }
+
+/* ---------- Full scoreboard ---------- */
+function viewScore(){
+  const teams = rankedTeams();
+  const head = `<tr><th style="text-align:left;padding:8px">#</th><th style="text-align:left;padding:8px">Team</th>`+
+    GAMES.map(g=>`<th style="padding:8px;font-size:11px" title="${esc(g.name)}">${g.act}</th>`).join("")+
+    `<th style="padding:8px">Total</th></tr>`;
+  const rows = teams.map((t,i)=>`<tr style="border-top:1px solid var(--line)">
+    <td style="padding:8px;font-weight:800;color:${i===0&&teamTotal(t)>0?'var(--y)':'var(--muted)'}">${i+1}</td>
+    <td style="padding:8px"><span class="dot" style="color:${t.color};background:${t.color};display:inline-block;vertical-align:middle;margin-right:8px"></span><b>${esc(t.name)}</b></td>
+    ${GAMES.map(g=>`<td style="padding:8px;text-align:center;color:${t.scores[g.id]!=null?'var(--ink)':'var(--muted)'}">${t.scores[g.id]!=null?t.scores[g.id]:'·'}</td>`).join("")}
+    <td style="padding:8px;text-align:center;font-weight:900;font-size:18px">${teamTotal(t)}</td>
+  </tr>`).join("");
+  return `<div class="h1">Scoreboard</div>
+  <p class="sub">Full breakdown by activity. Points are entered on each game's screen.</p>
+  <div class="card pad" style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse;min-width:640px">${head}${rows}</table>
+  </div>
+  <div class="row" style="margin-top:16px">
+    ${GAMES.map(g=>`<button class="btn sm" style="border-color:${g.color}55" onclick="go('#/game/${g.id}')">${g.emoji} ${g.act}</button>`).join("")}
+  </div>`;
+}
+
+/* ---------- Game screen ---------- */
+function viewGame(g){
+  if(!g) return `<div class="empty">Game not found. <a href="#/">Home</a></div>`;
+  const moduleHtml = g.module ? `<div id="moduleMount" class="card pad" style="margin-bottom:16px"></div>` : "";
+  return `
+  <div class="row" style="margin-bottom:12px">
+    <button class="btn sm ghost" onclick="go('#/')">← All games</button>
+    <span class="pill">ACT ${g.act} of 10</span>
+  </div>
+  <div class="hero slim">
+    <img src="hero${g.id}.jpg" alt="" onerror="this.src='hero.png'">
+    <div class="ovs">
+      <div class="ghead">
+        <div class="em">${g.emoji}</div>
+        <div style="flex:1;min-width:240px">
+          <h1>${esc(g.name)}</h1>
+          <span class="otag" style="background:${g.outCol}">▶ OUTPUT · ${esc(g.outType)}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  ${moduleHtml}
+
+  <div class="cols">
+    <div class="card pad">
+      <p class="section-label">The Challenge</p>
+      <p style="font-size:15px;line-height:1.55;margin:0 0 16px">${esc(g.desc)}</p>
+      <p class="section-label">How to run it</p>
+      <ol class="steps">${g.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+      <hr/>
+      <p class="section-label">Learning element</p>
+      <p style="margin:0 0 14px;font-size:14px;color:#c9cdf0">${esc(g.learning)}</p>
+      <p class="section-label">Suggested AI apps</p>
+      <div class="row">${g.apps.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</div>
+    </div>
+    <div>
+      <div class="card pad" style="margin-bottom:16px">
+        <p class="section-label" style="text-align:center">⏱ ${g.mins}-Minute Timer</p>
+        <div id="timerMount"></div>
+      </div>
+      <div class="card pad">
+        <p class="section-label">Award points — ${esc(g.name)}</p>
+        <div id="scoreMount"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function mountGame(g){
+  mountTimer(document.getElementById("timerMount"), g.mins*60);
+  mountScore(document.getElementById("scoreMount"), g);
+  if(g.module==="cups") mountCups();
+  if(g.module==="roulette") mountRoulette();
+  if(g.module==="cards") mountCards();
+  if(g.module==="builder") mountBuilder();
+  if(g.module==="trees") mountTrees();
+  if(g.module==="showdown") mountShowdown();
+}
+
+/* ---------- Timer ---------- */
+let TIMERS=[];
+function clearTimers(){ TIMERS.forEach(clearInterval); TIMERS=[]; }
+function mountTimer(el, total){
+  if(!el) return;
+  let remaining = total, running=false, iv=null;
+  el.innerHTML = `<div class="timer">
+    <div class="tdisplay" id="td">${fmt(remaining)}</div>
+    <div class="tbar"><i id="tbar" style="width:100%"></i></div>
+    <div class="row chips" style="justify-content:center;margin-top:6px">
+      <button class="btn primary" id="tStart">▶ Start</button>
+      <button class="btn" id="tReset">↺ Reset</button>
+    </div>
+    <div class="row chips" style="justify-content:center">
+      <button class="btn sm ghost" data-add="60">+1:00</button>
+      <button class="btn sm ghost" data-add="30">+0:30</button>
+      <button class="btn sm ghost" data-add="-30">−0:30</button>
+    </div>
+  </div>`;
+  const td=el.querySelector("#td"), bar=el.querySelector("#tbar"), startBtn=el.querySelector("#tStart");
+  function paint(){
+    td.textContent=fmt(remaining);
+    bar.style.width=Math.max(0,remaining/total*100)+"%";
+    td.className="tdisplay"+(remaining<=10?" crit":remaining<=30?" warn":"");
+  }
+  function tick(){
+    remaining--;
+    if(remaining<=0){ remaining=0; stop(); beep(); toast("⏰ Time's up!"); }
+    paint();
+  }
+  function start(){ if(running)return; running=true; startBtn.textContent="⏸ Pause"; startBtn.classList.remove("primary"); iv=setInterval(tick,1000); TIMERS.push(iv); }
+  function stop(){ running=false; clearInterval(iv); startBtn.textContent="▶ Start"; startBtn.classList.add("primary"); }
+  startBtn.onclick=()=>running?stop():start();
+  el.querySelector("#tReset").onclick=()=>{ stop(); remaining=total; paint(); };
+  el.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{ remaining=Math.max(0,remaining+ +b.dataset.add); if(remaining>total){/*allow grow*/} paint(); });
+  paint();
+}
+function fmt(s){ const m=Math.floor(s/60), ss=s%60; return m+":"+String(ss).padStart(2,"0"); }
+
+/* Web Audio beep — no external file */
+function beep(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    [0,180,360].forEach((delay,i)=>{
+      const o=ctx.createOscillator(), gN=ctx.createGain();
+      o.type="square"; o.frequency.value=i===2?1180:880;
+      o.connect(gN); gN.connect(ctx.destination);
+      const t=ctx.currentTime+delay/1000;
+      gN.gain.setValueAtTime(.001,t); gN.gain.exponentialRampToValueAtTime(.25,t+.02);
+      gN.gain.exponentialRampToValueAtTime(.001,t+.16);
+      o.start(t); o.stop(t+.18);
+    });
+  }catch(e){}
+}
+
+/* ---------- Score entry (per game) ---------- */
+function mountScore(el, g){
+  if(!el) return;
+  if(!state.teams.length){ el.innerHTML=`<div class="empty">Add teams first.<br><button class="btn sm primary" style="margin-top:8px" onclick="go('#/teams')">Set up teams</button></div>`; return; }
+  const draw=()=>{
+    el.innerHTML = state.teams.map(t=>{
+      const v = t.scores[g.id]!=null ? t.scores[g.id] : 0;
+      return `<div class="score-team">
+        <span class="dot" style="color:${t.color};background:${t.color}"></span>
+        <b>${esc(t.name)}</b>
+        <div class="stepper">
+          <button onclick="bump('${t.id}',${g.id},-1)">−</button>
+          <span class="val" style="color:${t.scores[g.id]!=null?'var(--ink)':'var(--muted)'}">${v}</span>
+          <button onclick="bump('${t.id}',${g.id},1)">＋</button>
+        </div>
+      </div>`;
+    }).join("") + `
+      <hr/>
+      <p class="fs-hint" style="margin:0 0 8px">Quick award — tap a placing to add:</p>
+      <div class="awardbtns row">
+        <button class="btn sm" style="border-color:#fbbf24" onclick="awardTop(${g.id})">🥇 Rank teams (10/7/5/3…)</button>
+        <button class="btn sm ghost" onclick="clearGame(${g.id})">Clear this game</button>
+      </div>`;
+  };
+  el._draw=draw; draw();
+}
+function bump(teamId, gameId, d){
+  const t=state.teams.find(x=>x.id===teamId); if(!t)return;
+  const cur = t.scores[gameId]!=null ? t.scores[gameId] : 0;
+  t.scores[gameId]=Math.max(0,cur+d); save();
+  const m=document.getElementById("scoreMount"); if(m&&m._draw)m._draw();
+  refreshMini();
+}
+function clearGame(gameId){ state.teams.forEach(t=>{ delete t.scores[gameId]; }); save();
+  const m=document.getElementById("scoreMount"); if(m&&m._draw)m._draw(); refreshMini(); toast("Cleared"); }
+function awardTop(gameId){
+  const pts=[10,7,5,3,2,1,1,1,1,1,1,1];
+  const names=state.teams.map(t=>t.name);
+  const order=prompt("Enter team finishing order, best first — comma separated.\nTeams: "+names.join(", "),names.join(", "));
+  if(!order)return;
+  const wanted=order.split(",").map(s=>s.trim().toLowerCase());
+  let rank=0;
+  wanted.forEach(nm=>{
+    const t=state.teams.find(x=>x.name.toLowerCase()===nm);
+    if(t){ t.scores[gameId]=pts[rank]||1; rank++; }
+  });
+  save(); const m=document.getElementById("scoreMount"); if(m&&m._draw)m._draw(); refreshMini(); toast("Points awarded");
+}
+function refreshMini(){ /* no mini on game page; leaderboard refreshes on nav */ }
+
+/* ---------- Randomizer helpers ---------- */
+function spinSlot(slotEl, pool, finalVal, dur, cb){
+  const valEl=slotEl.querySelector(".val");
+  slotEl.classList.add("spin"); valEl.classList.add("blur");
+  const iv=setInterval(()=>{ valEl.textContent=pick(pool); }, 70); TIMERS.push(iv);
+  setTimeout(()=>{
+    clearInterval(iv);
+    slotEl.classList.remove("spin"); valEl.classList.remove("blur");
+    valEl.textContent=finalVal; slotEl.classList.add("locked");
+    cb&&cb();
+  }, dur);
+}
+
+/* ---- Game 01: Nerf Prompt Cups ---- */
+const CUPCATS=[["C","🔴","Character","#fb7185"],["A","🔵","Action","#60a5fa"],["S","🟡","Scene","#fbbf24"]];
+function mountCups(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  if(!state.cups.activeTeam || !state.teams.find(t=>t.id===state.cups.activeTeam))
+    state.cups.activeTeam = state.teams[0] ? state.teams[0].id : null;
+  m.innerHTML=`
+    <p class="section-label">🎯 Prompt Cup Reveal <span class="muted" style="text-transform:none;letter-spacing:0">— pick the team, then click the cup they shot</span></p>
+    <div class="teamchips" id="cupTeams">
+      ${state.teams.map(t=>`<button class="teamchip" style="--tc:${t.color}" data-team="${t.id}">${esc(t.name)}</button>`).join("")}
+    </div>
+    <div class="reveal-wrap three">
+      ${CUPCATS.map(([k,em,lab,col])=>`<div class="slot" style="--slotc:${col}" data-k="${k}">
+        <div class="lab" style="color:${col}">${em} ${lab} <span id="cupNum${k}"></span></div>
+        <div class="val muted">— cup —</div></div>`).join("")}
+    </div>
+    ${CUPCATS.map(([k,em,lab,col])=>`
+      <div class="cupgroup"><div class="cglab" style="color:${col}">${em} ${lab} cups</div>
+      <div class="cupgrid">${state.cups[k].map((_,i)=>
+        `<button class="cupbtn" style="--cupc:${col}" data-cat="${k}" data-i="${i}">${k}${i+1}</button>`).join("")}
+      </div></div>`).join("")}
+    <div class="row" style="justify-content:center;margin-top:12px">
+      <button class="btn ghost sm" id="cupNext">🧹 Next team</button>
+      <button class="btn ghost sm" onclick="go('#/admin')">🔒 Edit contents (admin)</button>
+    </div>
+    <div class="combo" id="cupCombo" style="display:none;margin-top:16px">
+      <div class="lab" id="cupComboLab">Team prompt</div><div class="txt" id="cupTxt"></div>
+      <div class="row" style="margin-top:10px"><button class="btn ghost sm" id="cupCopy">📋 Copy prompt</button></div>
+    </div>`;
+  let spinning=false;
+  const teamOf=id=>state.teams.find(t=>t.id===id)||null;
+  const paint=()=>{
+    m.querySelectorAll(".teamchip").forEach(ch=>ch.classList.toggle("active", ch.dataset.team===state.cups.activeTeam));
+    CUPCATS.forEach(([k])=>{
+      const slot=m.querySelector(`.slot[data-k="${k}"]`), val=slot.querySelector(".val");
+      const cur=state.cups.current[k];
+      if(cur==null){ val.textContent="— cup —"; val.classList.add("muted"); slot.classList.remove("locked"); m.querySelector("#cupNum"+k).textContent=""; }
+      else{ val.textContent=state.cups[k][cur]; val.classList.remove("muted"); slot.classList.add("locked"); m.querySelector("#cupNum"+k).textContent="· "+k+(cur+1); }
+    });
+    m.querySelectorAll(".cupbtn").forEach(b=>{
+      const id=b.dataset.cat+(+b.dataset.i+1), by=state.cups.used[id], t=by?teamOf(by):null;
+      b.classList.toggle("used", !!by);
+      if(t){ b.style.borderColor=t.color; b.style.background=t.color+"2e"; b.style.color=t.color; b.title="Shot by "+t.name; }
+      else if(by){ b.style.borderColor="#666"; b.style.background=""; b.style.color=""; b.title="Revealed"; }
+      else { b.style.borderColor=""; b.style.background=""; b.style.color=""; b.title=""; }
+    });
+    const c=state.cups.current, all=c.C!=null&&c.A!=null&&c.S!=null;
+    const combo=m.querySelector("#cupCombo");
+    if(all){
+      const txt=`${state.cups.C[c.C]} ${state.cups.A[c.A]} ${state.cups.S[c.S]}`;
+      const at=teamOf(state.cups.activeTeam);
+      const lab=m.querySelector("#cupComboLab");
+      lab.textContent = at ? `${at.name} — prompt` : "Team prompt";
+      lab.style.color = at ? at.color : "";
+      m.querySelector("#cupTxt").textContent=txt;
+      combo.style.display="block";
+      m.querySelector("#cupCopy").onclick=()=>copy(txt);
+    } else combo.style.display="none";
+  };
+  m.querySelectorAll(".teamchip").forEach(ch=>ch.onclick=()=>{
+    state.cups.activeTeam=ch.dataset.team; save(); paint();
+  });
+  m.querySelectorAll(".cupbtn").forEach(b=>b.onclick=()=>{
+    if(spinning) return;
+    const k=b.dataset.cat, i=+b.dataset.i;
+    spinning=true;
+    const slot=m.querySelector(`.slot[data-k="${k}"]`);
+    slot.classList.remove("locked");
+    m.querySelector("#cupCombo").style.display="none";
+    spinSlot(slot, state.cups[k], state.cups[k][i], 1300, ()=>{
+      spinning=false;
+      state.cups.current[k]=i;
+      state.cups.used[k+(i+1)]=state.cups.activeTeam||true;
+      save(); paint();
+    });
+  });
+  m.querySelector("#cupNext").onclick=()=>{
+    state.cups.current={C:null,A:null,S:null};
+    const idx=state.teams.findIndex(t=>t.id===state.cups.activeTeam);
+    if(state.teams.length) state.cups.activeTeam=state.teams[(idx+1)%state.teams.length].id;
+    save(); paint();
+  };
+  paint();
+}
+
+/* ---------- Admin (password-gated) ---------- */
+const ADMIN_PASS="1994";
+function adminOk(){ return sessionStorage.getItem("aitb_admin")==="1"; }
+function adminTry(){
+  const v=document.getElementById("adminPw").value;
+  if(v===ADMIN_PASS){ sessionStorage.setItem("aitb_admin","1"); render(); }
+  else toast("Wrong password");
+}
+function adminLock(){ sessionStorage.removeItem("aitb_admin"); go("#/"); }
+function adminEdit(k,i,v){ state.cups[k][i]=v; save(); }
+function adminShuffle(){
+  ["C","A","S"].forEach(k=>state.cups[k].sort(()=>Math.random()-.5));
+  state.cups.used={}; state.cups.current={C:null,A:null,S:null};
+  save(); render(); toast("Shuffled — rewrite your paper slips!");
+}
+function adminDefaults(){
+  state.cups.C=POOL.cupCharacter.slice(0,10);
+  state.cups.A=POOL.cupAction.slice(0,10);
+  state.cups.S=POOL.cupScene.slice(0,10);
+  state.cups.used={}; state.cups.current={C:null,A:null,S:null};
+  save(); render(); toast("Defaults restored");
+}
+function adminResetReveals(){
+  state.cups.used={}; state.cups.current={C:null,A:null,S:null};
+  save(); render(); toast("Reveals reset");
+}
+function adminToggleBuild(id){
+  state.buildOk=state.buildOk||{};
+  state.buildOk[id]=!state.buildOk[id];
+  save(); render();
+  const t=state.teams.find(x=>x.id===id);
+  toast((state.buildOk[id]?"✅ Prompts unlocked for ":"🔒 Prompts locked for ")+(t?t.name:"team"));
+}
+let ADMIN_TAB=1;
+function adminTab(id){ ADMIN_TAB=id; render(); }
+function viewAdmin(){
+  if(!adminOk()) return `
+    <div class="card" style="max-width:420px;margin:60px auto;text-align:center">
+      <p class="section-label">🔒 Admin access</p>
+      <div class="row" style="justify-content:center;margin-top:10px">
+        <input type="password" id="adminPw" placeholder="Password" onkeydown="if(event.key==='Enter')adminTry()" />
+        <button class="btn primary" onclick="adminTry()">Unlock</button>
+      </div>
+    </div>`;
+  const g=GAMES.find(x=>x.id===ADMIN_TAB)||GAMES[0];
+  return `
+    <div class="ghead">
+      <div style="flex:1">
+        <h1>🔒 Admin</h1>
+        <p class="sub">Host-only controls, per game. Participants never see this page.</p>
+      </div>
+      <button class="btn ghost sm" onclick="adminLock()">🔓 Lock</button>
+    </div>
+    <div class="tabs" style="margin-bottom:16px">
+      ${GAMES.map(x=>`<button class="tab ${x.id===ADMIN_TAB?'active':''}" onclick="adminTab(${x.id})">${x.emoji} Game ${x.id}</button>`).join("")}
+    </div>
+    ${adminPanel(g)}`;
+}
+function adminPanel(g){
+  if(g.id===1) return `
+    <div class="ghead" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h1 style="font-size:20px">🎯 ${esc(g.name)} — cup contents</h1>
+        <p class="sub">Write each line on a paper slip and paste it inside the matching numbered cup. Edits save automatically. A coloured dot shows which team shot that cup.</p>
+      </div>
+      <div class="row">
+        <button class="btn ghost sm" onclick="adminShuffle()">🔀 Shuffle all</button>
+        <button class="btn ghost sm" onclick="adminDefaults()">↺ Defaults</button>
+        <button class="btn ghost sm" onclick="adminResetReveals()">🧽 Reset reveals</button>
+      </div>
+    </div>
+    <div class="reveal-wrap three" style="align-items:start">
+      ${CUPCATS.map(([k,em,lab,col])=>`<div class="card">
+        <p class="section-label" style="color:${col}">${em} ${lab}</p>
+        ${state.cups[k].map((v,i)=>{
+          const by=state.cups.used[k+(i+1)];
+          const t=by?state.teams.find(x=>x.id===by):null;
+          const dot=t?`<span title="${esc(t.name)}" style="color:${t.color};font-size:17px">●</span>`
+                   :by?`<span title="revealed" style="color:#888;font-size:17px">●</span>`
+                      :`<span style="opacity:0;font-size:17px">●</span>`;
+          return `<div class="adminrow">
+            <b style="color:${col}">${k}${i+1}</b>
+            <input value="${esc(v)}" oninput="adminEdit('${k}',${i},this.value)" />
+            ${dot}
+          </div>`;
+        }).join("")}
+      </div>`).join("")}
+    </div>`;
+  if(g.id===2) return `
+    <div class="card">
+      <p class="section-label">🕹️ ${esc(g.name)} — prompt approvals</p>
+      <p class="sub" style="margin:0 0 10px">Approved teams can open the AI build prompts on the Game 02 screen. Tap to toggle.</p>
+      <div class="row">
+        ${state.teams.map(t=>{ const ok=(state.buildOk||{})[t.id];
+          return `<button class="btn sm ${ok?'green':'ghost'}" onclick="adminToggleBuild('${t.id}')">${ok?'✅':'🔒'} ${esc(t.name)}</button>`; }).join("")}
+      </div>
+    </div>`;
+  if(g.id===3){
+    const fmt=ts=>ts?new Date(ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+    return `
+    <div class="ghead" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h1 style="font-size:20px">${g.emoji} ${esc(g.name)} — team progress</h1>
+        <p class="sub">Teams check in when they scan the QR and open the mission page. Check-ins on this device/browser appear instantly — for phones, mark them here as you see teams scan. Tap ✅ when a team finishes.</p>
+      </div>
+      <button class="btn ghost sm" onclick="adminReset3()">🧽 Reset all</button>
+    </div>
+    <div class="card">
+      ${state.teams.map(t=>{
+        const s=(state.scan3||{})[t.id]||{};
+        const status = s.done?`<span style="color:#34d399;font-weight:700">✅ Done at ${fmt(s.done)}</span>`
+          : s.scan?`<span style="color:#22d3ee;font-weight:700">📱 Scanned at ${fmt(s.scan)}</span>`
+          : `<span class="muted">⚪ Waiting for scan</span>`;
+        return `<div class="adminrow" style="gap:12px">
+          <b style="width:auto;min-width:120px;color:${t.color}">● ${esc(t.name)}</b>
+          <span style="flex:1">${status}</span>
+          ${!s.scan?`<button class="btn sm ghost" onclick="adminScan3('${t.id}')">📱 Mark scanned</button>`:""}
+          ${s.scan&&!s.done?`<button class="btn sm green" onclick="adminDone3('${t.id}')">✅ Mark done</button>`:""}
+          ${s.scan?`<button class="btn sm ghost" title="undo last step" onclick="adminUndo3('${t.id}')">↺</button>`:""}
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+  if(g.id===7) return `
+    <div class="ghead" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h1 style="font-size:20px">${g.emoji} ${esc(g.name)} — words &amp; progress</h1>
+        <p class="sub">Type the words each team chose as they play. Tick ✅ when the team completes the activity.</p>
+      </div>
+      <button class="btn ghost sm" onclick="adminG7Reset()">🧽 Reset all</button>
+    </div>
+    <div class="card">
+      ${state.teams.map(t=>{
+        const s=(state.g7||{})[t.id]||{};
+        const w=Array.isArray(s.words)?s.words:[];
+        if(!s.submitted) return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+          <div class="row" style="align-items:center;margin-bottom:8px">
+            <b style="color:${t.color}">● ${esc(t.name)}</b>
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn sm cyan" onclick="adminG7Submit('${t.id}')">📤 Submit words</button>
+          </div>
+          <div class="row" style="gap:6px;flex-wrap:wrap">
+            ${[0,1,2,3,4,5,6].map(i=>`<input id="g7w_${t.id}_${i}" value="${esc(w[i]||"")}" placeholder="Word ${i+1}"
+              style="flex:1;min-width:96px;max-width:150px" oninput="adminG7Type('${t.id}',${i},this.value)"
+              onkeydown="if(event.key==='Enter')adminG7Submit('${t.id}')" />`).join("")}
+          </div>
+        </div>`;
+        return `<div class="adminrow" style="gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+          <b style="width:auto;min-width:120px;color:${t.color}">● ${esc(t.name)}</b>
+          <span style="flex:1;display:flex;flex-wrap:wrap;gap:6px">
+            ${w.map((x,i)=>x?`<span class="tag">${i+1}. ${esc(x)}</span>`:"").join("")}
+          </span>
+          <button class="btn sm ghost" title="edit words" onclick="adminG7Edit('${t.id}')">✏️</button>
+          <button class="btn sm ${s.done?'green':'ghost'}" onclick="adminG7Done('${t.id}')">${s.done?'✅ Completed':'⬜ Mark complete'}</button>
+        </div>`;
+      }).join("")}
+    </div>`;
+  if(g.id===8) return `
+    <div class="ghead" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h1 style="font-size:20px">${g.emoji} ${esc(g.name)} — team progress</h1>
+        <p class="sub">Tap the picture numbers a team completes (marshal-confirmed). A team wins by ending their turn — banking 1 point per completed picture — or by finishing all ${SHOWDOWN.length}. Banked points go straight to the scoreboard.</p>
+      </div>
+      <button class="btn ghost sm" onclick="adminG8Reset()">🧽 Reset all</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      ${state.teams.map(t=>{
+        const s=(state.g8||{})[t.id]||{done:{}};
+        const n=Object.values(s.done||{}).filter(Boolean).length;
+        const all=n===SHOWDOWN.length;
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+          <div class="row" style="align-items:center;margin-bottom:8px;gap:10px">
+            <b style="color:${t.color}">● ${esc(t.name)}</b>
+            <span class="muted">${n}/${SHOWDOWN.length} pictures</span>
+            <div style="flex:1"></div>
+            ${all?`<span style="font-weight:800;color:#fbbf24">👑 Completed all — ${n} pts banked!</span>`
+              :s.ended?`<span style="font-weight:800;color:#34d399">🏁 Turn ended — ${n} pts banked</span>
+                <button class="btn sm ghost" title="reopen turn" onclick="adminG8Reopen('${t.id}')">↺</button>`
+              :`<button class="btn sm green" onclick="adminG8End('${t.id}')">🏁 End turn (bank ${n} pts)</button>`}
+          </div>
+          <div class="row" style="gap:6px;flex-wrap:wrap">
+            ${SHOWDOWN.map((c,i)=>`<button class="btn sm ${s.done&&s.done[i+1]?'primary':'ghost'}"
+              ${s.ended?'disabled style="opacity:.45"':''} onclick="adminG8Toggle('${t.id}',${i+1})">${i+1}</button>`).join("")}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+    <p class="section-label">🗝️ Answer key <span class="muted" style="text-transform:none;letter-spacing:0">— don't show on the projector!</span></p>
+    <div class="card">
+      ${SHOWDOWN.map((c,i)=>`<div class="adminrow" style="gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)">
+        <img src="${c.img}" alt="" style="width:120px;border-radius:10px;flex:none" onerror="this.style.display='none'">
+        <div style="flex:1">
+          <b>Challenge ${i+1} · <span style="color:#f59e0b">${esc(c.style)}</span></b>
+          <p class="sub" style="margin:4px 0 0">${esc(c.prompt)}</p>
+        </div>
+      </div>`).join("")}
+    </div>`;
+  if(g.id===9||g.id===10){
+    const fmt=ts=>ts?new Date(ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
+    return `
+    <div class="ghead" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h1 style="font-size:20px">${g.emoji} ${esc(g.name)} — team progress</h1>
+        <p class="sub">Tick ✅ when a team completes the activity.</p>
+      </div>
+      <button class="btn ghost sm" onclick="adminGDoneReset(${g.id})">🧽 Reset all</button>
+    </div>
+    <div class="card">
+      ${state.teams.map(t=>{
+        const ts=((state.gdone||{})[g.id]||{})[t.id];
+        return `<div class="adminrow" style="gap:12px;padding:6px 0">
+          <b style="width:auto;min-width:120px;color:${t.color}">● ${esc(t.name)}</b>
+          <span style="flex:1">${ts?`<span style="color:#34d399;font-weight:700">✅ Completed at ${fmt(ts)}</span>`:`<span class="muted">⚪ In progress</span>`}</span>
+          <button class="btn sm ${ts?'green':'ghost'}" onclick="adminGDone(${g.id},'${t.id}')">${ts?'✅ Completed':'⬜ Mark complete'}</button>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+  return `
+    <div class="card" style="text-align:center;padding:34px 20px">
+      <div style="font-size:40px">${g.emoji}</div>
+      <b style="font-size:17px">${esc(g.name)}</b>
+      <p class="sub" style="margin-top:6px">No host controls for this game yet — tell Claude what you want to control here.</p>
+    </div>`;
+}
+function adminGDone(gid,tid){
+  state.gdone=state.gdone||{};
+  const s=state.gdone[gid]=state.gdone[gid]||{};
+  if(s[tid]) delete s[tid]; else s[tid]=Date.now();
+  save(); render();
+}
+function adminGDoneReset(gid){
+  if(state.gdone) delete state.gdone[gid];
+  save(); render(); toast("Game "+gid+" progress reset");
+}
+function adminG7Type(id,i,v){
+  state.g7=state.g7||{};
+  const s=state.g7[id]=state.g7[id]||{};
+  if(!Array.isArray(s.words))s.words=[];
+  s.words[i]=v; save();
+}
+function adminG7Submit(id){
+  const vals=[0,1,2,3,4,5,6].map(i=>{
+    const inp=document.getElementById("g7w_"+id+"_"+i);
+    return inp?inp.value.trim():"";
+  });
+  if(!vals.some(v=>v)){ toast("Type at least one word first"); return; }
+  state.g7=state.g7||{};
+  const s=state.g7[id]=state.g7[id]||{};
+  s.words=vals; s.submitted=true;
+  save(); render();
+}
+function adminG7Edit(id){
+  const s=(state.g7||{})[id]; if(!s)return;
+  s.submitted=false; save(); render();
+}
+function adminG7Done(id){ state.g7=state.g7||{}; const s=state.g7[id]=state.g7[id]||{}; if(!s.submitted)return; s.done=!s.done; save(); render(); }
+function adminG7Reset(){ state.g7={}; save(); render(); toast("Game 7 progress reset"); }
+function adminG8Sync(id){
+  // bank points to the scoreboard when a turn is ended or all pictures are done
+  const s=(state.g8||{})[id]; const team=state.teams.find(x=>x.id===id);
+  if(!team) return;
+  const n=s?Object.values(s.done||{}).filter(Boolean).length:0;
+  if(s&&(s.ended||n===SHOWDOWN.length)) team.scores[8]=n;
+  else delete team.scores[8];
+}
+function adminG8Toggle(id,num){
+  state.g8=state.g8||{};
+  const s=state.g8[id]=state.g8[id]||{done:{}};
+  if(s.ended) return;
+  s.done[num]=!s.done[num];
+  adminG8Sync(id); save(); render();
+}
+function adminG8End(id){
+  state.g8=state.g8||{};
+  const s=state.g8[id]=state.g8[id]||{done:{}};
+  s.ended=true; adminG8Sync(id); save(); render();
+  const t=state.teams.find(x=>x.id===id);
+  const n=Object.values(s.done||{}).filter(Boolean).length;
+  toast((t?t.name:"Team")+" banked "+n+" pts 🏁");
+}
+function adminG8Reopen(id){
+  const s=(state.g8||{})[id]; if(!s)return;
+  s.ended=false; adminG8Sync(id); save(); render();
+}
+function adminG8Reset(){
+  state.g8={};
+  state.teams.forEach(t=>{ if(t.scores) delete t.scores[8]; });
+  save(); render(); toast("Game 8 progress reset");
+}
+function adminScan3(id){ state.scan3=state.scan3||{}; (state.scan3[id]=state.scan3[id]||{}).scan=Date.now(); save(); render(); }
+function adminDone3(id){ state.scan3=state.scan3||{}; const s=state.scan3[id]=state.scan3[id]||{}; if(!s.scan)s.scan=Date.now(); s.done=Date.now(); save(); render(); }
+function adminUndo3(id){ const s=(state.scan3||{})[id]; if(!s)return; if(s.done)delete s.done; else delete s.scan; save(); render(); }
+function adminReset3(){ state.scan3={}; save(); render(); toast("Game 3 progress reset"); }
+
+/* ---- Game 05: Roulette (two wheels) ---- */
+function mountRoulette(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  m.innerHTML=`
+    <p class="section-label">🎡 Double Roulette <span class="muted" style="text-transform:none;letter-spacing:0">— spin each wheel one at a time</span></p>
+    <div class="roulette-row">
+      ${wheelHtml("genre","Genre","🎸","#f472b6")}
+      ${wheelHtml("topic","Mandatory Topic","🎤","#22d3ee")}
+    </div>
+    <div class="combo" id="rCombo" style="display:none;margin-top:16px">
+      <div class="lab">Your song brief</div>
+      <div class="txt"><span id="rGenre">—</span> song about <span id="rTopic">—</span></div>
+    </div>`;
+  const spin={
+    genre:setupWheel(m.querySelector('[data-w="genre"]'),POOL.genre),
+    topic:setupWheel(m.querySelector('[data-w="topic"]'),POOL.topic),
+  };
+  const res={};
+  const meta={genre:{label:"Genre",out:"#rGenre"},topic:{label:"Topic",out:"#rTopic"}};
+  m.querySelectorAll('[data-spin]').forEach(btn=>{
+    btn.onclick=()=>{
+      const key=btn.dataset.spin, val=pick(POOL[key]);
+      btn.disabled=true; btn.style.opacity=".55"; btn.textContent="Spinning…";
+      m.querySelector(meta[key].out).textContent="…";
+      spin[key](val,()=>{
+        res[key]=val;
+        m.querySelector(meta[key].out).textContent=val;
+        btn.disabled=false; btn.style.opacity="1"; btn.textContent="🔁 Re-spin "+meta[key].label;
+        if(res.genre&&res.topic) m.querySelector("#rCombo").style.display="block";
+      });
+    };
+  });
+}
+function wheelHtml(key,label,icon,col){
+  return `<div class="wheelbox">
+    <div class="lab" style="color:${col};font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:800">${label}</div>
+    <div class="wheel-outer">
+      <div class="wheel-ptr"></div>
+      <div class="wheel" data-w="${key}"></div>
+      <div class="wheel-hub">${icon}</div>
+    </div>
+    <div class="wheel-result" data-r="${key}" style="color:${col}">—</div>
+    <button class="btn primary" data-spin="${key}" style="min-width:150px">🎲 Spin ${label}</button>
+  </div>`;
+}
+function setupWheel(wheelEl, pool){
+  const n=pool.length, seg=360/n, C=100, R=96, hubR=19;
+  const colors=["#7c3aed","#22d3ee","#fbbf24","#34d399","#fb7185","#f472b6","#60a5fa","#f59e0b","#10b981","#e879f9"];
+  const col=i=>colors[i%colors.length];
+  let paths="", labels="";
+  for(let i=0;i<n;i++){
+    const a0=(i*seg-90)*Math.PI/180, a1=((i+1)*seg-90)*Math.PI/180;
+    const x0=(C+R*Math.cos(a0)).toFixed(2), y0=(C+R*Math.sin(a0)).toFixed(2);
+    const x1=(C+R*Math.cos(a1)).toFixed(2), y1=(C+R*Math.sin(a1)).toFixed(2);
+    const large=seg>180?1:0;
+    paths+=`<path d="M${C} ${C} L${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} Z" fill="${col(i)}" stroke="#0b0b16" stroke-width="0.7"/>`;
+    // label: centred on the wedge's radial centreline; flip lower half so text stays upright
+    const mid=i*seg+seg/2, flip=(mid>90&&mid<270), rMid=(hubR+R)/2, midRad=mid*Math.PI/180;
+    const px=(C+rMid*Math.sin(midRad)).toFixed(2), py=(C-rMid*Math.cos(midRad)).toFixed(2);
+    const rot=(flip?mid+90:mid-90).toFixed(2);
+    labels+=`<text x="${px}" y="${py}" text-anchor="middle" dominant-baseline="central"
+      transform="rotate(${rot} ${px} ${py})"
+      font-size="7.6" font-weight="800" fill="#fff"
+      style="paint-order:stroke;stroke:#000;stroke-width:1.7;stroke-linejoin:round">${esc(pool[i])}</text>`;
+  }
+  wheelEl.innerHTML=`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><g>${paths}</g>`+
+    `<circle cx="${C}" cy="${C}" r="${hubR}" fill="#0c0c1a" stroke="#2a2a4d" stroke-width="2"/><g>${labels}</g></svg>`;
+  const resEl=wheelEl.closest(".wheel-outer").parentElement.querySelector("[data-r]");
+  let currentRot=0;
+  return function(finalVal, cb){
+    resEl.textContent="…";
+    const idx=pool.indexOf(finalVal);
+    const target = 360*5 + (360 - (idx*seg + seg/2)); // land pointer(top) on segment centre
+    currentRot += target;
+    wheelEl.style.transform=`rotate(${currentRot}deg)`;
+    setTimeout(()=>{ resEl.textContent=finalVal; cb&&cb(); }, 4600);
+  };
+}
+
+/* ---- Game 06: Random Card Cinematic ---- */
+function mountCards(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  const specs=[
+    {k:"country",lab:"Country / Civilization",icon:"🏛️",col:"#fbbf24"},
+    {k:"cardChar",lab:"Character",icon:"🎭",col:"#fb7185"},
+    {k:"cardScene",lab:"Scene",icon:"⚔️",col:"#22d3ee"},
+    {k:"style",lab:"Cinematic Style",icon:"🎥",col:"#a78bfa"},
+  ];
+  m.innerHTML=`
+    <p class="section-label">🎬 Deal the Wildcards <span class="muted" style="text-transform:none;letter-spacing:0">— 4 cards · NO re-draws</span></p>
+    <div class="reveal-wrap four">
+      ${specs.map(s=>`
+        <div class="pcard" data-k="${s.k}" style="--cc:${s.col}">
+          <div class="pcard-inner">
+            <div class="pcard-face pcard-back">🂠</div>
+            <div class="pcard-face pcard-front">
+              <div class="lab" style="color:${s.col};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:800">${s.icon} ${s.lab}</div>
+              <div class="val" style="font-size:18px;font-weight:800"></div>
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>
+    <div class="row" style="justify-content:center;margin-top:6px">
+      <button class="btn primary lg" id="cGo">🎴 DRAW</button>
+      <button class="btn ghost" id="cCopy" style="display:none">📋 Copy prompt</button>
+    </div>
+    <div class="combo" id="cCombo" style="display:none;margin-top:16px">
+      <div class="lab">Cinematic brief</div><div class="txt" id="cTxt"></div>
+    </div>`;
+  const cards=[...m.querySelectorAll(".pcard")];
+  m.querySelector("#cGo").onclick=()=>{
+    const res={};
+    m.querySelector("#cCombo").style.display="none";
+    m.querySelector("#cCopy").style.display="none";
+    cards.forEach(c=>c.classList.remove("flipped"));
+    cards.forEach((c,i)=>{
+      const k=c.dataset.k, val=pick(POOL[k]); res[k]=val;
+      setTimeout(()=>{
+        c.querySelector(".pcard-front .val").textContent=val;
+        c.classList.add("flipped");
+        if(i===cards.length-1) setTimeout(()=>{
+          const txt=`${res.country} · ${res.cardChar} · ${res.cardScene} · shot in ${res.style} style`;
+          m.querySelector("#cTxt").textContent=txt;
+          m.querySelector("#cCombo").style.display="block";
+          const cb=m.querySelector("#cCopy"); cb.style.display="inline-flex"; cb.onclick=()=>copy(txt);
+        },600);
+      }, 350 + i*650);
+    });
+  };
+}
+
+/* ---- Game 02: Builder (templates + rules + roles) ---- */
+const BUILD = {
+  Mario:{ emoji:"🍄", col:"#fb7185",
+    prompt:`Build a single-file HTML5 canvas "Super Mario"-style platformer that runs in one browser tab.
+
+REQUIREMENTS
+- One playable level, side-scrolling. Arrow keys / A-D to move, Space/Up to jump.
+- A player character with gravity, running and jumping physics.
+- Solid ground + at least 4 floating platforms to jump between.
+- At least 3 enemies that move; stomping on top defeats them, touching the side loses a life.
+- Collectible coins (show a coin counter) and a flag/goal at the far right that shows "LEVEL CLEAR".
+- 3 lives, a HUD (coins + lives), and a Game Over + Restart screen.
+- Everything in ONE .html file, no external assets — draw with canvas shapes/emoji.
+
+Make it actually playable and fun. Return the complete file.`},
+  "Pac-Man":{ emoji:"👻", col:"#fbbf24",
+    prompt:`Build a single-file HTML5 canvas "Pac-Man"-style maze game that runs in one browser tab.
+
+REQUIREMENTS
+- A grid maze with walls, filled with pellets (dots) the player eats.
+- Player moves with arrow keys, continuous movement in the last direction until a wall.
+- At least 2 ghosts that chase the player with simple AI.
+- 4 power pellets that let the player eat ghosts for a few seconds (ghosts turn blue).
+- Score counter + lives. Win when all pellets are eaten → "YOU WIN"; lose all lives → "GAME OVER" + Restart.
+- Everything in ONE .html file, no external assets — draw with canvas.
+
+Make it actually playable. Return the complete file.`},
+  "Donkey Kong":{ emoji:"🦍", col:"#22d3ee",
+    prompt:`Build a single-file HTML5 canvas "Donkey Kong"-style arcade climber that runs in one browser tab.
+
+REQUIREMENTS
+- Multiple sloped girders/platforms connected by ladders the player climbs.
+- Player walks left/right (arrows) and climbs ladders (up/down), with gravity and jumping (Space).
+- Rolling barrels spawn from the top and roll down the girders; jump them or lose a life.
+- A goal at the very top (the princess) → reaching it shows "YOU WIN".
+- 3 lives, score for jumping barrels, Game Over + Restart screen.
+- Everything in ONE .html file, no external assets — draw with canvas.
+
+Make it actually playable. Return the complete file.`},
+};
+const SCAFFOLD = `<!doctype html><html><head><meta charset="utf-8">
+<title>Retro Game</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;display:grid;place-items:center;font-family:monospace}
+  canvas{background:#101020;border:2px solid #333;image-rendering:pixelated}
+  #hud{position:fixed;top:10px;left:10px;color:#fff;font-size:18px}
+</style></head><body>
+<div id="hud">Score: <span id="score">0</span> · Lives: <span id="lives">3</span></div>
+<canvas id="c" width="800" height="480"></canvas>
+<script>
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const keys={}; addEventListener('keydown',e=>keys[e.key]=true); addEventListener('keyup',e=>keys[e.key]=false);
+let score=0, lives=3;
+const player={x:60,y:400,w:28,h:28,vy:0,onGround:false};
+function update(){
+  // TODO: movement, gravity, collisions, enemies, win/lose
+}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#4ade80'; ctx.fillRect(0,440,cv.width,40);        // ground
+  ctx.fillStyle='#f87171'; ctx.fillRect(player.x,player.y,player.w,player.h); // player
+}
+function loop(){ update(); draw();
+  document.getElementById('score').textContent=score;
+  document.getElementById('lives').textContent=lives;
+  requestAnimationFrame(loop);
+}
+loop();
+<\/script></body></html>`;
+
+function mountBuilder(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  const names=Object.keys(BUILD);
+  state.buildOk=state.buildOk||{};
+  m.innerHTML=`
+    <p class="section-label">🎮 Demo Arcade <span class="muted" style="text-transform:none;letter-spacing:0">— fullscreen playable demos for the projector: this is the bar to beat!</span></p>
+    <div class="playcards">
+      <div class="playcard" style="--accent:#f43f5e">
+        <div class="pemoji">🍄</div><b>Super Jumpman</b><span>Mario-style platformer — run, jump, stomp, grab the flag</span>
+        <button class="btn primary" onclick="openArcade('jump')">▶ Play fullscreen</button>
+      </div>
+      <div class="playcard" style="--accent:#fbbf24">
+        <div class="pemoji">👻</div><b>Chomp Maze</b><span>Pac-Man-style — eat every dot, dodge the ghosts</span>
+        <button class="btn primary" onclick="openArcade('chomp')">▶ Play fullscreen</button>
+      </div>
+      <div class="playcard" style="--accent:#a78bfa">
+        <div class="pemoji">🦍</div><b>Barrel Climb</b><span>Donkey Kong-style — climb the girders, dodge barrels, save the day</span>
+        <button class="btn primary" onclick="openArcade('barrel')">▶ Play fullscreen</button>
+      </div>
+    </div>
+    <hr/>
+    <p class="section-label">🕹️ Speed-Build Kit <span class="muted" style="text-transform:none;letter-spacing:0">— prompts unlock per team once the host approves</span></p>
+    <div class="big-note" style="margin-bottom:14px">⚡ 15-minute sprint · 1 builder per game + 1 QA runner. A game only counts if it <b>actually plays</b>.</div>
+    <div class="teamchips" id="bTeams">
+      ${state.teams.map(t=>`<button class="teamchip" style="--tc:${t.color}" data-team="${t.id}">${state.buildOk[t.id]?"✅":"🔒"} ${esc(t.name)}</button>`).join("")}
+    </div>
+    <div id="bGate"></div>
+    <hr/>
+    <p class="section-label">Suggested roles</p>
+    <div class="role-grid">
+      <div class="role"><b>🍄 Mario Builder</b><span>Owns the platformer end-to-end</span></div>
+      <div class="role"><b>👻 Pac-Man Builder</b><span>Owns the maze game end-to-end</span></div>
+      <div class="role"><b>🦍 DK Builder</b><span>Owns the climber end-to-end</span></div>
+      <div class="role"><b>🧪 QA Runner</b><span>Tests each build, reports bugs live, confirms it plays</span></div>
+    </div>`;
+  const gate=m.querySelector("#bGate");
+  let selTeam=state.teams[0]?state.teams[0].id:null, curTab=names[0];
+  const drawKit=()=>{
+    m.querySelectorAll("#bTeams .teamchip").forEach(ch=>ch.classList.toggle("active",ch.dataset.team===selTeam));
+    const t=state.teams.find(x=>x.id===selTeam);
+    if(!t){ gate.innerHTML=""; return; }
+    if(!state.buildOk[t.id]){
+      gate.innerHTML=`<div class="card" style="text-align:center;padding:30px 20px">
+        <div style="font-size:44px">🔒</div>
+        <b style="font-size:18px;color:${t.color}">${esc(t.name)} — prompts locked</b>
+        <p class="sub" style="margin:8px 0 0">Show the host your team plan first. Approved teams get the AI build prompts.<br>
+        <span class="muted">Host: approve teams in 🔒 Admin.</span></p>
+      </div>`;
+      return;
+    }
+    gate.innerHTML=`
+      <div class="tabs" id="bTabs">${names.map(n=>`<button class="tab ${n===curTab?'active':''}" data-t="${n}">${BUILD[n].emoji} ${n}</button>`).join("")}</div>
+      <div id="bBody"></div>`;
+    const body=gate.querySelector("#bBody");
+    const drawTab=(n)=>{
+      curTab=n; const b=BUILD[n];
+      body.innerHTML=`
+        <div class="row" style="margin-bottom:10px">
+          <span class="tag" style="border-color:${b.col}">${b.emoji} ${n} — AI build prompt</span>
+        </div>
+        <div class="copywrap">
+          <button class="btn sm cyan copybtn" data-copy="prompt">📋 Copy prompt</button>
+          <pre class="code" id="promptCode">${esc(b.prompt)}</pre>
+        </div>
+        <div class="row" style="margin:14px 0 8px">
+          <span class="tag">🧱 Optional HTML scaffold (shared starter)</span>
+        </div>
+        <div class="copywrap">
+          <button class="btn sm green copybtn" data-copy="scaffold">📋 Copy scaffold</button>
+          <pre class="code" id="scaffoldCode">${esc(SCAFFOLD)}</pre>
+        </div>`;
+      body.querySelector('[data-copy="prompt"]').onclick=()=>copy(b.prompt);
+      body.querySelector('[data-copy="scaffold"]').onclick=()=>copy(SCAFFOLD);
+    };
+    gate.querySelectorAll("#bTabs .tab").forEach(tb=>tb.onclick=()=>{
+      gate.querySelectorAll("#bTabs .tab").forEach(x=>x.classList.remove("active"));
+      tb.classList.add("active"); drawTab(tb.dataset.t);
+    });
+    drawTab(curTab);
+  };
+  m.querySelectorAll("#bTeams .teamchip").forEach(ch=>ch.onclick=()=>{ selTeam=ch.dataset.team; drawKit(); });
+  drawKit();
+}
+
+/* ---------- Demo Arcade (Game 02 playable demos) ---------- */
+let ARCADE=null, ARCADE_KEYS=null;
+function openArcade(key){
+  closeArcade();
+  const ov=document.createElement("div"); ov.className="arcade";
+  ov.innerHTML=`
+    <div class="ahud" id="aHud"></div>
+    <canvas id="aCv"></canvas>
+    <div class="akeys" id="aKeys"></div>
+    <button class="btn ghost sm aclose" onclick="closeArcade()">✕ Close (Esc)</button>
+    <div class="tctl tleft">
+      <span class="tspace"></span><button class="tbtn" data-tk="up">▲</button><span class="tspace"></span>
+      <button class="tbtn" data-tk="left">◀</button><span class="tspace"></span><button class="tbtn" data-tk="right">▶</button>
+      <span class="tspace"></span><button class="tbtn" data-tk="down">▼</button><span class="tspace"></span>
+    </div>
+    <div class="tctl tright"><button class="tbtn tjump" data-tk="jump">A</button></div>`;
+  document.body.appendChild(ov);
+  if(matchMedia("(pointer:coarse)").matches||"ontouchstart" in window) ov.classList.add("touch");
+  const cv=ov.querySelector("#aCv");
+  const game=ARCADE_GAMES[key](cv, ov.querySelector("#aHud"), ov.querySelector("#aKeys"));
+  ov.style.setProperty("--ar", (cv.width/cv.height).toFixed(4));
+  // touch pads write into the same key-state the keyboard uses
+  ov.querySelectorAll(".tbtn").forEach(b=>{
+    const tk=b.dataset.tk;
+    const on=e=>{ e.preventDefault(); if(ARCADE_KEYS)ARCADE_KEYS[tk]=true; b.classList.add("on"); };
+    const off=e=>{ e.preventDefault(); if(ARCADE_KEYS)ARCADE_KEYS[tk]=false; b.classList.remove("on"); };
+    b.addEventListener("pointerdown",on);
+    b.addEventListener("pointerup",off);
+    b.addEventListener("pointercancel",off);
+    b.addEventListener("pointerleave",off);
+    b.addEventListener("contextmenu",e=>e.preventDefault());
+  });
+  ARCADE={ov,game};
+}
+function closeArcade(){ if(!ARCADE)return; try{ARCADE.game.stop();}catch(e){} ARCADE.ov.remove(); ARCADE=null; }
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&ARCADE) closeArcade(); });
+window.addEventListener("hashchange", closeArcade);
+
+function arcadeKeys(){
+  const k={};
+  const MAP={arrowleft:"left",a:"left",arrowright:"right",d:"right",arrowup:"up",w:"up",arrowdown:"down",s:"down"," ":"jump",enter:"enter"};
+  const dn=e=>{ const key=MAP[e.key.toLowerCase()]; if(key){ k[key]=true; e.preventDefault(); } };
+  const up=e=>{ const key=MAP[e.key.toLowerCase()]; if(key){ k[key]=false; e.preventDefault(); } };
+  window.addEventListener("keydown",dn); window.addEventListener("keyup",up);
+  k._off=()=>{ window.removeEventListener("keydown",dn); window.removeEventListener("keyup",up); if(ARCADE_KEYS===k)ARCADE_KEYS=null; };
+  ARCADE_KEYS=k;
+  return k;
+}
+function arcadeLoop(step,draw,k){
+  // fixed 60Hz logic step regardless of display refresh rate
+  let raf, last=performance.now(), acc=0;
+  const loop=now=>{
+    acc+=Math.min(200,now-last); last=now;
+    while(acc>=16.67){ step(); acc-=16.67; }
+    draw(); raf=requestAnimationFrame(loop);
+  };
+  raf=requestAnimationFrame(loop);
+  return {stop(){ cancelAnimationFrame(raf); k._off(); }};
+}
+function arcadeText(ctx,W,H,big,small){
+  ctx.fillStyle="#000a"; ctx.fillRect(0,H/2-90,W,180);
+  ctx.textAlign="center"; ctx.fillStyle="#fff";
+  ctx.font="900 52px Segoe UI,system-ui,sans-serif"; ctx.fillText(big,W/2,H/2-10);
+  ctx.font="700 22px Segoe UI,system-ui,sans-serif"; ctx.fillStyle="#fbbf24"; ctx.fillText(small,W/2,H/2+40);
+}
+
+/* --- Super Jumpman: side-scrolling platformer --- */
+function gameJump(cv,hud,keysEl){
+  const W=960,H=520,T=40; cv.width=W; cv.height=H;
+  const ctx=cv.getContext("2d");
+  keysEl.textContent="← → / A D move · Space jump · Enter restart · Esc close";
+  const ROWS=[
+    "",
+    "",
+    "              ooo            ooo",
+    "             =====          =====",
+    "",
+    "                                     ooo          ooo               ooo",
+    "       =o=                          =====        =====     ===    =====",
+    "",
+    "        o             oo                     o                             o",
+    "      =====          ====        ==o==      ===        ====      ==      ===",
+    "  P        E        E         E          E          E         E        E",
+    "#############   #################   ##########################   ###############",
+    "#############   #################   ##########################   ###############",
+  ].map(r=>r.padEnd(84," "));
+  const COLS=84, WORLD=COLS*T;
+  const solid=(c,r)=>{ if(c<0||c>=COLS)return true; if(r<0)return false; if(r>=ROWS.length)return false; const ch=ROWS[r][c]; return ch==="#"||ch==="="; };
+  let p,coins,enemies,flag,cam,score,lives,st,tick;
+  function init(){
+    coins=[]; enemies=[]; flag=null;
+    for(let r=0;r<ROWS.length;r++)for(let c=0;c<COLS;c++){
+      const ch=ROWS[r][c];
+      if(ch==="o")coins.push({x:c*T+T/2,y:r*T+T/2,got:false});
+      if(ch==="E")enemies.push({x:c*T+T/2,y:r*T+T-16,dir:-1,dead:false});
+      if(ch==="F")flag={x:c*T+T/2,y:r*T};
+      if(ch==="P")p={x:c*T+8,y:r*T,vx:0,vy:0,w:26,h:36,ground:false,face:1};
+    }
+    if(!flag)flag={x:(COLS-4)*T,y:9*T};
+    cam=0; score=0; lives=3; st="play"; tick=0;
+  }
+  function respawn(){ p.x=T+8; p.y=10*T-40; p.vx=0; p.vy=0; cam=0; }
+  const k=arcadeKeys();
+  function hurt(){ lives--; if(lives<=0){st="over";} else respawn(); }
+  function step(){
+    tick++;
+    if(st!=="play"){ if(k.enter||k.jump)init(); return; }
+    // input
+    if(k.left){p.vx-=.6;p.face=-1} if(k.right){p.vx+=.6;p.face=1}
+    p.vx*=.85; p.vx=Math.max(-5,Math.min(5,p.vx));
+    if(k.jump&&p.ground){p.vy=-13;p.ground=false;}
+    p.vy+=.6; p.vy=Math.min(14,p.vy);
+    // X move + collide
+    p.x+=p.vx;
+    let c0=Math.floor(p.x/T),c1=Math.floor((p.x+p.w)/T),r0=Math.floor(p.y/T),r1=Math.floor((p.y+p.h-1)/T);
+    for(let r=r0;r<=r1;r++){ if(p.vx>0&&solid(c1,r)){p.x=c1*T-p.w-0.01;p.vx=0;} if(p.vx<0&&solid(c0,r)){p.x=(c0+1)*T+0.01;p.vx=0;} }
+    // Y move + collide
+    p.y+=p.vy; p.ground=false;
+    c0=Math.floor(p.x/T);c1=Math.floor((p.x+p.w)/T);r0=Math.floor(p.y/T);r1=Math.floor((p.y+p.h)/T);
+    for(let c=c0;c<=c1;c++){
+      if(p.vy>0&&solid(c,r1)){p.y=r1*T-p.h-0.01;p.vy=0;p.ground=true;}
+      if(p.vy<0&&solid(c,r0)){p.y=(r0+1)*T+0.01;p.vy=0;}
+    }
+    if(p.y>H+80)hurt();
+    // coins
+    coins.forEach(o=>{ if(!o.got&&Math.abs(p.x+p.w/2-o.x)<26&&Math.abs(p.y+p.h/2-o.y)<28){o.got=true;score+=50;} });
+    // enemies
+    enemies.forEach(e=>{
+      if(e.dead)return;
+      e.x+=e.dir*1.3;
+      const ec=Math.floor((e.x+e.dir*14)/T), er=Math.floor((e.y+14)/T);
+      if(solid(ec,Math.floor(e.y/T))||!solid(ec,er)) e.dir*=-1;
+      const dx=(p.x+p.w/2)-e.x, dy=(p.y+p.h/2)-(e.y-2);
+      if(Math.abs(dx)<24&&Math.abs(dy)<26){
+        if(p.vy>2&&dy<-4){e.dead=true;score+=100;p.vy=-8;}
+        else hurt();
+      }
+    });
+    // flag
+    if(Math.abs(p.x+p.w/2-flag.x)<24&&p.y+p.h>flag.y-10){st="win";score+=500;}
+    cam=Math.max(0,Math.min(WORLD-W,p.x-360));
+  }
+  function draw(){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#131335"); g.addColorStop(1,"#2b1b52");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // parallax hills
+    ctx.fillStyle="#1d1d46";
+    for(let i=0;i<7;i++){ const hx=((i*520)-(cam*.4))%(WORLD)-100; ctx.beginPath(); ctx.arc(hx,H,180,Math.PI,0); ctx.fill(); }
+    ctx.save(); ctx.translate(-cam,0);
+    // tiles
+    const cA=Math.floor(cam/T), cB=Math.min(COLS-1,Math.ceil((cam+W)/T));
+    for(let r=0;r<ROWS.length;r++)for(let c=cA;c<=cB;c++){
+      const ch=ROWS[r][c];
+      if(ch==="#"){ ctx.fillStyle="#5b3a29"; ctx.fillRect(c*T,r*T,T,T);
+        if(!solid(c,r-1)){ctx.fillStyle="#34d399";ctx.fillRect(c*T,r*T,T,9);}
+        ctx.strokeStyle="#0006"; ctx.strokeRect(c*T+.5,r*T+.5,T-1,T-1); }
+      if(ch==="="){ ctx.fillStyle="#f59e0b"; ctx.fillRect(c*T,r*T+6,T,T-14);
+        ctx.strokeStyle="#0007"; ctx.strokeRect(c*T+.5,r*T+6.5,T-1,T-15); }
+    }
+    // coins
+    coins.forEach(o=>{ if(o.got)return; const w=8+6*Math.abs(Math.sin(tick*.1+o.x));
+      ctx.fillStyle="#fde047"; ctx.beginPath(); ctx.ellipse(o.x,o.y,w,13,0,0,7); ctx.fill();
+      ctx.strokeStyle="#b45309"; ctx.stroke(); });
+    // flag
+    ctx.fillStyle="#e5e7eb"; ctx.fillRect(flag.x-3,flag.y-150,6,150);
+    ctx.fillStyle="#22d3ee"; ctx.beginPath(); ctx.moveTo(flag.x+3,flag.y-150); ctx.lineTo(flag.x+52,flag.y-132); ctx.lineTo(flag.x+3,flag.y-114); ctx.fill();
+    // enemies
+    enemies.forEach(e=>{ if(e.dead)return;
+      ctx.fillStyle="#a855f7"; ctx.beginPath(); ctx.arc(e.x,e.y,15,Math.PI,0); ctx.fill(); ctx.fillRect(e.x-15,e.y-1,30,12);
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(e.x-6,e.y-4,4.5,0,7); ctx.arc(e.x+6,e.y-4,4.5,0,7); ctx.fill();
+      ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(e.x-6+e.dir*2,e.y-4,2,0,7); ctx.arc(e.x+6+e.dir*2,e.y-4,2,0,7); ctx.fill(); });
+    // player
+    ctx.fillStyle="#ef4444"; ctx.fillRect(p.x,p.y,p.w,14);
+    ctx.fillStyle="#3b82f6"; ctx.fillRect(p.x,p.y+14,p.w,p.h-14);
+    ctx.fillStyle="#fcd9b8"; ctx.fillRect(p.x+4,p.y+3,p.w-8,9);
+    ctx.fillStyle="#000"; ctx.fillRect(p.x+(p.face>0?p.w-10:4),p.y+5,4,4);
+    ctx.restore();
+    if(st==="win")arcadeText(ctx,W,H,"🏁 LEVEL CLEAR!","Enter = play again · Esc = close");
+    if(st==="over")arcadeText(ctx,W,H,"💀 GAME OVER","Enter = try again · Esc = close");
+    hud.innerHTML=`<span>🍄 SUPER JUMPMAN</span><span>⭐ ${score}</span><span>❤️ ${lives}</span>`;
+  }
+  init();
+  return arcadeLoop(step,draw,k);
+}
+
+/* --- Chomp Maze: pac-style maze game --- */
+function gameChomp(cv,hud,keysEl){
+  const MAPS=[
+    "###################",
+    "#........#........#",
+    "#o##.###.#.###.##o#",
+    "#.................#",
+    "#.##.#.#####.#.##.#",
+    "#....#...#...#....#",
+    "####.###.#.###.####",
+    "   #.#...G...#.#   ",
+    "####.#.#####.#.####",
+    "#........#........#",
+    "#.##.###.#.###.##.#",
+    "#o.#.....P.....#.o#",
+    "##.#.#.#####.#.#.##",
+    "#....#...#...#....#",
+    "###################",
+  ];
+  const CO=19,RO=15,T=34,W=CO*T,H=RO*T; cv.width=W; cv.height=H;
+  const ctx=cv.getContext("2d");
+  keysEl.textContent="← ↑ ↓ → / WASD move · Enter restart · Esc close";
+  const wall=(c,r)=>{ c=((c%CO)+CO)%CO; if(r<0||r>=RO)return true; return MAPS[r][c]==="#"; };
+  const GCOLS=["#f43f5e","#22d3ee","#fbbf24"];
+  let dots,pac,ghosts,score,lives,st,fright,tick,total;
+  function ent(c,r){ return {x:c*T+T/2,y:r*T+T/2,dir:[0,0],want:[0,0]}; }
+  let pacHome=[9,11],gHome=[9,7];
+  function init(){
+    dots={}; total=0;
+    for(let r=0;r<RO;r++)for(let c=0;c<CO;c++){ const ch=MAPS[r][c];
+      if(ch==="."){dots[c+","+r]=1;total++;} if(ch==="o"){dots[c+","+r]=2;total++;}
+      if(ch==="P")pacHome=[c,r]; if(ch==="G")gHome=[c,r]; }
+    score=0; lives=3; st="play"; fright=0; tick=0;
+    resetPos();
+  }
+  function resetPos(){
+    pac=ent(...pacHome); pac.dir=[0,0]; pac.want=[0,0];
+    ghosts=GCOLS.map((col,i)=>{ const g=ent(gHome[0]-1+i,gHome[1]); g.col=col; g.dir=[0,-1]; g.wait=140+i*200; return g; });
+    fright=0;
+  }
+  const k=arcadeKeys();
+  const atCenter=e=>Math.abs((e.x-T/2)%T)<2.6&&Math.abs((e.y-T/2)%T)<2.6;
+  const tileOf=e=>[Math.round((e.x-T/2)/T),Math.round((e.y-T/2)/T)];
+  function tryDir(e,d,sp){
+    const [c,r]=tileOf(e);
+    if(!wall(c+d[0],r+d[1])){e.dir=d;return true;} return false;
+  }
+  function move(e,sp){
+    e.x+=e.dir[0]*sp; e.y+=e.dir[1]*sp;
+    if(e.x<-T/2)e.x=W+T/2-1; if(e.x>W+T/2)e.x=-T/2+1;
+    const [c,r]=tileOf(e);
+    if(e.dir[0]&&wall(c+e.dir[0],r)&&atCenter(e)){e.x=c*T+T/2;e.dir=[0,0];}
+    if(e.dir[1]&&wall(c,r+e.dir[1])&&atCenter(e)){e.y=r*T+T/2;e.dir=[0,0];}
+    if(e.dir[0])e.y+= (r*T+T/2-e.y)*.3; if(e.dir[1])e.x+=(c*T+T/2-e.x)*.3;
+  }
+  function step(){
+    tick++;
+    if(st!=="play"){ if(k.enter||k.jump)init(); return; }
+    if(fright>0)fright--;
+    // pac input
+    if(k.left)pac.want=[-1,0]; if(k.right)pac.want=[1,0]; if(k.up)pac.want=[0,-1]; if(k.down)pac.want=[0,1];
+    if((pac.want[0]!==pac.dir[0]||pac.want[1]!==pac.dir[1])&&atCenter(pac)) tryDir(pac,pac.want);
+    if(pac.want[0]===-pac.dir[0]&&pac.want[1]===-pac.dir[1]&&(pac.dir[0]||pac.dir[1])) pac.dir=pac.want.slice();
+    move(pac,2.6);
+    // eat
+    const [pc,pr]=tileOf(pac), key=pc+","+pr;
+    if(dots[key]){ score+=dots[key]===2?50:10; if(dots[key]===2)fright=420; delete dots[key]; total--; if(total<=0)st="win"; }
+    // ghosts
+    ghosts.forEach(g=>{
+      if(g.wait>0){g.wait--;return;}
+      if(atCenter(g)){
+        const [c,r]=tileOf(g);
+        const opts=[[1,0],[-1,0],[0,1],[0,-1]].filter(d=>!(d[0]===-g.dir[0]&&d[1]===-g.dir[1])&&!wall(c+d[0],r+d[1]));
+        if(opts.length){
+          let best;
+          if(Math.random()<.38) best=opts[Math.floor(Math.random()*opts.length)];
+          else{
+            const dist=d=>{const dx=(c+d[0])-pc,dy=(r+d[1])-pr;return dx*dx+dy*dy;};
+            opts.sort((a,b)=>dist(a)-dist(b));
+            best=fright>0?opts[opts.length-1]:opts[0];
+          }
+          g.dir=best;
+        }
+      }
+      move(g,fright>0?1.5:1.9);
+      const dx=g.x-pac.x,dy=g.y-pac.y;
+      if(dx*dx+dy*dy<380){
+        if(fright>0){ score+=200; g.x=gHome[0]*T+T/2; g.y=gHome[1]*T+T/2; g.wait=120; g.dir=[0,-1]; }
+        else{ lives--; if(lives<=0)st="over"; else resetPos(); }
+      }
+    });
+  }
+  function draw(){
+    ctx.fillStyle="#050514"; ctx.fillRect(0,0,W,H);
+    for(let r=0;r<RO;r++)for(let c=0;c<CO;c++){
+      if(MAPS[r][c]==="#"){ ctx.fillStyle="#1e1b6b"; ctx.fillRect(c*T+2,r*T+2,T-4,T-4);
+        ctx.strokeStyle="#4f46e5"; ctx.strokeRect(c*T+2.5,r*T+2.5,T-5,T-5); }
+    }
+    for(const key in dots){ const [c,r]=key.split(",").map(Number);
+      ctx.fillStyle="#fde047"; ctx.beginPath();
+      ctx.arc(c*T+T/2,r*T+T/2,dots[key]===2?(7+2*Math.sin(tick*.15)):3.5,0,7); ctx.fill(); }
+    // pac
+    const ang=Math.atan2(pac.dir[1],pac.dir[0])||0, mouth=.28+.22*Math.sin(tick*.25);
+    ctx.fillStyle="#facc15"; ctx.beginPath();
+    ctx.moveTo(pac.x,pac.y); ctx.arc(pac.x,pac.y,14,ang+mouth,ang-mouth); ctx.closePath(); ctx.fill();
+    // ghosts
+    ghosts.forEach(g=>{
+      const col=fright>0?((fright<120&&Math.floor(tick/10)%2)?"#fff":"#3b82f6"):g.col;
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(g.x,g.y-2,13,Math.PI,0);
+      ctx.lineTo(g.x+13,g.y+11);
+      for(let i=2;i>=-2;i--) ctx.lineTo(g.x+i*6.5-3.25,g.y+11-((i+10)%2?5:0));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(g.x-5,g.y-4,4,0,7); ctx.arc(g.x+5,g.y-4,4,0,7); ctx.fill();
+      ctx.fillStyle="#1e1b4b"; ctx.beginPath(); ctx.arc(g.x-5+g.dir[0]*2,g.y-4+g.dir[1]*2,2,0,7); ctx.arc(g.x+5+g.dir[0]*2,g.y-4+g.dir[1]*2,2,0,7); ctx.fill();
+    });
+    if(st==="win")arcadeText(ctx,W,H,"🎉 MAZE CLEARED!","Enter = play again · Esc = close");
+    if(st==="over")arcadeText(ctx,W,H,"👻 GAME OVER","Enter = try again · Esc = close");
+    hud.innerHTML=`<span>👻 CHOMP MAZE</span><span>⭐ ${score}</span><span>❤️ ${lives}</span>`;
+  }
+  init();
+  return arcadeLoop(step,draw,k);
+}
+
+/* --- Barrel Climb: DK-style girder climber --- */
+function gameBarrel(cv,hud,keysEl){
+  const W=960,H=600; cv.width=W; cv.height=H;
+  const ctx=cv.getContext("2d");
+  keysEl.textContent="← → move · ↑ ↓ climb ladders · Space jump · Enter restart · Esc close";
+  // girders bottom(0)→top(5); barrels roll downhill
+  const G=[...Array(6)].map((_,i)=>{ const d=(i%2)?1:-1, s=.018*d; return {cy:555-90*i, s, d}; });
+  const gy=(i,x)=>G[i].cy+G[i].s*(x-480);
+  const LAD=[ // {lo: lower girder idx, x}
+    {lo:0,x:180},{lo:0,x:820},{lo:1,x:90},{lo:1,x:620},{lo:2,x:320},{lo:2,x:880},
+    {lo:3,x:150},{lo:3,x:700},{lo:4,x:430},{lo:4,x:870},
+  ];
+  const TOP={x1:40,x2:230,y:52}, TL={x:120}; // princess platform + its ladder from girder 5
+  const KONG={x:300}, SPAWN=220;
+  let p,bars,score,lives,st,tick;
+  function init(){ bars=[]; score=0; lives=3; st="play"; tick=0; respawn(); }
+  function respawn(){ p={x:70,g:0,y:0,vy:0,jump:false,climb:null,onTop:false,face:1,inv:110}; p.y=gy(0,p.x)-17; }
+  const k=arcadeKeys();
+  function hurt(){ lives--; if(lives<=0)st="over"; else respawn(); }
+  function step(){
+    tick++;
+    if(st!=="play"){ if(k.enter||k.jump)init(); return; }
+    if(p.inv>0)p.inv--;
+    // spawn barrels
+    if(tick%SPAWN===1&&bars.length<6) bars.push({x:KONG.x+40,g:5,y:gy(5,KONG.x+40)-11,climb:null,scored:false,rot:0});
+    // player
+    if(p.climb!==null){
+      const L=p.climb;
+      const topY=L.top? TOP.y : gy(L.lo+1,L.x), botY=L.top? gy(5,L.x) : gy(L.lo,L.x);
+      if(k.up)p.y-=2.4; if(k.down)p.y+=2.4;
+      p.x=L.x;
+      if(p.y-17<=topY-17){ p.y=topY-17; if(L.top){p.onTop=true;p.climb=null;st="win";score+=1000;} else {p.g=L.lo+1;p.climb=null;} }
+      if(p.y>=botY-17){ p.y=botY-17; p.g=L.lo; p.climb=null; }
+    } else if(!p.onTop){
+      if(k.left){p.x-=3;p.face=-1} if(k.right){p.x+=3;p.face=1}
+      p.x=Math.max(14,Math.min(W-14,p.x));
+      if(p.jump){ p.vy+=.55; p.y+=p.vy; if(p.y>=gy(p.g,p.x)-17){p.y=gy(p.g,p.x)-17;p.jump=false;p.vy=0;} }
+      else{
+        p.y=gy(p.g,p.x)-17;
+        if(k.jump){p.jump=true;p.vy=-9;}
+        // grab ladder
+        if(k.up||k.down){
+          for(const L of LAD){
+            if(Math.abs(p.x-L.x)<16){
+              if(k.up&&L.lo+1<=5&&p.g===L.lo){p.climb=L;break;}
+              if(k.down&&p.g===L.lo+1){p.climb=L;break;}
+            }
+          }
+          if(!p.climb&&p.g===5&&k.up&&Math.abs(p.x-TL.x)<16){p.climb={lo:4,x:TL.x,top:true};}
+        }
+      }
+    }
+    // barrels
+    bars.forEach(b=>{
+      b.rot+=.2;
+      if(b.climb!==null){
+        const L=b.climb; b.y+=2.6; b.x=L.x;
+        if(b.y>=gy(L.lo,L.x)-11){ b.y=gy(L.lo,L.x)-11; b.g=L.lo; b.climb=null; }
+      } else {
+        b.x+=G[b.g].d*2.7;
+        if(b.x<-25||b.x>W+25){
+          if(b.g===0){ b.dead=true; score+=25; }
+          else{ b.g--; b.x=Math.max(-20,Math.min(W+20,b.x)); }
+        }
+        b.y=gy(b.g,Math.max(0,Math.min(W,b.x)))-11;
+        // maybe take a ladder down
+        for(const L of LAD){
+          if(L.lo+1===b.g&&Math.abs(b.x-L.x)<4&&Math.random()<.12){ b.climb=L; break; }
+        }
+      }
+      // jump-over bonus
+      if(!b.scored&&p.jump&&b.g===p.g&&Math.abs(b.x-p.x)<28&&b.y-p.y>20){ b.scored=true; score+=100; }
+      // hit player
+      const dx=b.x-p.x, dy=b.y-(p.y+2);
+      if(dx*dx+dy*dy<540&&st==="play"&&p.inv<=0) hurt();
+    });
+    bars=bars.filter(b=>!b.dead);
+  }
+  function drawLadder(x,y1,y2){
+    ctx.strokeStyle="#22d3ee"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x-9,y1); ctx.lineTo(x-9,y2); ctx.moveTo(x+9,y1); ctx.lineTo(x+9,y2); ctx.stroke();
+    for(let y=y1+6;y<y2;y+=12){ ctx.beginPath(); ctx.moveTo(x-9,y); ctx.lineTo(x+9,y); ctx.stroke(); }
+    ctx.lineWidth=1;
+  }
+  function draw(){
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0b0b22"); g.addColorStop(1,"#26103e");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // ladders behind girders
+    LAD.forEach(L=>drawLadder(L.x,gy(L.lo+1,L.x),gy(L.lo,L.x)));
+    drawLadder(TL.x,TOP.y,gy(5,TL.x));
+    // girders
+    G.forEach((gr,i)=>{ ctx.strokeStyle="#f43f5e"; ctx.lineWidth=8; ctx.beginPath();
+      ctx.moveTo(0,gy(i,0)); ctx.lineTo(W,gy(i,W)); ctx.stroke();
+      ctx.strokeStyle="#be123c"; ctx.lineWidth=2;
+      for(let x=10;x<W;x+=34){ ctx.beginPath(); ctx.moveTo(x,gy(i,x)-4); ctx.lineTo(x+14,gy(i,x+14)+4); ctx.stroke(); }
+    });
+    ctx.lineWidth=1;
+    // princess platform
+    ctx.strokeStyle="#f472b6"; ctx.lineWidth=8; ctx.beginPath(); ctx.moveTo(TOP.x1,TOP.y); ctx.lineTo(TOP.x2,TOP.y); ctx.stroke(); ctx.lineWidth=1;
+    // princess
+    ctx.fillStyle="#f9a8d4"; ctx.fillRect(126,TOP.y-34,18,24);
+    ctx.fillStyle="#fcd9b8"; ctx.beginPath(); ctx.arc(135,TOP.y-40,9,0,7); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="700 13px Segoe UI"; ctx.fillText("HELP!",160,TOP.y-42);
+    // kong
+    const kx=KONG.x, ky=gy(5,kx);
+    ctx.fillStyle="#7c4a21"; ctx.beginPath(); ctx.arc(kx,ky-32,26,0,7); ctx.fill();
+    ctx.fillStyle="#5b3a29"; ctx.beginPath(); ctx.arc(kx-24,ky-18,11,0,7); ctx.arc(kx+24,ky-18,11,0,7); ctx.fill();
+    ctx.fillStyle="#e7c9a9"; ctx.beginPath(); ctx.arc(kx,ky-26,13,0,7); ctx.fill();
+    ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(kx-5,ky-32,2.6,0,7); ctx.arc(kx+5,ky-32,2.6,0,7); ctx.fill();
+    // barrels
+    bars.forEach(b=>{ ctx.fillStyle="#f59e0b"; ctx.beginPath(); ctx.arc(b.x,b.y,11,0,7); ctx.fill();
+      ctx.strokeStyle="#92400e"; ctx.beginPath(); ctx.arc(b.x,b.y,11,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(b.x-11*Math.cos(b.rot),b.y-11*Math.sin(b.rot)); ctx.lineTo(b.x+11*Math.cos(b.rot),b.y+11*Math.sin(b.rot)); ctx.stroke(); });
+    // player (blinks while invulnerable)
+    if(!(p.inv>0&&Math.floor(tick/5)%2)){
+      ctx.fillStyle="#3b82f6"; ctx.fillRect(p.x-9,p.y-4,18,21);
+      ctx.fillStyle="#ef4444"; ctx.fillRect(p.x-9,p.y-12,18,8);
+      ctx.fillStyle="#fcd9b8"; ctx.beginPath(); ctx.arc(p.x,p.y-16,8,0,7); ctx.fill();
+      ctx.fillStyle="#000"; ctx.fillRect(p.x+(p.face>0?2:-5),p.y-18,3,3);
+    }
+    if(st==="win")arcadeText(ctx,W,H,"💖 RESCUED!","Enter = play again · Esc = close");
+    if(st==="over")arcadeText(ctx,W,H,"🛢️ GAME OVER","Enter = try again · Esc = close");
+    hud.innerHTML=`<span>🦍 BARREL CLIMB</span><span>⭐ ${score}</span><span>❤️ ${lives}</span>`;
+  }
+  init();
+  return arcadeLoop(step,draw,k);
+}
+
+const ARCADE_GAMES={jump:gameJump, chomp:gameChomp, barrel:gameBarrel};
+
+/* ---------- Game 04: Sample Resort Tree Explorer app ---------- */
+const TREES=[
+  {img:"tree1.jpg",emoji:"🥥",name:"Coconut Palm",my:"Pokok Kelapa",latin:"Cocos nucifera",col:"#34d399",
+   height:"Up to 30 m tall",age:"Lives 60–80 years",home:"Tropical beaches",
+   facts:["Every single part is useful — food, drink, rope, even the roof!","One palm can grow 50–80 coconuts every year.","A coconut can float across the ocean and sprout on a faraway beach."],
+   wow:"A coconut is not a nut — it's one giant seed!"},
+  {img:"tree2.jpg",emoji:"🌧️",name:"Rain Tree",my:"Pokok Pukul Lima",latin:"Samanea saman",col:"#22d3ee",
+   height:"Up to 25 m tall",age:"Lives 80–100 years",home:"Came from South America",
+   facts:["Its canopy spreads wider than the tree is tall — a giant green umbrella!","Its leaves fold up before rain and every evening around 5 o'clock.","That's why we call it Pokok Pukul Lima — the 5 o'clock tree!"],
+   wow:"This tree can tell you the time AND the weather!"},
+  {img:"tree3.jpg",emoji:"🌸",name:"Frangipani",my:"Bunga Kemboja",latin:"Plumeria",col:"#f472b6",
+   height:"Up to 8 m tall",age:"Lives 100+ years",home:"Loves sunny gardens",
+   facts:["Its sweet flowers welcome guests at resorts and spas.","The flowers smell strongest at night.","Cut one branch, plant it in soil — a whole new tree grows!"],
+   wow:"Its flowers have no nectar — they charm moths with pure perfume!"},
+  {img:"tree4.jpg",emoji:"🌳",name:"Banyan Tree",my:"Pokok Ara",latin:"Ficus benghalensis",col:"#a78bfa",
+   height:"Up to 20 m tall",age:"Lives 200+ years",home:"Asia's gentle giant",
+   facts:["It grows a 'beard' of hanging roots that turn into brand-new trunks.","One banyan can spread so wide it looks like a little forest.","Birds, bats and squirrels feast on its tiny figs."],
+   wow:"One famous banyan in India is bigger than a football field!"}];
+const TREE_QUIZ=[
+  {q:"I fold my leaves at pukul lima — 5 o'clock sharp!",a:1},
+  {q:"My giant seed can float across the whole ocean!",a:0},
+  {q:"My perfume makes the spa smell amazing!",a:2},
+  {q:"My hanging roots grow into brand-new trunks!",a:3}];
+let TQ={i:0,score:0,picked:null};
+function mountTrees(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  m.innerHTML=`
+    <p class="section-label">🌴 Sample Tree App <span class="muted" style="text-transform:none;letter-spacing:0">— show on projector: this is what your team will build!</span></p>
+    <div class="playcards">
+      <div class="playcard" style="--accent:#34d399">
+        <div class="pemoji">🌳</div><b>Resort Tree Explorer</b><span>4 resort trees · photos · fun facts · mini quiz — a real working example</span>
+        <button class="btn primary" onclick="openTrees()">▶ Open fullscreen</button>
+      </div>
+    </div>`;
+}
+function openTrees(){ closeTrees(); const ov=document.createElement("div"); ov.className="treeapp"; ov.id="treeOv"; document.body.appendChild(ov); treeGo("home"); }
+function closeTrees(){ const ov=document.getElementById("treeOv"); if(ov)ov.remove(); }
+window.addEventListener("keydown",e=>{ if(e.key==="Escape") closeTrees(); });
+window.addEventListener("hashchange", closeTrees);
+function treeGo(view){
+  const ov=document.getElementById("treeOv"); if(!ov)return;
+  const head=(title,sub)=>`
+    <div class="thead">
+      <div style="flex:1"><h1>${title}</h1><div class="tsub">${sub}</div></div>
+      ${view!=="home"?`<button class="btn ghost" onclick="treeGo('home')">← All trees</button>`:""}
+      <button class="btn ghost" onclick="closeTrees()">✕ Close</button>
+    </div>`;
+  if(view==="home"){
+    ov.innerHTML=head("🌴 Resort Tree Explorer","A sample tree app — 4 trees, fun facts + a mini quiz. Built with AI!")+`
+      <div class="tgrid">
+        ${TREES.map((t,i)=>`<div class="tcard" style="--tc:${t.col}" onclick="treeGo('t${i}')">
+          <img src="${t.img}" alt="" onerror="this.style.display='none'">
+          <div class="tinfo"><b>${t.emoji} ${esc(t.name)}</b><span>${esc(t.my)} · <i>${esc(t.latin)}</i></span></div>
+        </div>`).join("")}
+        <div class="tcard" style="--tc:#fbbf24" onclick="TQ={i:0,score:0,picked:null};treeGo('quiz')">
+          <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-size:56px;background:linear-gradient(135deg,#7c3aed44,#fbbf2433)">❓</div>
+          <div class="tinfo"><b>🎯 Which Tree Am I?</b><span>4-question mini quiz — tap to play!</span></div>
+        </div>
+      </div>`;
+  } else if(view==="quiz"){
+    if(TQ.i>=TREE_QUIZ.length){
+      ov.innerHTML=head("🎯 Quiz complete!","")+`
+        <div class="card" style="text-align:center;padding:40px 20px">
+          <div style="font-size:60px">${TQ.score===4?"🏆":TQ.score>=2?"🌟":"🌱"}</div>
+          <h1 style="margin:10px 0">You got ${TQ.score} / ${TREE_QUIZ.length}!</h1>
+          <div class="row" style="justify-content:center;margin-top:14px">
+            <button class="btn primary lg" onclick="TQ={i:0,score:0,picked:null};treeGo('quiz')">🔁 Play again</button>
+            <button class="btn ghost lg" onclick="treeGo('home')">← All trees</button>
+          </div>
+        </div>`;
+      return;
+    }
+    const q=TREE_QUIZ[TQ.i];
+    ov.innerHTML=head("🎯 Which Tree Am I?",`Question ${TQ.i+1} of ${TREE_QUIZ.length} · Score ${TQ.score}`)+`
+      <div class="card" style="max-width:760px;margin:0 auto;padding:22px">
+        <div class="twow" style="margin:0 0 18px">“${q.q}”</div>
+        ${TREES.map((t,i)=>{
+          let cls="";
+          if(TQ.picked!==null){ if(i===q.a)cls="correct"; else if(i===TQ.picked)cls="wrong"; }
+          return `<button class="qopt ${cls}" onclick="treeAnswer(${i})">${t.emoji} ${esc(t.name)} <span class="muted">(${esc(t.my)})</span></button>`;
+        }).join("")}
+        ${TQ.picked!==null?`<div class="row" style="justify-content:center;margin-top:8px">
+          <button class="btn primary lg" onclick="TQ.i++;TQ.picked=null;treeGo('quiz')">${TQ.i+1<TREE_QUIZ.length?"Next question →":"See my score 🏁"}</button>
+        </div>`:""}
+      </div>`;
+  } else {
+    const i=+view.slice(1), t=TREES[i]; if(!t)return treeGo("home");
+    ov.innerHTML=head(`${t.emoji} ${esc(t.name)}`,`${esc(t.my)} · <i>${esc(t.latin)}</i>`)+`
+      <img src="${t.img}" alt="" class="tdetail-img" style="width:100%;max-height:44vh;object-fit:cover;border-radius:18px;background:#141432" onerror="this.style.display='none'">
+      <div class="tstats">
+        <div class="tstat">📏 ${esc(t.height)}</div>
+        <div class="tstat">🎂 ${esc(t.age)}</div>
+        <div class="tstat">🌍 ${esc(t.home)}</div>
+      </div>
+      <p class="section-label">Fun facts</p>
+      <ul class="tfacts">${t.facts.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+      <div class="twow">💡 ${esc(t.wow)}</div>
+      <div class="row" style="margin-top:18px">
+        <button class="btn ghost" onclick="treeGo('t${(i+3)%4}')">← ${TREES[(i+3)%4].emoji} ${esc(TREES[(i+3)%4].name)}</button>
+        <button class="btn ghost" onclick="treeGo('t${(i+1)%4}')">${TREES[(i+1)%4].emoji} ${esc(TREES[(i+1)%4].name)} →</button>
+      </div>`;
+  }
+  ov.scrollTop=0;
+}
+function treeAnswer(i){
+  if(TQ.picked!==null)return;
+  TQ.picked=i;
+  if(i===TREE_QUIZ[TQ.i].a)TQ.score++;
+  treeGo("quiz");
+}
+
+/* ---------- Game 08: Speed Edit Showdown challenge gallery ---------- */
+const SHOWDOWN=[
+  {img:"edit1.jpg", style:"3D cartoon",       prompt:"Cute 3D cartoon render of a cat astronaut floating in outer space holding a glass of frothy milk tea (teh tarik), stars and planets behind, vibrant colors"},
+  {img:"edit2.jpg", style:"Photorealistic",   prompt:"Photorealistic photo of a giant hot air balloon shaped like a spiky durian fruit floating over a tropical beach at sunset, golden light"},
+  {img:"edit3.jpg", style:"Pixel art",        prompt:"Retro pixel art of a penguin selling ice cream from a rainbow-colored van in a sunny desert with cactus, 16-bit video game style"},
+  {img:"edit4.jpg", style:"Watercolor",       prompt:"Soft watercolor painting of a traditional Malaysian kampung stilt house underwater with colorful fish swimming through its open windows, dreamy pastel tones"},
+  {img:"edit5.jpg", style:"Claymation",       prompt:"Claymation stop-motion style scene of a friendly tiger riding a bicycle with a basket of satay skewers on the back, city street background, handmade plasticine look"},
+  {img:"edit6.jpg", style:"Comic book",       prompt:"Bold comic book illustration of a shiny robot playing badminton against a determined chicken on an outdoor court, action lines, halftone dots, dynamic poses"},
+  {img:"edit7.jpg", style:"Paper cutout",     prompt:"Layered paper cutout craft art of a castle made of watermelon slices standing on a green hill with paper clouds and sun, colorful construction paper texture"},
+  {img:"edit8.jpg", style:"Neon glow",        prompt:"Glowing neon outline art of a friendly dragon curled around a lighthouse at night, electric blue and pink neon lines on dark background"},
+  {img:"edit9.jpg", style:"Crayon drawing",   prompt:"Child's crayon drawing of a happy elephant painting a rainbow across the sky with its trunk, wobbly lines, bright waxy crayon strokes on white paper"},
+  {img:"edit10.jpg",style:"Origami",          prompt:"Origami paper folding art of a rocket ship launching from a green rice paddy field, folded paper clouds of smoke, crisp geometric paper textures"},
+];
+function mountShowdown(){
+  const m=document.getElementById("moduleMount"); if(!m)return;
+  m.innerHTML=`
+    <p class="section-label">🖼️ Challenge Gallery <span class="muted" style="text-transform:none;letter-spacing:0">— tap a card to show it BIG on the projector</span></p>
+    <div class="tgrid">
+      ${SHOWDOWN.map((c,i)=>`<div class="tcard" style="--tc:#f59e0b" onclick="openShowdown(${i})">
+        <img src="${c.img}" alt="" onerror="this.style.display='none'">
+        <div class="tinfo"><b>👁️ Challenge ${i+1}</b><span>Can your team copy this with a prompt?</span></div>
+      </div>`).join("")}
+    </div>`;
+}
+let SD_I=0;
+function openShowdown(i){ closeShowdown(); const ov=document.createElement("div"); ov.className="treeapp"; ov.id="sdOv"; document.body.appendChild(ov); sdGo(i); }
+function closeShowdown(){ const ov=document.getElementById("sdOv"); if(ov)ov.remove(); }
+window.addEventListener("keydown",e=>{ if(e.key==="Escape") closeShowdown(); });
+window.addEventListener("hashchange", closeShowdown);
+function sdGo(i){
+  const ov=document.getElementById("sdOv"); if(!ov)return;
+  SD_I=(i+SHOWDOWN.length)%SHOWDOWN.length;
+  const c=SHOWDOWN[SD_I];
+  ov.innerHTML=`
+    <div class="thead">
+      <div style="flex:1"><h1>👁️ Challenge ${SD_I+1} <span style="color:var(--muted);font-size:.6em">of ${SHOWDOWN.length}</span></h1>
+      <div class="tsub">Study it… then recreate it with ONE prompt!</div></div>
+      <button class="btn ghost" onclick="sdGo(${SD_I-1})">← Prev</button>
+      <button class="btn ghost" onclick="sdGo(${SD_I+1})">Next →</button>
+      <button class="btn ghost" onclick="closeShowdown()">✕ Close</button>
+    </div>
+    <img src="${c.img}" alt="" style="width:100%;max-height:76vh;object-fit:contain;border-radius:18px;background:#000">`;
+  ov.scrollTop=0;
+}
+
+/* ---------- Flag Retrieval board ---------- */
+const FLAG_COLORS=[
+  {name:"Crimson",c:"#e11d48"},{name:"Ocean",c:"#0284c7"},{name:"Amber",c:"#f59e0b"},
+  {name:"Emerald",c:"#10b981"},{name:"Violet",c:"#8b5cf6"},{name:"Rose",c:"#ec4899"},
+  {name:"Cyan",c:"#06b6d4"},{name:"Tangerine",c:"#f97316"},{name:"Teal",c:"#14b8a6"},{name:"Lime",c:"#84cc16"}];
+
+function newFlagBoard(){
+  const ids=GAMES.map(g=>g.id);
+  for(let i=ids.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
+  return {order:ids, revealed:{}};
+}
+function ensureFlags(){ if(!state.flags||!Array.isArray(state.flags.order)){ state.flags=newFlagBoard(); save(); } }
+
+function viewFlags(){
+  ensureFlags();
+  const revealedCount=Object.keys(state.flags.revealed).length;
+  const cards=state.flags.order.map((id,i)=>{
+    const g=GAMES.find(x=>x.id===id), col=FLAG_COLORS[i%FLAG_COLORS.length];
+    const rev=!!state.flags.revealed[id];
+    return `<div class="flagcard ${rev?'revealed':''}" style="--fc:${col.c}" onclick="flagClick(${id})">
+      <div class="flagcard-inner">
+        <div class="flagface front"><div class="q">?</div><div class="cn">${col.name}</div></div>
+        <div class="flagface back">
+          <div class="em">${g.emoji}</div>
+          <span class="pill">ACT ${g.act}</span>
+          <div class="nm">${esc(g.name)}</div>
+          <div class="qrhint">📱 tap for QR brief</div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  return `<div class="row" style="justify-content:space-between">
+    <div><div class="h1">🚩 Flag Retrieval</div>
+    <p class="sub">Each colour hides one activity. Pick a card to reveal the mission — participants scan the QR to get the brief on their phones. ${revealedCount}/10 revealed.</p></div>
+  </div>
+  <div class="flag-grid">${cards}</div>
+  <div class="row" style="margin-top:18px">
+    <button class="btn ghost" onclick="resetFlags()">↺ Reshuffle & hide all</button>
+  </div>
+  <div id="flagModal"></div>`;
+}
+function flagClick(id){
+  ensureFlags();
+  if(!state.flags.revealed[id]){
+    state.flags.revealed[id]=true; save();
+    const card=document.querySelectorAll(".flagcard")[state.flags.order.indexOf(id)];
+    if(card) card.classList.add("revealed");
+    setTimeout(()=>openFlagModal(id), 700);
+  } else openFlagModal(id);
+}
+function openFlagModal(id){
+  const g=GAMES.find(x=>x.id===id);
+  const i=state.flags.order.indexOf(id), col=FLAG_COLORS[i%FLAG_COLORS.length];
+  let qrsvg="";
+  try{
+    const qr=qrcode(0,"M"); qr.addData(qrPayload(g),"Byte"); qr.make();
+    qrsvg=qr.createSvgTag({cellSize:4,margin:0,scalable:true});
+  }catch(e){ qrsvg="<div style='color:#000;font-size:13px;padding:16px'>QR could not be generated</div>"; }
+  const hosted=(location.protocol==="http:"||location.protocol==="https:");
+  const qrCaption=hosted?"📱 Scan to open the mission":"📱 Scan for the mission brief";
+  const el=document.getElementById("flagModal"); if(!el) return;
+  el.innerHTML=`<div class="modal-ov" onclick="if(event.target===this)closeFlagModal()">
+    <div class="modal">
+      <div style="flex:1;min-width:230px">
+        <span class="pill" style="border-color:${col.c};color:${col.c}">🚩 ${col.name} card</span>
+        <div style="font-size:46px;margin:10px 0 2px">${g.emoji}</div>
+        <span class="pill">ACT ${g.act}</span>
+        <h2 style="margin:8px 0 8px;font-size:25px">${esc(g.name)}</h2>
+        <span class="otag" style="background:${g.outCol}">▶ ${esc(g.outType)}</span>
+        <p class="muted" style="font-size:13px;margin-top:12px;line-height:1.5">${esc(g.learning)}</p>
+        <p class="section-label" style="margin-top:18px">🖥️ For the big screen</p>
+        <div class="row">
+          <button class="btn primary" onclick="go('#/game/${g.id}')">Open projector view →</button>
+          <button class="btn ghost" onclick="closeFlagModal()">Close</button>
+        </div>
+      </div>
+      <div style="text-align:center">
+        <p class="section-label">📱 For participants</p>
+        <div class="qrbox">${qrsvg}</div>
+        <p class="fs-hint" style="margin-top:9px">${qrCaption}</p>
+      </div>
+    </div>
+  </div>`;
+}
+function closeFlagModal(){ const el=document.getElementById("flagModal"); if(el) el.innerHTML=""; }
+function resetFlags(){
+  if(!confirm("Reshuffle the board and hide all cards again?")) return;
+  state.flags=newFlagBoard(); save(); render(); toast("Board reshuffled");
+}
+/* Participant mission page — what a scanned QR opens once the app is hosted (e.g. Vercel) */
+function viewMission(g){
+  if(!g) return `<div class="empty">Mission not found. <a href="#/">Home</a></div>`;
+  return `<div class="mission" style="max-width:560px;margin:0 auto">
+    <div class="hero slim">
+      <img src="hero${g.id}.jpg" alt="" onerror="this.src='hero.png'">
+      <div class="ovs">
+        <div class="ghead">
+          <div class="em">${g.emoji}</div>
+          <div style="flex:1;min-width:200px">
+            <span class="pill">ACT ${g.act} · MISSION BRIEF</span>
+            <h1 style="font-size:26px;margin:8px 0 6px">${esc(g.name)}</h1>
+            <span class="otag" style="background:${g.outCol}">▶ OUTPUT · ${esc(g.outType)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card pad">
+      <p class="section-label">Your mission</p>
+      <p style="font-size:15px;line-height:1.55;margin:0 0 16px">${esc(g.desc)}</p>
+      <p class="section-label">Steps</p>
+      <ol class="steps">${g.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+      <hr/>
+      <p class="section-label">Suggested AI apps</p>
+      <div class="row">${g.apps.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</div>
+    </div>
+    ${g.id===3?`
+    <div class="card pad" style="margin-top:14px">
+      <p class="section-label">📱 Team check-in</p>
+      <p class="sub" style="margin:0 0 10px">Tap your team — this starts your mission clock!</p>
+      <div class="teamchips">
+        ${state.teams.map(t=>{ const s=(state.scan3||{})[t.id];
+          return `<button class="teamchip ${s&&s.scan?'active':''}" style="--tc:${t.color}" onclick="missionCheckin('${t.id}')">${s&&s.scan?'🚀 ':''}${esc(t.name)}</button>`; }).join("")}
+      </div>
+    </div>`:""}
+    <p class="fs-hint" style="text-align:center;margin-top:14px">Good luck, team! 🚀</p>
+  </div>`;
+}
+function missionCheckin(id){
+  state.scan3=state.scan3||{};
+  const s=state.scan3[id]=state.scan3[id]||{};
+  if(!s.scan){ s.scan=Date.now(); save(); }
+  render();
+  const t=state.teams.find(x=>x.id===id);
+  toast((t?t.name:"Team")+" checked in — GO! 🚀");
+}
+function qrPayload(g){
+  // Hosted (http/https, e.g. Vercel game hub): deep-link to the mobile mission page.
+  // Offline (file://): embed the brief itself as text.
+  if(location.protocol==="http:"||location.protocol==="https:")
+    return location.origin+location.pathname+"#/m/"+g.id;
+  return missionText(g);
+}
+function missionText(g){
+  return (`ACT ${g.act}: ${g.name.toUpperCase()}\nOUTPUT: ${g.outType}\n\nSTEPS:\n${g.steps.map((s,i)=>(i+1)+". "+s).join("\n")}\n\nAPPS: ${g.apps.join(", ")}`)
+    .replace(/[—–]/g,"-").replace(/→/g,"->").replace(/[“”]/g,'"').replace(/[‘’]/g,"'");
+}
+
+/* ---------- utilities ---------- */
+function copy(txt){
+  navigator.clipboard?.writeText(txt).then(()=>toast("Copied ✓"),()=>fallbackCopy(txt)) || fallbackCopy(txt);
+}
+function fallbackCopy(txt){ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
+  try{document.execCommand("copy");toast("Copied ✓");}catch(e){toast("Copy failed");} ta.remove(); }
+let toastT=null;
+function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),1600); }
+function bindCommon(){}
+</script>
+</body>
+</html>
