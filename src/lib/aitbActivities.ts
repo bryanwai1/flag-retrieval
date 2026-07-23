@@ -20,6 +20,9 @@ export type AitbActivity = {
   hero: string
   /** Physical props the marshal hands the team at this station. Empty = phones only. */
   props: string[]
+  /** When set, the mission page shows word inputs the team fills in; submissions
+   *  land on aitb_progress.words and appear live in the admin panel. */
+  wordsInput?: { count: number; title: string; hint: string; labels?: string[] }
 }
 
 export const AITB_ACTIVITIES: AitbActivity[] = [
@@ -39,6 +42,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🔫', '📢', '📺', '🧩', '🎨'],
     apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg',
     props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
+    wordsInput: { count: 3, title: '🧩 Your 3 secret words', hint: 'Type the words from your red, blue and yellow cups!', labels: ['🔴 Red cup word', '🔵 Blue cup word', '🟡 Yellow cup word'] },
   },
   {
     id: 2, act: '02', emoji: '🕹️', color: '#22d3ee', name: 'Retro Game Speed Build',
@@ -141,6 +145,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🏓', '🔤', '📝', '🤖', '🌟'],
     apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg',
     props: ['26 cups labelled A–Z', 'Ping pong balls (6+)', 'Table for the cup grid'],
+    wordsInput: { count: 7, title: '🔤 Your 7 words', hint: 'Type the 7 words that use ALL your collected letters!' },
   },
   {
     id: 8, act: '08', emoji: '👁️', color: '#f59e0b', name: 'Speed Edit Showdown',

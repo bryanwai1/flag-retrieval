@@ -268,6 +268,39 @@ export function AitbAdmin() {
           </div>
         </div>
 
+        {/* Team word submissions — Nerf (3) + Ping Pong (7), live via realtime */}
+        <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+          <h2 className="font-black text-lg mb-1">📝 Team words</h2>
+          <p className="text-gray-400 text-sm mb-4">Words each team typed on their phone — updates live.</p>
+          <div className="grid lg:grid-cols-2 gap-4">
+            {AITB_ACTIVITIES.filter(a => a.wordsInput).map(a => (
+              <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
+                <div className="font-black mb-2" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name} ({a.wordsInput!.count} words)</div>
+                {teams.map(t => {
+                  const p = progress.find(x => x.team_id === t.id && x.activity_id === a.id)
+                  const words = p?.words ?? []
+                  return (
+                    <div key={t.id} className="flex items-start gap-2 mb-1.5">
+                      <span className="font-bold text-sm whitespace-nowrap" style={{ color: t.color }}>● {t.name}</span>
+                      {words.length === 0
+                        ? <span className="text-gray-600 text-sm">— not submitted</span>
+                        : <span className="flex flex-wrap gap-1">
+                            {words.map((w, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-full text-xs font-bold"
+                                style={{ background: `${a.color}22`, color: a.color, border: `1px solid ${a.color}55` }}>
+                                {w}
+                              </span>
+                            ))}
+                          </span>}
+                    </div>
+                  )
+                })}
+                {teams.length === 0 && <div className="text-gray-600 text-sm">No teams yet.</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Station props — what the marshal hands each team */}
         <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
           <h2 className="font-black text-lg mb-1">🎒 Station props</h2>
@@ -395,6 +428,10 @@ export function AitbAdmin() {
                 <QRCodeSVG value={url} size={min(560, window.innerWidth - 120, window.innerHeight - 260)} />
               </div>
               <div className="text-gray-500 text-xs mt-3">{url}</div>
+              <div className="inline-block mt-3 px-4 py-2 rounded-xl font-black"
+                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1.5px solid #fbbf2466' }}>
+                🔑 Marshal password: {settings?.admin_password ?? '—'}
+              </div>
               <div className="flex gap-2 justify-center mt-4">
                 <button onClick={() => setQrActivity(qrActivity > 1 ? qrActivity - 1 : 10)} className="px-4 py-2 rounded-xl font-bold" style={{ border: '1.5px solid rgba(255,255,255,0.2)' }}>← Prev</button>
                 <button onClick={() => setQrActivity(null)} className="px-4 py-2 rounded-xl font-bold" style={{ background: '#fff', color: '#000' }}>Close</button>

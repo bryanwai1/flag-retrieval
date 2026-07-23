@@ -394,5 +394,6 @@ export interface AitbProgress {
   steps_done: number[]
   completed_at: string | null
   bonus: number
+  words: string[]
   created_at: string
 }

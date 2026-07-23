@@ -24,6 +24,22 @@ export function AitbMission() {
   const [celebrate, setCelebrate] = useState(false)
   const busyRef = useRef(false)
   const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
+  const [wordDrafts, setWordDrafts] = useState<string[]>([])
+  const [wordsError, setWordsError] = useState('')
+  const [wordsSaved, setWordsSaved] = useState(false)
+
+  const wordsCfg = activity?.wordsInput
+
+  // Seed the word inputs from the DB (another phone may have submitted first),
+  // but never clobber what someone on this phone is mid-typing.
+  useEffect(() => {
+    if (!wordsCfg) return
+    setWordDrafts(prev => {
+      if (prev.some(w => w.trim())) return prev
+      const fromDb = progress?.words ?? []
+      return Array.from({ length: wordsCfg.count }, (_, i) => fromDb[i] ?? '')
+    })
+  }, [wordsCfg, progress])
 
   const team = teams.find(t => t.id === teamId) ?? null
 
@@ -94,6 +110,26 @@ export function AitbMission() {
       .eq('id', progress.id).select().maybeSingle()
     busyRef.current = false
     if (data) setProgress(data)
+  }
+
+  const submitWords = async () => {
+    if (!progress || !wordsCfg || progress.completed_at || timeUp || busyRef.current) return
+    const clean = wordDrafts.map(w => w.trim())
+    if (clean.some(w => !w)) {
+      setWordsError(`Fill in all ${wordsCfg.count} words first!`)
+      return
+    }
+    busyRef.current = true
+    const { data } = await supabase
+      .from('aitb_progress').update({ words: clean })
+      .eq('id', progress.id).select().maybeSingle()
+    busyRef.current = false
+    if (data) {
+      setProgress(data)
+      setWordsError('')
+      setWordsSaved(true)
+      setTimeout(() => setWordsSaved(false), 2500)
+    }
   }
 
   // Admin-password completion → +300 + speed bonus
@@ -254,6 +290,48 @@ export function AitbMission() {
                 )
               })}
             </div>
+
+            {/* Word submission (Nerf: 3 words · Ping Pong: 7 words) */}
+            {wordsCfg && progress?.scanned_at && (
+              <>
+                <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">{wordsCfg.title}</div>
+                <div className="rounded-2xl p-4 mb-5"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: `2px solid ${progress.words.length > 0 ? '#34d39966' : `${activity.color}44`}`,
+                  }}>
+                  <p className="text-gray-400 text-sm mb-3">{wordsCfg.hint}</p>
+                  <div className={`grid gap-2 mb-3 ${wordsCfg.count > 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {wordDrafts.map((w, i) => (
+                      <input key={i} value={w}
+                        disabled={!!progress.completed_at || timeUp}
+                        onChange={e => {
+                          const next = [...wordDrafts]
+                          next[i] = e.target.value
+                          setWordDrafts(next)
+                          setWordsError('')
+                        }}
+                        placeholder={wordsCfg.labels?.[i] ?? `Word ${i + 1}`}
+                        className="bg-gray-800/70 rounded-xl px-3 py-2.5 font-bold outline-none"
+                        style={{ border: `1.5px solid ${w.trim() ? `${activity.color}77` : 'rgba(255,255,255,0.12)'}` }} />
+                    ))}
+                  </div>
+                  {wordsError && <div className="text-red-400 text-sm font-bold mb-2">{wordsError}</div>}
+                  {!progress.completed_at && (
+                    <button onClick={submitWords} disabled={timeUp}
+                      className="w-full py-3 rounded-xl font-black text-lg transition-all active:scale-95"
+                      style={{ background: activity.color, color: '#000' }}>
+                      {wordsSaved ? '✅ SENT!' : progress.words.length > 0 ? '🔁 UPDATE WORDS' : '📤 SUBMIT WORDS'}
+                    </button>
+                  )}
+                  {progress.words.length > 0 && (
+                    <div className="text-emerald-400 text-sm font-bold mt-2 text-center">
+                      ✅ The host has your words{progress.completed_at ? '' : ' — you can still fix them until the marshal signs off'}!
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Apps */}
             <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 Your AI tools</div>
