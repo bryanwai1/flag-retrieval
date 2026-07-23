@@ -268,6 +268,26 @@ export function AitbAdmin() {
           </div>
         </div>
 
+        {/* Station props — what the marshal hands each team */}
+        <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+          <h2 className="font-black text-lg mb-1">🎒 Station props</h2>
+          <p className="text-gray-400 text-sm mb-4">Hand these to the team at each station.</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            {AITB_ACTIVITIES.filter(a => a.props.length > 0).map(a => (
+              <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
+                <div className="font-black mb-1" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name}</div>
+                <ul className="text-sm text-gray-300">
+                  {a.props.map(p => <li key={p} className="mb-0.5">▪ {p}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="text-gray-500 text-sm mt-3">
+            📱 No props needed (phones only):{' '}
+            {AITB_ACTIVITIES.filter(a => a.props.length === 0).map(a => `${a.emoji} ${a.act}`).join(' · ')}
+          </p>
+        </div>
+
         {/* Game details */}
         <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
           <h2 className="font-black text-lg mb-1">📖 Game details</h2>

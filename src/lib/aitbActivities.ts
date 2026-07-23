@@ -18,6 +18,8 @@ export type AitbActivity = {
   apps: string[]
   mins: number
   hero: string
+  /** Physical props the marshal hands the team at this station. Empty = phones only. */
+  props: string[]
 }
 
 export const AITB_ACTIVITIES: AitbActivity[] = [
@@ -36,6 +38,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🔫', '📢', '📺', '🧩', '🎨'],
     apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg',
+    props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
   },
   {
     id: 2, act: '02', emoji: '🕹️', color: '#22d3ee', name: 'Retro Game Speed Build',
@@ -52,6 +55,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🙋', '🤖', '⏱️', '🎮', '🏆'],
     apps: ['AI Studio', 'Canva', 'Antigravity'], mins: 15, hero: '/aitb/hero2.jpg',
+    props: [],
   },
   {
     id: 3, act: '03', emoji: '🏰', color: '#a78bfa', name: 'Rubber Band Castle',
@@ -68,6 +72,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🪢', '🙌', '🏗️', '📸', '🏰'],
     apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero3.jpg',
+    props: ['Rubber band with 6–8 strings tied on', 'Stack of cups (8–10) for the castle'],
   },
   {
     id: 4, act: '04', emoji: '🌳', color: '#34d399', name: 'Resort Tree App Sprint',
@@ -84,6 +89,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
     apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg',
+    props: ['6 numbered tree marker tags (hang around resort BEFORE the game)'],
   },
   {
     id: 5, act: '05', emoji: '🎶', color: '#f472b6', name: 'Roulette Jingle & Dance Off',
@@ -100,6 +106,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🎡', '✍️', '🎵', '💃', '🎤'],
     apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg',
+    props: ['Portable speaker (play the AI song for the dance)'],
   },
   {
     id: 6, act: '06', emoji: '🎬', color: '#fbbf24', name: 'Random Card Cinematic',
@@ -116,6 +123,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🃏', '🚫', '🎭', '🤖', '🍿'],
     apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg',
+    props: [],
   },
   {
     id: 7, act: '07', emoji: '🏓', color: '#60a5fa', name: 'Ping Pong Alphabet Pitch',
@@ -132,6 +140,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🏓', '🔤', '📝', '🤖', '🌟'],
     apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg',
+    props: ['26 cups labelled A–Z', 'Ping pong balls (6+)', 'Table for the cup grid'],
   },
   {
     id: 8, act: '08', emoji: '👁️', color: '#f59e0b', name: 'Speed Edit Showdown',
@@ -148,6 +157,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['👀', '🔁', '🎨', '🙋', '⚡'],
     apps: ['NanoBanana', 'Ideogram', 'ChatGPT'], mins: 12, hero: '/aitb/hero8.jpg',
+    props: [],
   },
   {
     id: 9, act: '09', emoji: '🐘', color: '#2dd4bf', name: 'Found Object Animals',
@@ -164,6 +174,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🦁', '🧺', '🖼️', '📸', '🎬'],
     apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg',
+    props: ['2 animal archetype cards per team', 'Collection basket for found objects'],
   },
   {
     id: 10, act: '10', emoji: '🧭', color: '#c084fc', name: 'Resort Character Journey',
@@ -180,6 +191,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🎨', '📷', '🤖', '🔒', '📖'],
     apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 20, hero: '/aitb/hero10.jpg',
+    props: [],
   },
 ]
 
