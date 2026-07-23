@@ -374,6 +374,7 @@ export interface ChainStationScan {
 export interface AitbSettings {
   id: number
   admin_password: string
+  game_ends_at: string | null
   updated_at: string
 }
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { aitbActivity, AITB_POINTS, aitbSpeedBonus, aitbProgressPoints } from '../lib/aitbActivities'
+import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const TEAM_KEY = 'aitb_my_team'
@@ -22,6 +23,7 @@ export function AitbMission() {
   const [pwError, setPwError] = useState('')
   const [celebrate, setCelebrate] = useState(false)
   const busyRef = useRef(false)
+  const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
 
   const team = teams.find(t => t.id === teamId) ?? null
 
@@ -67,7 +69,7 @@ export function AitbMission() {
 
   // Check-in: creates the progress row, starts the timer, +100 pts
   const checkIn = async () => {
-    if (!teamId || !activity || busyRef.current) return
+    if (!teamId || !activity || busyRef.current || timeUp) return
     busyRef.current = true
     const { data } = await supabase
       .from('aitb_progress')
@@ -82,7 +84,7 @@ export function AitbMission() {
   }
 
   const toggleStep = async (i: number) => {
-    if (!progress || progress.completed_at || busyRef.current) return
+    if (!progress || progress.completed_at || busyRef.current || timeUp) return
     busyRef.current = true
     const done = progress.steps_done.includes(i)
       ? progress.steps_done.filter(x => x !== i)
@@ -96,7 +98,7 @@ export function AitbMission() {
 
   // Admin-password completion → +300 + speed bonus
   const tryComplete = async () => {
-    if (!progress?.scanned_at || !activity) return
+    if (!progress?.scanned_at || !activity || timeUp) return
     const { data: settings } = await supabase.from('aitb_settings').select('admin_password').eq('id', 1).maybeSingle()
     if (!settings || pw !== settings.admin_password) {
       setPwError('Wrong password — ask the marshal!')
@@ -144,10 +146,21 @@ export function AitbMission() {
       {/* Admin-only back button — players scan a QR per activity, no browsing */}
       {isAdmin && (
         <a href="/aitb/admin"
-          className="fixed top-3 left-3 z-40 px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
+          className="fixed top-3 left-3 z-[70] px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
           style={{ background: 'rgba(17,24,39,0.75)', color: '#2dd4bf', border: '1.5px solid #2dd4bf66' }}>
           ← Admin
         </a>
+      )}
+      {/* Whole-game countdown pill */}
+      {gameEndsAt && !timeUp && (
+        <div className="fixed top-3 right-3 z-40 px-4 py-2 rounded-xl font-black text-sm tabular-nums backdrop-blur"
+          style={{
+            background: 'rgba(17,24,39,0.75)',
+            color: gameRemainingMs! < 5 * 60_000 ? '#f87171' : '#fbbf24',
+            border: `1.5px solid ${gameRemainingMs! < 5 * 60_000 ? '#f8717166' : '#fbbf2466'}`,
+          }}>
+          ⏳ {fmtCountdown(gameRemainingMs!)}
+        </div>
       )}
       {/* Hero */}
       <div className="relative">
@@ -304,6 +317,17 @@ export function AitbMission() {
               style={{ background: '#34d399', color: '#000' }}>
               ✅ Confirm complete
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Whole-game TIME'S UP lockout — covers everything, no more playing */}
+      {timeUp && (
+        <div className="fixed inset-0 z-[60] bg-gray-950/95 flex items-center justify-center p-6 text-center">
+          <div>
+            <div className="text-8xl mb-4 animate-bounce">⏰</div>
+            <div className="font-black text-5xl text-red-400 mb-3">TIME'S UP!</div>
+            <div className="text-gray-300 font-bold text-lg">The game has ended.<br />Head back to the main hall! 🏁</div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
+import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
 const UNLOCK_KEY = 'aitb_admin_unlocked'
@@ -18,6 +19,8 @@ export function AitbAdmin() {
   const [newPw, setNewPw] = useState('')
   const [qrActivity, setQrActivity] = useState<number | null>(null)
   const [toast, setToast] = useState('')
+  const [timerMins, setTimerMins] = useState('90')
+  const { endsAt, remainingMs, timeUp } = useAitbGameTimer()
 
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2500) }
 
@@ -105,6 +108,32 @@ export function AitbAdmin() {
     }
   }
 
+  const startTimer = async () => {
+    const m = parseInt(timerMins, 10)
+    if (!m || m <= 0) { say('Enter minutes first ⏳'); return }
+    await supabase.from('aitb_settings')
+      .update({ game_ends_at: new Date(Date.now() + m * 60_000).toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', 1)
+    say(`Game timer started — ${m} min ⏳`)
+  }
+
+  const extendTimer = async () => {
+    if (!endsAt) return
+    // Extending after expiry re-opens the game for 5 minutes from now
+    const base = Math.max(new Date(endsAt).getTime(), Date.now())
+    await supabase.from('aitb_settings')
+      .update({ game_ends_at: new Date(base + 5 * 60_000).toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', 1)
+    say('+5 minutes added ⏳')
+  }
+
+  const clearTimer = async () => {
+    await supabase.from('aitb_settings')
+      .update({ game_ends_at: null, updated_at: new Date().toISOString() })
+      .eq('id', 1)
+    say('Game timer cleared 🧹')
+  }
+
   const resetAll = async () => {
     if (!confirm('Reset ALL progress for ALL teams? Points go back to zero.')) return
     await supabase.from('aitb_progress').delete().gte('activity_id', 0)
@@ -153,6 +182,44 @@ export function AitbAdmin() {
           <button onClick={resetAll} className="px-4 py-2 rounded-xl font-bold text-sm text-red-400" style={{ border: '1.5px solid rgba(248,113,113,0.4)' }}>
             🧽 Reset all
           </button>
+        </div>
+
+        {/* Whole-game timer — mission pages lock when it hits zero */}
+        <div className="rounded-3xl p-6 mb-6 flex items-center gap-6 flex-wrap"
+          style={{
+            background: timeUp ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.04)',
+            border: timeUp ? '2px solid rgba(248,113,113,0.5)' : '2px solid rgba(255,255,255,0.08)',
+          }}>
+          <div>
+            <h2 className="font-black text-lg">⏳ Game timer</h2>
+            <p className="text-gray-400 text-sm">Phones lock when it reaches zero.</p>
+          </div>
+          <div className="font-black text-5xl tabular-nums"
+            style={{ color: !endsAt ? '#4b5563' : timeUp ? '#f87171' : remainingMs! < 5 * 60_000 ? '#fbbf24' : '#2dd4bf' }}>
+            {!endsAt ? '--:--' : timeUp ? "TIME'S UP" : fmtCountdown(remainingMs!)}
+          </div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <input value={timerMins} onChange={e => setTimerMins(e.target.value.replace(/\D/g, ''))}
+              inputMode="numeric" placeholder="min"
+              className="w-20 bg-gray-800/60 rounded-lg px-3 py-2 font-bold text-center outline-none"
+              style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
+            <button onClick={startTimer} className="px-4 py-2 rounded-lg font-black" style={{ background: '#2dd4bf', color: '#000' }}>
+              ▶ Start
+            </button>
+            {endsAt && (
+              <>
+                <button onClick={extendTimer} className="px-4 py-2 rounded-lg font-black"
+                  style={{ background: '#fbbf2422', color: '#fbbf24', border: '1.5px solid #fbbf2455' }}>
+                  +5 min
+                </button>
+                <button onClick={clearTimer} className="px-4 py-2 rounded-lg font-bold text-gray-400"
+                  style={{ border: '1.5px solid rgba(255,255,255,0.15)' }}>
+                  ✕ Clear
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">

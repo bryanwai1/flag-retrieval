@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
+import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 export function AitbProjector() {
@@ -9,6 +10,7 @@ export function AitbProjector() {
   const [progress, setProgress] = useState<AitbProgress[]>([])
   const [now, setNow] = useState(Date.now())
   const [view, setView] = useState<number | null>(null) // null = scoreboard, 1-10 = game briefing slide
+  const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return
@@ -65,6 +67,15 @@ export function AitbProjector() {
           <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-gray-950/40" />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto p-12 min-h-screen flex flex-col">
+          {/* Compact game countdown so the host sees it even on briefing slides */}
+          {gameEndsAt && (
+            <div className="fixed top-4 right-4 z-20 px-5 py-2.5 rounded-2xl font-black text-2xl tabular-nums backdrop-blur"
+              style={timeUp
+                ? { background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '2px solid #f87171' }
+                : { background: 'rgba(17,24,39,0.75)', color: gameRemainingMs! < 5 * 60_000 ? '#f87171' : '#fbbf24', border: '2px solid rgba(255,255,255,0.15)' }}>
+              {timeUp ? "⏰ TIME'S UP!" : `⏳ ${fmtCountdown(gameRemainingMs!)}`}
+            </div>
+          )}
           <GameNav view={view} setView={setView} />
           <div className="flex-1 grid lg:grid-cols-2 gap-10 items-center">
             <div>
@@ -116,6 +127,25 @@ export function AitbProjector() {
           <p className="text-gray-400 text-2xl mt-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
             scan 📱 · play 🎮 · score 🏆
           </p>
+          {/* Whole-game countdown, big for the back of the room */}
+          {gameEndsAt && !timeUp && (
+            <div className="inline-block mt-6 px-12 py-4 rounded-3xl"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: `3px solid ${gameRemainingMs! < 5 * 60_000 ? '#f87171' : '#fbbf24'}66`,
+              }}>
+              <span className="font-black text-8xl tabular-nums"
+                style={{ color: gameRemainingMs! < 5 * 60_000 ? '#f87171' : '#fbbf24' }}>
+                ⏳ {fmtCountdown(gameRemainingMs!)}
+              </span>
+            </div>
+          )}
+          {timeUp && (
+            <div className="inline-block mt-6 px-14 py-5 rounded-3xl animate-pulse"
+              style={{ background: 'rgba(248,113,113,0.12)', border: '3px solid #f87171' }}>
+              <span className="font-black text-8xl text-red-400">⏰ TIME'S UP!</span>
+            </div>
+          )}
         </div>
 
         {ranked.length === 0 && (
@@ -196,6 +226,11 @@ function fmtElapsed(ms: number): string {
 function GameNav({ view, setView }: { view: number | null; setView: (v: number | null) => void }) {
   return (
     <div className="flex gap-2 justify-center flex-wrap mb-8">
+      <a href="/aitb/admin"
+        className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+        style={{ background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1.5px solid rgba(255,255,255,0.2)' }}>
+        ← Admin
+      </a>
       <button onClick={() => setView(null)}
         className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
         style={view === null
