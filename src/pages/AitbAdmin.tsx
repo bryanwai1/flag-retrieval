@@ -428,10 +428,6 @@ export function AitbAdmin() {
                 <QRCodeSVG value={url} size={min(560, window.innerWidth - 120, window.innerHeight - 260)} />
               </div>
               <div className="text-gray-500 text-xs mt-3">{url}</div>
-              <div className="inline-block mt-3 px-4 py-2 rounded-xl font-black"
-                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1.5px solid #fbbf2466' }}>
-                🔑 Marshal password: {settings?.admin_password ?? '—'}
-              </div>
               <div className="flex gap-2 justify-center mt-4">
                 <button onClick={() => setQrActivity(qrActivity > 1 ? qrActivity - 1 : 10)} className="px-4 py-2 rounded-xl font-bold" style={{ border: '1.5px solid rgba(255,255,255,0.2)' }}>← Prev</button>
                 <button onClick={() => setQrActivity(null)} className="px-4 py-2 rounded-xl font-bold" style={{ background: '#fff', color: '#000' }}>Close</button>
