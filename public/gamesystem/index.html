@@ -443,6 +443,32 @@ function teamTotal(t){ return Object.values(t.scores||{}).reduce((a,b)=>a+(+b||0
 function rankedTeams(){ return [...state.teams].sort((a,b)=>teamTotal(b)-teamTotal(a)); }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
+/* ---------- Team sync from the Game Hub (Supabase aitb_teams) ----------
+   Teams created in the AITB admin appear here automatically, so hosts never
+   type team names twice. Offline the fetch just fails silently and the app
+   keeps its locally stored teams. Scores are preserved by team id. */
+const HUB_URL="https://hqzvootetvvxcqzdhbjd.supabase.co";
+const HUB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhxenZvb3RldHZ2eGNxemRoYmpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMDEzNTksImV4cCI6MjA5MTU3NzM1OX0.L6rTy3TAyGZOIcbmBdk2jbLPo9UHmzKHoYkuXxvPFbw";
+async function syncTeams(){
+  try{
+    const r=await fetch(HUB_URL+"/rest/v1/aitb_teams?select=id,name,color&order=sort_order,created_at",
+      {headers:{apikey:HUB_KEY,Authorization:"Bearer "+HUB_KEY}});
+    if(!r.ok) return;
+    const rows=await r.json();
+    if(!Array.isArray(rows)||!rows.length) return;
+    const sig=t=>t.map(x=>[x.id,x.name,x.color].join("|")).join(";");
+    if(sig(rows)===sig(state.teams)) return;
+    state.teams=rows.map(x=>{
+      const old=state.teams.find(t=>t.id===x.id);
+      return {id:x.id,name:x.name,color:x.color,scores:old?old.scores:{}};
+    });
+    save();
+    if(!ARCADE) render(); // don't interrupt someone mid-game
+    toast("👥 Teams synced from Game Hub");
+  }catch(e){/* offline — keep local teams */}
+}
+window.addEventListener("DOMContentLoaded",()=>{ syncTeams(); setInterval(syncTeams,60000); });
+
 /* ---------- Router ---------- */
 window.addEventListener("hashchange", render);
 window.addEventListener("DOMContentLoaded", render);
@@ -455,6 +481,14 @@ function render(){
   const h = location.hash || "#/";
   const app = document.getElementById("app");
   let body="";
+  if(h.startsWith("#/play/")){
+    // direct link to one arcade game (mission pages link phones straight here)
+    const key = h.split("/")[2];
+    app.innerHTML = topbar(true) + `<main>${viewPlayHub(key)}</main>`;
+    if(ARCADE_GAMES[key]) openArcade(key);
+    window.scrollTo(0,0);
+    return;
+  }
   if(h.startsWith("#/game/")){
     const id = +h.split("/")[2];
     body = viewGame(GAMES.find(g=>g.id===id));
@@ -495,6 +529,24 @@ function topbar(slim){
     <button class="navbtn" onclick="go('#/teams')">👥 Teams</button>
     <button class="navbtn solid" onclick="go('#/score')">🏆 Scoreboard</button>
     <button class="navbtn" onclick="go('#/admin')" title="Admin">🔒</button>
+  </div>`;
+}
+
+/* ---------- Play hub (backdrop for #/play/<key> arcade deep links) ---------- */
+const PLAY_GAMES=[
+  {key:"jump",   emoji:"🍄", name:"Super Jumpman",  sub:"the Mario one"},
+  {key:"chomp",  emoji:"👻", name:"Chomp Maze",     sub:"the Pac-Man one"},
+  {key:"barrel", emoji:"🦍", name:"Barrel Climb",   sub:"the Donkey Kong one"},
+];
+function viewPlayHub(active){
+  return `<div style="max-width:560px;margin:0 auto;text-align:center">
+    <div class="h1" style="margin-top:10px">🕹️ Play the 3 games</div>
+    <p class="sub">These are the games your team must rebuild with AI. Play them to learn the rules!</p>
+    ${PLAY_GAMES.map(p=>`
+      <button class="btn ${p.key===active?'primary':''} lg" style="display:block;width:100%;margin:10px 0;padding:16px"
+        onclick="location.hash='#/play/${p.key}';openArcade('${p.key}')">
+        ${p.emoji} ${esc(p.name)} <span class="muted" style="font-weight:400">— ${p.sub}</span>
+      </button>`).join("")}
   </div>`;
 }
 
@@ -730,9 +782,23 @@ function beep(){
   }catch(e){}
 }
 
-/* ---------- Score entry (per game) ---------- */
+/* ---------- Score entry (per game) ----------
+   Marshal-locked: the projector is in participant view, so awarding points
+   needs the marshal password once per browser session. */
+function marshalOk(){ return sessionStorage.getItem("gs_marshal_ok")==="1"; }
+function marshalAsk(gid){
+  const v=prompt("🔑 Marshal password:");
+  if(v===null) return;
+  if(v===ADMIN_PASS){ sessionStorage.setItem("gs_marshal_ok","1"); toast("Marshal unlocked 🔓"); render(); }
+  else toast("Wrong password");
+}
 function mountScore(el, g){
   if(!el) return;
+  if(!marshalOk()){
+    el.innerHTML=`<div class="empty">🔒 Marshal only.<br>Points need the marshal password.<br>
+      <button class="btn sm primary" style="margin-top:8px" onclick="marshalAsk(${g.id})">🔑 Marshal unlock</button></div>`;
+    return;
+  }
   if(!state.teams.length){ el.innerHTML=`<div class="empty">Add teams first.<br><button class="btn sm primary" style="margin-top:8px" onclick="go('#/teams')">Set up teams</button></div>`; return; }
   const draw=()=>{
     el.innerHTML = state.teams.map(t=>{
@@ -1494,7 +1560,9 @@ function openArcade(key){
 }
 function closeArcade(){ if(!ARCADE)return; try{ARCADE.game.stop();}catch(e){} ARCADE.ov.remove(); ARCADE=null; }
 window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&ARCADE) closeArcade(); });
-window.addEventListener("hashchange", closeArcade);
+// closing on hashchange would kill the #/play/<key> deep-link route (its render
+// opens the arcade first, then this listener would fire) — so skip play routes
+window.addEventListener("hashchange", ()=>{ if(!location.hash.startsWith("#/play/")) closeArcade(); });
 
 function arcadeKeys(){
   const k={};

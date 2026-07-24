@@ -27,6 +27,7 @@ export function AitbMission() {
   const [wordDrafts, setWordDrafts] = useState<string[]>([])
   const [wordsError, setWordsError] = useState('')
   const [wordsSaved, setWordsSaved] = useState(false)
+  const [zoomImg, setZoomImg] = useState<number | null>(null)
 
   const wordsCfg = activity?.wordsInput
 
@@ -291,6 +292,50 @@ export function AitbMission() {
               })}
             </div>
 
+            {/* Playable reference games (act 02) */}
+            {activity.demos && (
+              <>
+                <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🕹️ Play the 3 games first!</div>
+                <div className="flex flex-col gap-2 mb-5">
+                  {activity.demos.map(d => (
+                    <a key={d.label} href={d.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-2xl px-4 py-3 transition-all active:scale-[0.98]"
+                      style={{ background: `${activity.color}12`, border: `2px solid ${activity.color}55` }}>
+                      <span className="text-3xl">{d.emoji}</span>
+                      <span className="flex-1">
+                        <span className="font-black">{d.label}</span>
+                        <span className="text-gray-400 font-bold text-sm"> — {d.sub}</span>
+                      </span>
+                      <span className="font-black" style={{ color: activity.color }}>PLAY ▶</span>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Target photo gallery (act 08) */}
+            {activity.gallery && (
+              <>
+                <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🖼️ The 10 target pictures</div>
+                <div className="rounded-2xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${activity.color}44` }}>
+                  <p className="text-sm font-bold mb-3" style={{ color: activity.color }}>
+                    ⚠️ You must REGENERATE the picture with AI — then show the marshal your picture AND the prompt you used. No prompt = no points!
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {activity.gallery.map((s, i) => (
+                      <button key={s.img} onClick={() => setZoomImg(i)} className="text-left">
+                        <img src={s.img} alt={s.label} loading="lazy"
+                          className="rounded-xl w-full aspect-square object-cover"
+                          style={{ border: `2px solid ${activity.color}44` }} />
+                        <div className="text-xs font-bold text-gray-300 mt-1">#{i + 1} · {s.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-gray-500 text-xs mt-2">Tap a picture to see it big.</p>
+                </div>
+              </>
+            )}
+
             {/* Word submission (Nerf: 3 words · Ping Pong: 7 words) */}
             {wordsCfg && progress?.scanned_at && (
               <>
@@ -396,6 +441,20 @@ export function AitbMission() {
               ✅ Confirm complete
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Fullscreen target picture (act 08 gallery) */}
+      {zoomImg !== null && activity.gallery && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4" onClick={() => setZoomImg(null)}>
+          <img src={activity.gallery[zoomImg].img} alt="" className="max-w-full max-h-[75vh] rounded-2xl" />
+          <div className="font-black text-xl mt-3" style={{ color: activity.color }}>
+            #{zoomImg + 1} · {activity.gallery[zoomImg].label}
+          </div>
+          <div className="text-gray-400 text-sm font-bold mt-1 text-center">
+            Regenerate this with AI — show the marshal the picture + your prompt!
+          </div>
+          <div className="text-gray-500 text-xs mt-3">tap anywhere to close</div>
         </div>
       )}
 

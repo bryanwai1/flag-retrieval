@@ -103,6 +103,9 @@ export function AitbAdmin() {
         team_id: teamId, activity_id: activityId,
         scanned_at: nowIso, steps_done: [0, 1, 2, 3, 4], completed_at: nowIso, bonus: 100,
       })
+    } else if (row.completed_at) {
+      // already done: clicking again undoes the completion (timer keeps running)
+      await supabase.from('aitb_progress').update({ completed_at: null, bonus: 0 }).eq('id', row.id)
     } else {
       await supabase.from('aitb_progress').update({ completed_at: nowIso, bonus: row.bonus || 100 }).eq('id', row.id)
     }
@@ -372,7 +375,7 @@ export function AitbAdmin() {
         {/* Progress matrix */}
         <div className="rounded-3xl p-6 overflow-x-auto" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
           <h2 className="font-black text-lg mb-1">📊 Live progress</h2>
-          <p className="text-gray-400 text-sm mb-4">⚪ waiting · 🕐 playing · ✅ done — click = complete · right-click = reset</p>
+          <p className="text-gray-400 text-sm mb-4">⚪ waiting · 🕐 playing · ✅ done — click = complete / click ✅ = undo · right-click = full reset</p>
           <table className="w-full text-center">
             <thead>
               <tr>
@@ -399,7 +402,7 @@ export function AitbAdmin() {
                           <button
                             onClick={() => completeCell(t.id, a.id)}
                             onContextMenu={e => { e.preventDefault(); resetCell(t.id, a.id) }}
-                            title={`${a.name} — ${pts} pts. Click = complete, right-click = reset`}
+                            title={`${a.name} — ${pts} pts. Click = ${p?.completed_at ? 'undo complete' : 'complete'}, right-click = full reset`}
                             className="rounded-lg px-1.5 py-1 text-sm font-bold hover:bg-white/10">
                             {label}
                           </button>

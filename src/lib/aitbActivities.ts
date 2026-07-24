@@ -23,6 +23,10 @@ export type AitbActivity = {
   /** When set, the mission page shows word inputs the team fills in; submissions
    *  land on aitb_progress.words and appear live in the admin panel. */
   wordsInput?: { count: number; title: string; hint: string; labels?: string[] }
+  /** Playable reference games shown as buttons on the mission page (act 02). */
+  demos?: { emoji: string; label: string; sub: string; url: string }[]
+  /** Sample photo gallery shown on the mission page (act 08 target images). */
+  gallery?: { img: string; label: string }[]
 }
 
 export const AITB_ACTIVITIES: AitbActivity[] = [
@@ -60,6 +64,11 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🙋', '🤖', '⏱️', '🎮', '🏆'],
     apps: ['AI Studio', 'Canva', 'Antigravity'], mins: 15, hero: '/aitb/hero2.jpg',
     props: [],
+    demos: [
+      { emoji: '🍄', label: 'Super Jumpman', sub: 'the Mario one', url: '/gamesystem/index.html?v=2#/play/jump' },
+      { emoji: '👻', label: 'Chomp Maze', sub: 'the Pac-Man one', url: '/gamesystem/index.html?v=2#/play/chomp' },
+      { emoji: '🦍', label: 'Barrel Climb', sub: 'the Donkey Kong one', url: '/gamesystem/index.html?v=2#/play/barrel' },
+    ],
   },
   {
     id: 3, act: '03', emoji: '🏰', color: '#a78bfa', name: 'Rubber Band Castle',
@@ -154,15 +163,27 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     desc: 'A target image goes up on the big screen. Team members take turns — relay style — each writing the next prompt to recreate it with AI. Race to submit: the faster your picture gets the marshal’s ✅, the more points you score.',
     learning: 'Turn-taking, observation, and reverse prompt engineering under time pressure.',
     steps: [
-      'Look at the target picture on the big screen.',
+      'Pick a target picture from the gallery below.',
       'Take turns — each member writes the next prompt!',
       'Keep regenerating until it matches.',
-      'Show your best picture to the marshal.',
+      'Show the marshal your picture AND your prompt!',
       'Faster ✅ from the marshal = more points!',
     ],
     stepEmojis: ['👀', '🔁', '🎨', '🙋', '⚡'],
     apps: ['NanoBanana', 'Ideogram', 'ChatGPT'], mins: 12, hero: '/aitb/hero8.jpg',
     props: [],
+    gallery: [
+      { img: '/gamesystem/edit1.jpg', label: '3D cartoon' },
+      { img: '/gamesystem/edit2.jpg', label: 'Photorealistic' },
+      { img: '/gamesystem/edit3.jpg', label: 'Pixel art' },
+      { img: '/gamesystem/edit4.jpg', label: 'Watercolor' },
+      { img: '/gamesystem/edit5.jpg', label: 'Claymation' },
+      { img: '/gamesystem/edit6.jpg', label: 'Comic book' },
+      { img: '/gamesystem/edit7.jpg', label: 'Paper cutout' },
+      { img: '/gamesystem/edit8.jpg', label: 'Neon glow' },
+      { img: '/gamesystem/edit9.jpg', label: 'Crayon drawing' },
+      { img: '/gamesystem/edit10.jpg', label: 'Origami' },
+    ],
   },
   {
     id: 9, act: '09', emoji: '🐘', color: '#2dd4bf', name: 'Found Object Animals',
