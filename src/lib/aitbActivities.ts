@@ -91,10 +91,10 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     id: 4, act: '04', emoji: '🌳', color: '#34d399', name: 'Resort Tree App Sprint',
     outType: 'Interactive Web App',
     tagline: 'Photograph 6 trees, then build a real tree app with AI!',
-    desc: 'Team splits up to photograph 6 pre-marked trees around the resort, then races back to build a real, deployable interactive web app showcasing all 6 trees with facts, photos, and one interactive element.',
+    desc: 'Team splits up to photograph any 6 different trees around the vicinity, then races back to build a real, deployable interactive web app showcasing all 6 trees with facts, photos, and one interactive element.',
     learning: 'Distributed exploration, focused technical collaboration, and shipping real products fast.',
     steps: [
-      'Find the 6 marked trees around the resort.',
+      'Find any 6 different trees around the vicinity.',
       'Split up and snap photos of each tree.',
       'Run back and build a tree app with AI.',
       'Add fun facts + 1 mini game or quiz.',
@@ -102,7 +102,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     ],
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
     apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg',
-    props: ['6 numbered tree marker tags (hang around resort BEFORE the game)'],
+    props: [],
   },
   {
     id: 5, act: '05', emoji: '🎶', color: '#f472b6', name: 'Roulette Jingle & Dance Off',
