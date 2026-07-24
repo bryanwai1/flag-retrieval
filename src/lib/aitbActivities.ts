@@ -235,6 +235,16 @@ export function aitbActivity(id: number): AitbActivity | undefined {
    Max per activity: 1400 pts                                            */
 export const AITB_POINTS = { scan: 100, step: 100, complete: 300 } as const
 
+/** Speed-bonus decay zones for the mission-page bar. Fractions of the
+ *  activity's minutes; past the last zone the bonus floors at 100. */
+export const AITB_BONUS_ZONES = [
+  { untilFrac: 0.5, bonus: 500 },
+  { untilFrac: 0.75, bonus: 400 },
+  { untilFrac: 1.0, bonus: 300 },
+  { untilFrac: 1.25, bonus: 200 },
+] as const
+export const AITB_BONUS_FLOOR = 100
+
 export function aitbSpeedBonus(elapsedMs: number, mins: number): number {
   const frac = elapsedMs / (mins * 60_000)
   if (frac <= 0.5) return 500

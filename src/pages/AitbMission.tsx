@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { aitbActivity, AITB_POINTS, aitbSpeedBonus, aitbProgressPoints } from '../lib/aitbActivities'
+import { aitbActivity, AITB_POINTS, AITB_BONUS_ZONES, AITB_BONUS_FLOOR, aitbSpeedBonus, aitbProgressPoints } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
@@ -160,10 +160,6 @@ export function AitbMission() {
     ? (progress.completed_at ? new Date(progress.completed_at).getTime() : now) - new Date(progress.scanned_at).getTime()
     : 0
   const points = progress ? aitbProgressPoints(progress) : 0
-  const liveBonus = useMemo(
-    () => (progress?.scanned_at && !progress.completed_at && activity ? aitbSpeedBonus(elapsedMs, activity.mins) : null),
-    [progress, elapsedMs, activity],
-  )
 
   if (!activity) {
     return (
@@ -253,19 +249,8 @@ export function AitbMission() {
                 🚀 START MISSION (+{AITB_POINTS.scan} pts)
               </button>
             ) : (
-              <div className="flex items-center justify-between rounded-2xl px-4 py-3 mb-4"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)' }}>
-                <div>
-                  <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">{progress.completed_at ? 'Finished in' : '⏱ Timer running'}</div>
-                  <div className="font-black text-3xl tabular-nums">{fmtElapsed(elapsedMs)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">Speed bonus</div>
-                  <div className="font-black text-2xl" style={{ color: progress.completed_at ? '#34d399' : activity.color }}>
-                    {progress.completed_at ? `+${progress.bonus}` : `+${liveBonus}`}
-                  </div>
-                </div>
-              </div>
+              <BonusBar elapsedMs={elapsedMs} mins={activity.mins}
+                completed={!!progress.completed_at} bankedBonus={progress.bonus} />
             )}
 
             {/* Steps — fun point form */}
@@ -486,6 +471,77 @@ export function AitbMission() {
 
 function fmtElapsed(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
-  const m = Math.floor(s / 60)
-  return `${m}:${String(s % 60).padStart(2, '0')}`
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+}
+
+/* Team mission timer + speed-bonus decay bar. The fill grows to the right as
+   time passes; the bonus you'd bank by finishing NOW drops zone by zone
+   (+500 → +400 → +300 → +200 → floor +100). The tip glows and throws sparks. */
+function BonusBar({ elapsedMs, mins, completed, bankedBonus }: {
+  elapsedMs: number; mins: number; completed: boolean; bankedBonus: number
+}) {
+  const spanMs = mins * 60_000 * 1.25 // bar covers up to the last decaying zone
+  const frac = Math.min(1, elapsedMs / spanMs)
+  const liveBonus = aitbSpeedBonus(elapsedMs, mins)
+  const shown = completed ? bankedBonus : liveBonus
+  const barColor = shown >= 500 ? '#34d399' : shown >= 400 ? '#2dd4bf' : shown >= 300 ? '#fbbf24' : shown >= 200 ? '#fb923c' : '#f87171'
+  // spark particles fly off the tip in fixed directions with staggered delays
+  const sparks = [
+    { dx: 10, dy: -14, dur: 0.8, delay: 0 }, { dx: -8, dy: -16, dur: 1.0, delay: 0.15 },
+    { dx: 14, dy: -6, dur: 0.7, delay: 0.3 }, { dx: -12, dy: 8, dur: 0.9, delay: 0.45 },
+    { dx: 8, dy: 14, dur: 0.85, delay: 0.6 }, { dx: -4, dy: 16, dur: 1.1, delay: 0.75 },
+  ]
+  return (
+    <div className="rounded-2xl px-4 py-3 mb-4" style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)' }}>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">{completed ? 'Finished in' : '⏱ Your team timer'}</div>
+          <div className="font-black text-3xl tabular-nums">{fmtElapsed(elapsedMs)}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">{completed ? 'Bonus banked' : 'Finish NOW for'}</div>
+          <div className="font-black text-2xl transition-colors duration-700" style={{ color: completed ? '#34d399' : barColor }}>
+            +{shown}{!completed && ' pts'}
+          </div>
+        </div>
+      </div>
+      {/* zone track */}
+      <div className="relative h-5 rounded-full overflow-visible" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        {/* zone dividers */}
+        {AITB_BONUS_ZONES.slice(0, -1).map(z => (
+          <div key={z.bonus} className="absolute top-0 bottom-0 w-px bg-white/25" style={{ left: `${(z.untilFrac / 1.25) * 100}%` }} />
+        ))}
+        {/* fill */}
+        <div className="absolute left-0 top-0 bottom-0 rounded-full transition-all duration-1000 ease-linear"
+          style={{ width: `${frac * 100}%`, background: `linear-gradient(90deg, ${barColor}55, ${barColor})`, minWidth: 10 }} />
+        {/* glowing tip + sparks */}
+        {!completed && (
+          <div className="absolute top-1/2" style={{ left: `${frac * 100}%`, color: barColor }}>
+            <div className="aitb-tip absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{ width: 14, height: 14, background: `radial-gradient(circle, #fff 15%, ${barColor} 60%)` }} />
+            {sparks.map((s, i) => (
+              <span key={i} className="aitb-spark"
+                style={{ '--dx': `${s.dx}px`, '--dy': `${s.dy}px`, '--dur': `${s.dur}s`, '--delay': `${s.delay}s` } as React.CSSProperties} />
+            ))}
+          </div>
+        )}
+      </div>
+      {/* zone labels */}
+      <div className="flex text-[10px] font-black mt-1 text-gray-400">
+        <span style={{ width: '40%', color: shown >= 500 ? '#34d399' : undefined }}>+500</span>
+        <span style={{ width: '20%', color: !completed && shown === 400 ? '#2dd4bf' : undefined }}>+400</span>
+        <span style={{ width: '20%', color: !completed && shown === 300 ? '#fbbf24' : undefined }}>+300</span>
+        <span style={{ width: '20%', color: !completed && shown === 200 ? '#fb923c' : undefined }}>+200</span>
+        <span style={{ color: !completed && shown === AITB_BONUS_FLOOR ? '#f87171' : undefined }}>+{AITB_BONUS_FLOOR}</span>
+      </div>
+      {!completed && (
+        <div className="text-gray-500 text-xs font-bold mt-1">
+          ⚡ Faster finish = bigger bonus. The bar fills as time runs — don't let it reach the end!
+        </div>
+      )}
+    </div>
+  )
 }
