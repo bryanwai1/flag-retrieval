@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
@@ -96,18 +96,20 @@ export function AitbAdmin() {
 
   const completeCell = async (teamId: string, activityId: number) => {
     const row = progress.find(p => p.team_id === teamId && p.activity_id === activityId)
+    const activity = aitbActivity(activityId)!
     const nowIso = new Date().toISOString()
     if (!row) {
-      // never scanned: create fully-complete row with minimum bonus
+      // never scanned: force-complete with no speed bonus (no real timer ran)
       await supabase.from('aitb_progress').insert({
         team_id: teamId, activity_id: activityId,
-        scanned_at: nowIso, steps_done: [0, 1, 2, 3, 4], completed_at: nowIso, bonus: 100,
+        scanned_at: nowIso, steps_done: [0, 1, 2, 3, 4], completed_at: nowIso, bonus: 0,
       })
     } else if (row.completed_at) {
       // already done: clicking again undoes the completion (timer keeps running)
       await supabase.from('aitb_progress').update({ completed_at: null, bonus: 0 }).eq('id', row.id)
     } else {
-      await supabase.from('aitb_progress').update({ completed_at: nowIso, bonus: row.bonus || 100 }).eq('id', row.id)
+      const bonus = row.scanned_at ? aitbSpeedBonus(Date.now() - new Date(row.scanned_at).getTime(), activity) : 0
+      await supabase.from('aitb_progress').update({ completed_at: nowIso, bonus }).eq('id', row.id)
     }
   }
 

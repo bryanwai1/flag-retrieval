@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { aitbActivity, AITB_POINTS, AITB_BONUS_ZONES, AITB_BONUS_FLOOR, aitbSpeedBonus, aitbProgressPoints } from '../lib/aitbActivities'
+import { aitbActivity, AITB_POINTS, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
@@ -142,7 +142,7 @@ export function AitbMission() {
       return
     }
     const elapsed = Date.now() - new Date(progress.scanned_at).getTime()
-    const bonus = aitbSpeedBonus(elapsed, activity.mins)
+    const bonus = aitbSpeedBonus(elapsed, activity)
     const { data } = await supabase
       .from('aitb_progress')
       .update({ completed_at: new Date().toISOString(), bonus })
@@ -249,7 +249,7 @@ export function AitbMission() {
                 🚀 START MISSION (+{AITB_POINTS.scan} pts)
               </button>
             ) : (
-              <BonusBar elapsedMs={elapsedMs} mins={activity.mins}
+              <BonusBar elapsedMs={elapsedMs} activity={activity}
                 completed={!!progress.completed_at} bankedBonus={progress.bonus} />
             )}
 
@@ -477,23 +477,36 @@ function fmtElapsed(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-/* Team mission timer + speed-bonus decay bar. The fill grows to the right as
-   time passes; the bonus you'd bank by finishing NOW drops zone by zone
-   (+500 → +400 → +300 → +200 → floor +100). The tip glows and throws sparks. */
-function BonusBar({ elapsedMs, mins, completed, bankedBonus }: {
-  elapsedMs: number; mins: number; completed: boolean; bankedBonus: number
+function fmtMin(mins: number): string {
+  const s = Math.round(mins * 60)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/* Team mission timer + speed-bonus milestone bar. Counts UP from 0 following
+   the team's own timer; the fill grows rightward through the game's OWN
+   bonusTiers milestones (e.g. finish ≤2:30 → +1000, ≤5:00 → +800 …) and past
+   the last milestone the bonus is 0. The tip glows and throws sparks. */
+function BonusBar({ elapsedMs, activity, completed, bankedBonus }: {
+  elapsedMs: number; activity: AitbActivity; completed: boolean; bankedBonus: number
 }) {
-  const spanMs = mins * 60_000 * 1.25 // bar covers up to the last decaying zone
-  const frac = Math.min(1, elapsedMs / spanMs)
-  const liveBonus = aitbSpeedBonus(elapsedMs, mins)
+  const tiers = activity.bonusTiers
+  const endMin = tiers[tiers.length - 1].uptoMin // bar span: 0 → last milestone
+  const frac = Math.min(1, elapsedMs / (endMin * 60_000))
+  const liveBonus = aitbSpeedBonus(elapsedMs, activity)
   const shown = completed ? bankedBonus : liveBonus
-  const barColor = shown >= 500 ? '#34d399' : shown >= 400 ? '#2dd4bf' : shown >= 300 ? '#fbbf24' : shown >= 200 ? '#fb923c' : '#f87171'
+  const maxPts = tiers[0].pts
+  const ratio = maxPts ? shown / maxPts : 0
+  const barColor = ratio >= 0.9 ? '#34d399' : ratio >= 0.7 ? '#2dd4bf' : ratio >= 0.5 ? '#fbbf24' : ratio > 0.2 ? '#fb923c' : '#f87171'
   // spark particles fly off the tip in fixed directions with staggered delays
   const sparks = [
     { dx: 10, dy: -14, dur: 0.8, delay: 0 }, { dx: -8, dy: -16, dur: 1.0, delay: 0.15 },
     { dx: 14, dy: -6, dur: 0.7, delay: 0.3 }, { dx: -12, dy: 8, dur: 0.9, delay: 0.45 },
     { dx: 8, dy: 14, dur: 0.85, delay: 0.6 }, { dx: -4, dy: 16, dur: 1.1, delay: 0.75 },
   ]
+  const segWidth = (i: number) => {
+    const from = i === 0 ? 0 : tiers[i - 1].uptoMin
+    return ((tiers[i].uptoMin - from) / endMin) * 100
+  }
   return (
     <div className="rounded-2xl px-4 py-3 mb-4" style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)' }}>
       <div className="flex items-center justify-between mb-2">
@@ -508,11 +521,10 @@ function BonusBar({ elapsedMs, mins, completed, bankedBonus }: {
           </div>
         </div>
       </div>
-      {/* zone track */}
+      {/* milestone track */}
       <div className="relative h-5 rounded-full overflow-visible" style={{ background: 'rgba(255,255,255,0.08)' }}>
-        {/* zone dividers */}
-        {AITB_BONUS_ZONES.slice(0, -1).map(z => (
-          <div key={z.bonus} className="absolute top-0 bottom-0 w-px bg-white/25" style={{ left: `${(z.untilFrac / 1.25) * 100}%` }} />
+        {tiers.slice(0, -1).map(t => (
+          <div key={t.uptoMin} className="absolute top-0 bottom-0 w-px bg-white/25" style={{ left: `${(t.uptoMin / endMin) * 100}%` }} />
         ))}
         {/* fill */}
         <div className="absolute left-0 top-0 bottom-0 rounded-full transition-all duration-1000 ease-linear"
@@ -529,17 +541,19 @@ function BonusBar({ elapsedMs, mins, completed, bankedBonus }: {
           </div>
         )}
       </div>
-      {/* zone labels */}
+      {/* milestone labels: points + the time each milestone ends */}
       <div className="flex text-[10px] font-black mt-1 text-gray-400">
-        <span style={{ width: '40%', color: shown >= 500 ? '#34d399' : undefined }}>+500</span>
-        <span style={{ width: '20%', color: !completed && shown === 400 ? '#2dd4bf' : undefined }}>+400</span>
-        <span style={{ width: '20%', color: !completed && shown === 300 ? '#fbbf24' : undefined }}>+300</span>
-        <span style={{ width: '20%', color: !completed && shown === 200 ? '#fb923c' : undefined }}>+200</span>
-        <span style={{ color: !completed && shown === AITB_BONUS_FLOOR ? '#f87171' : undefined }}>+{AITB_BONUS_FLOOR}</span>
+        {tiers.map((t, i) => (
+          <span key={t.uptoMin} style={{ width: `${segWidth(i)}%`, color: !completed && shown === t.pts ? barColor : undefined }}>
+            +{t.pts}
+            <span className="block font-bold text-gray-600">≤{fmtMin(t.uptoMin)}</span>
+          </span>
+        ))}
+        <span style={{ color: !completed && shown === 0 ? '#f87171' : undefined }}>0</span>
       </div>
       {!completed && (
         <div className="text-gray-500 text-xs font-bold mt-1">
-          ⚡ Faster finish = bigger bonus. The bar fills as time runs — don't let it reach the end!
+          ⚡ Every milestone you pass, the bonus drops — finish before the bar hits the end!
         </div>
       )}
     </div>

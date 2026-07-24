@@ -23,6 +23,9 @@ export type AitbActivity = {
   /** When set, the mission page shows word inputs the team fills in; submissions
    *  land on aitb_progress.words and appear live in the admin panel. */
   wordsInput?: { count: number; title: string; hint: string; labels?: string[] }
+  /** Speed-bonus milestones, unique per game. Ascending absolute minutes from
+   *  check-in: finish within uptoMin → earn pts; past the last tier → 0. */
+  bonusTiers: { uptoMin: number; pts: number }[]
   /** Playable reference games shown as buttons on the mission page (act 02). */
   demos?: { emoji: string; label: string; sub: string; url: string }[]
   /** Sample photo gallery shown on the mission page (act 08 target images). */
@@ -47,6 +50,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg',
     props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
     wordsInput: { count: 3, title: '🧩 Your 3 secret words', hint: 'Type the words from your red, blue and yellow cups!', labels: ['🔴 Red cup word', '🔵 Blue cup word', '🟡 Yellow cup word'] },
+    bonusTiers: [{ uptoMin: 2.5, pts: 1000 }, { uptoMin: 5, pts: 800 }, { uptoMin: 7.5, pts: 600 }, { uptoMin: 10, pts: 400 }, { uptoMin: 12.5, pts: 200 }],
   },
   {
     id: 2, act: '02', emoji: '🕹️', color: '#22d3ee', name: 'Retro Game Speed Build',
@@ -69,6 +73,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       { emoji: '👻', label: 'Chomp Maze', sub: 'the Pac-Man one', url: '/gamesystem/index.html?v=2#/play/chomp' },
       { emoji: '🦍', label: 'Barrel Climb', sub: 'the Donkey Kong one', url: '/gamesystem/index.html?v=2#/play/barrel' },
     ],
+    bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
     id: 3, act: '03', emoji: '🏰', color: '#a78bfa', name: 'Rubber Band Castle',
@@ -86,6 +91,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🪢', '🙌', '🏗️', '📸', '🏰'],
     apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero3.jpg',
     props: ['Rubber band with 6–8 strings tied on', 'Stack of cups (8–10) for the castle'],
+    bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
   },
   {
     id: 4, act: '04', emoji: '🌳', color: '#34d399', name: 'Resort Tree App Sprint',
@@ -103,6 +109,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
     apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg',
     props: [],
+    bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },
   {
     id: 5, act: '05', emoji: '🎶', color: '#f472b6', name: 'Roulette Jingle & Dance Off',
@@ -120,6 +127,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🎡', '✍️', '🎵', '💃', '🎤'],
     apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg',
     props: ['Portable speaker (play the AI song for the dance)'],
+    bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
     id: 6, act: '06', emoji: '🎬', color: '#fbbf24', name: 'Random Card Cinematic',
@@ -137,6 +145,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🃏', '🚫', '🎭', '🤖', '🍿'],
     apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg',
     props: [],
+    bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
     id: 7, act: '07', emoji: '🏓', color: '#60a5fa', name: 'Ping Pong Alphabet Pitch',
@@ -155,6 +164,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg',
     props: ['26 cups labelled A–Z', 'Ping pong balls (6+)', 'Table for the cup grid'],
     wordsInput: { count: 7, title: '🔤 Your 7 words', hint: 'Type the 7 words that use ALL your collected letters!' },
+    bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
   },
   {
     id: 8, act: '08', emoji: '👁️', color: '#f59e0b', name: 'Speed Edit Showdown',
@@ -184,6 +194,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       { img: '/gamesystem/edit9.jpg', label: 'Crayon drawing' },
       { img: '/gamesystem/edit10.jpg', label: 'Origami' },
     ],
+    bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
   },
   {
     id: 9, act: '09', emoji: '🐘', color: '#2dd4bf', name: 'Found Object Animals',
@@ -201,6 +212,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🦁', '🧺', '🖼️', '📸', '🎬'],
     apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg',
     props: ['2 animal archetype cards per team', 'Collection basket for found objects'],
+    bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
     id: 10, act: '10', emoji: '🧭', color: '#c084fc', name: 'Resort Character Journey',
@@ -218,6 +230,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🎨', '📷', '🤖', '🔒', '📖'],
     apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 20, hero: '/aitb/hero10.jpg',
     props: [],
+    bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },
 ]
 
@@ -225,33 +238,21 @@ export function aitbActivity(id: number): AitbActivity | undefined {
   return AITB_ACTIVITIES.find(a => a.id === id)
 }
 
-/* ---------- Scoring (all values in hundreds) ----------
+/* ---------- Scoring ----------
    Timer starts the moment the team checks in (scans the QR and taps start).
    +100  check-in (scan)
    +100  per step ticked (5 steps = 500)
    +300  activity completed (marshal password)
-   +bonus speed bonus on completion, based on elapsed vs the activity's minutes:
-         ≤50% time → +500 · ≤75% → +400 · ≤100% → +300 · ≤125% → +200 · else +100
-   Max per activity: 1400 pts                                            */
+   +bonus speed bonus on completion from the game's own bonusTiers ladder:
+         finish within the first milestone → top bonus (1000), each later
+         milestone pays less, past the last milestone → 0.
+   Max per activity: 1900 pts                                            */
 export const AITB_POINTS = { scan: 100, step: 100, complete: 300 } as const
 
-/** Speed-bonus decay zones for the mission-page bar. Fractions of the
- *  activity's minutes; past the last zone the bonus floors at 100. */
-export const AITB_BONUS_ZONES = [
-  { untilFrac: 0.5, bonus: 500 },
-  { untilFrac: 0.75, bonus: 400 },
-  { untilFrac: 1.0, bonus: 300 },
-  { untilFrac: 1.25, bonus: 200 },
-] as const
-export const AITB_BONUS_FLOOR = 100
-
-export function aitbSpeedBonus(elapsedMs: number, mins: number): number {
-  const frac = elapsedMs / (mins * 60_000)
-  if (frac <= 0.5) return 500
-  if (frac <= 0.75) return 400
-  if (frac <= 1.0) return 300
-  if (frac <= 1.25) return 200
-  return 100
+export function aitbSpeedBonus(elapsedMs: number, activity: Pick<AitbActivity, 'bonusTiers'>): number {
+  const mins = elapsedMs / 60_000
+  for (const t of activity.bonusTiers) if (mins <= t.uptoMin) return t.pts
+  return 0
 }
 
 export function aitbProgressPoints(p: {
