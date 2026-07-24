@@ -71,6 +71,15 @@ export function AitbAdmin() {
     await supabase.from('aitb_teams').update({ name }).eq('id', id)
   }
 
+  const saveAdjust = async (t: AitbTeam, raw: string) => {
+    const v = parseInt(raw, 10)
+    const adjust = Number.isFinite(v) ? v : 0
+    if (adjust === (t.adjust || 0)) return
+    await supabase.from('aitb_teams').update({ adjust }).eq('id', t.id)
+    say(`${t.name}: ${adjust >= 0 ? '+' : ''}${adjust} pts adjustment 🎁`)
+    load()
+  }
+
   const cycleColor = async (t: AitbTeam) => {
     const next = TEAM_COLORS[(TEAM_COLORS.indexOf(t.color) + 1) % TEAM_COLORS.length]
     await supabase.from('aitb_teams').update({ color: next }).eq('id', t.id)
@@ -236,12 +245,19 @@ export function AitbAdmin() {
                 <button onClick={() => cycleColor(t)} title="change colour" className="text-2xl" style={{ color: t.color }}>●</button>
                 <input defaultValue={t.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== t.name) renameTeam(t.id, e.target.value.trim()) }}
                   className="flex-1 bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none" style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
+                <input key={`adj-${t.id}-${t.adjust}`} defaultValue={t.adjust || 0} inputMode="numeric"
+                  title="Bonus / penalty points — added to the team total (use minus for penalty)"
+                  onBlur={e => saveAdjust(t, e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  className="w-16 bg-gray-800/60 rounded-lg px-2 py-2 font-bold text-center outline-none"
+                  style={{ border: '1.5px solid rgba(251,191,36,0.35)', color: '#fbbf24' }} />
                 <span className="font-black tabular-nums w-24 text-right" style={{ color: t.color }}>
-                  {progress.filter(p => p.team_id === t.id).reduce((a, p) => a + aitbProgressPoints(p), 0)} pts
+                  {progress.filter(p => p.team_id === t.id).reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0)} pts
                 </span>
                 <button onClick={() => deleteTeam(t)} className="text-gray-500 hover:text-red-400 px-1">✕</button>
               </div>
             ))}
+            <p className="text-gray-500 text-xs mt-1 mb-2">🟡 yellow box = bonus/penalty points you award manually (e.g. 200 or -100) — counted in the total.</p>
             <div className="flex gap-2 mt-3">
               <input value={newTeam} onChange={e => setNewTeam(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addTeam() }} placeholder="New team name"
@@ -391,7 +407,7 @@ export function AitbAdmin() {
             <tbody>
               {teams.map(t => {
                 const rows = progress.filter(p => p.team_id === t.id)
-                const total = rows.reduce((a, p) => a + aitbProgressPoints(p), 0)
+                const total = rows.reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0)
                 return (
                   <tr key={t.id} style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     <td className="text-left font-black py-2" style={{ color: t.color }}>● {t.name}</td>

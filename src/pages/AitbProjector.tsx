@@ -47,7 +47,7 @@ export function AitbProjector() {
         return {
           team: t,
           rows,
-          total: rows.reduce((a, p) => a + aitbProgressPoints(p), 0),
+          total: rows.reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0),
           completed: rows.filter(p => p.completed_at).length,
         }
       })

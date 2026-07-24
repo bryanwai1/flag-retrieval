@@ -383,6 +383,7 @@ export interface AitbTeam {
   name: string
   color: string
   sort_order: number
+  adjust: number
   created_at: string
 }
 
