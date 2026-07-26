@@ -159,7 +159,7 @@ export function AitbMission() {
   const elapsedMs = progress?.scanned_at
     ? (progress.completed_at ? new Date(progress.completed_at).getTime() : now) - new Date(progress.scanned_at).getTime()
     : 0
-  const points = progress ? aitbProgressPoints(progress) : 0
+  const points = progress ? aitbProgressPoints(progress, activity) : 0
 
   if (!activity) {
     return (

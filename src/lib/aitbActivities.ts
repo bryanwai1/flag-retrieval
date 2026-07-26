@@ -18,6 +18,9 @@ export type AitbActivity = {
   apps: string[]
   mins: number
   hero: string
+  /** Hand-set challenge tier shown on the draw cards. Decoupled from `mins` so a
+   *  quick activity can still read Hard (and a long one Easy). */
+  difficulty: 'Easy' | 'Normal' | 'Hard'
   /** Physical props the marshal hands the team at this station. Empty = phones only. */
   props: string[]
   /** When set, the mission page shows word inputs the team fills in; submissions
@@ -47,7 +50,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Ask AI to make the picture and score points!',
     ],
     stepEmojis: ['🔫', '📢', '📺', '🧩', '🎨'],
-    apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg',
+    apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg', difficulty: 'Easy',
     props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
     wordsInput: { count: 3, title: '🧩 Your 3 secret words', hint: 'Type the words from your red, blue and yellow cups!', labels: ['🔴 Red cup word', '🔵 Blue cup word', '🟡 Yellow cup word'] },
     bonusTiers: [{ uptoMin: 2.5, pts: 1000 }, { uptoMin: 5, pts: 800 }, { uptoMin: 7.5, pts: 600 }, { uptoMin: 10, pts: 400 }, { uptoMin: 12.5, pts: 200 }],
@@ -66,7 +69,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Other team tries your games. Best games win!',
     ],
     stepEmojis: ['🙋', '🤖', '⏱️', '🎮', '🏆'],
-    apps: ['AI Studio', 'Canva', 'Antigravity'], mins: 15, hero: '/aitb/hero2.jpg',
+    apps: ['AI Studio', 'Canva', 'Antigravity'], mins: 15, hero: '/aitb/hero2.jpg', difficulty: 'Hard',
     props: [],
     demos: [
       { emoji: '🍄', label: 'Super Jumpman', sub: 'the Mario one', url: '/gamesystem/index.html?v=2#/play/jump' },
@@ -89,7 +92,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'AI turns it into a REAL castle — with your team on top!',
     ],
     stepEmojis: ['🪢', '🙌', '🏗️', '📸', '🏰'],
-    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero3.jpg',
+    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero3.jpg', difficulty: 'Normal',
     props: ['Rubber band with 6–8 strings tied on', 'Stack of cups (8–10) for the castle'],
     bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
   },
@@ -107,7 +110,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Share your app with a QR code!',
     ],
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
-    apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg',
+    apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg', difficulty: 'Hard',
     props: [],
     bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },
@@ -125,7 +128,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Perform it live for the crowd!',
     ],
     stepEmojis: ['🎡', '✍️', '🎵', '💃', '🎤'],
-    apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg',
+    apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg', difficulty: 'Normal',
     props: ['Portable speaker (play the AI song for the dance)'],
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
@@ -143,7 +146,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Watch it together on the big screen!',
     ],
     stepEmojis: ['🃏', '🚫', '🎭', '🤖', '🍿'],
-    apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg',
+    apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg', difficulty: 'Normal',
     props: [],
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
@@ -161,7 +164,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Pitch your ad like a TV star!',
     ],
     stepEmojis: ['🏓', '🔤', '📝', '🤖', '🌟'],
-    apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg',
+    apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg', difficulty: 'Normal',
     props: ['26 cups labelled A–Z', 'Ping pong balls (6+)', 'Table for the cup grid'],
     wordsInput: { count: 7, title: '🔤 Your 7 words', hint: 'Type the 7 words that use ALL your collected letters!' },
     bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
@@ -180,7 +183,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Faster ✅ from the marshal = more points!',
     ],
     stepEmojis: ['👀', '🔁', '🎨', '🙋', '⚡'],
-    apps: ['NanoBanana', 'Ideogram', 'ChatGPT'], mins: 12, hero: '/aitb/hero8.jpg',
+    apps: ['NanoBanana', 'Ideogram', 'ChatGPT'], mins: 12, hero: '/aitb/hero8.jpg', difficulty: 'Easy',
     props: [],
     gallery: [
       { img: '/gamesystem/edit1.jpg', label: '3D cartoon' },
@@ -210,7 +213,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'AI animates your 2 animals playing together.',
     ],
     stepEmojis: ['🦁', '🧺', '🖼️', '📸', '🎬'],
-    apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg',
+    apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg', difficulty: 'Hard',
     props: ['2 animal archetype cards per team', 'Collection basket for found objects'],
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
@@ -228,7 +231,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Tell the story: A Day in the Life!',
     ],
     stepEmojis: ['🎨', '📷', '🤖', '🔒', '📖'],
-    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 20, hero: '/aitb/hero10.jpg',
+    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 20, hero: '/aitb/hero10.jpg', difficulty: 'Hard',
     props: [],
     bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },
@@ -247,23 +250,42 @@ export function aitbActivity(id: number): AitbActivity | undefined {
          finish within the first milestone → top bonus (1000), each later
          milestone pays less, past the last milestone → 0.
    Max per activity: 1900 pts                                            */
+// scan + per-step are flat "participation" points; `complete` is the fallback
+// completion award when a difficulty isn't known (see AITB_COMPLETE below).
 export const AITB_POINTS = { scan: 100, step: 100, complete: 300 } as const
 
-export function aitbSpeedBonus(elapsedMs: number, activity: Pick<AitbActivity, 'bonusTiers'>): number {
+// Harder missions are worth more. Completion award and the speed-bonus ladder
+// both scale by the mission's challenge tier, so acing a Hard beats a Easy.
+export const AITB_COMPLETE: Record<AitbActivity['difficulty'], number> = { Easy: 200, Normal: 350, Hard: 500 }
+export const AITB_BONUS_MULT: Record<AitbActivity['difficulty'], number> = { Easy: 1, Normal: 1.4, Hard: 1.8 }
+
+/** Best-case score if a mission is aced fast: scan + every step + completion + top bonus. */
+export function aitbMaxPoints(a: AitbActivity): number {
+  return AITB_POINTS.scan + a.steps.length * AITB_POINTS.step
+    + AITB_COMPLETE[a.difficulty] + Math.round((a.bonusTiers[0]?.pts ?? 0) * AITB_BONUS_MULT[a.difficulty])
+}
+
+export function aitbSpeedBonus(elapsedMs: number, activity: Pick<AitbActivity, 'bonusTiers' | 'difficulty'>): number {
   const mins = elapsedMs / 60_000
-  for (const t of activity.bonusTiers) if (mins <= t.uptoMin) return t.pts
+  const mult = AITB_BONUS_MULT[activity.difficulty] ?? 1
+  for (const t of activity.bonusTiers) if (mins <= t.uptoMin) return Math.round(t.pts * mult)
   return 0
 }
 
-export function aitbProgressPoints(p: {
-  scanned_at: string | null
-  steps_done: number[] | null
-  completed_at: string | null
-  bonus: number | null
-}): number {
+export function aitbProgressPoints(
+  p: {
+    scanned_at: string | null
+    steps_done: number[] | null
+    completed_at: string | null
+    bonus: number | null
+  },
+  // Pass the mission so the completion award scales by difficulty. Omitting it
+  // falls back to the flat award (kept for safety / any legacy call site).
+  activity?: Pick<AitbActivity, 'difficulty'>,
+): number {
   let pts = 0
   if (p.scanned_at) pts += AITB_POINTS.scan
   pts += (p.steps_done?.length ?? 0) * AITB_POINTS.step
-  if (p.completed_at) pts += AITB_POINTS.complete + (p.bonus ?? 0)
+  if (p.completed_at) pts += (activity ? AITB_COMPLETE[activity.difficulty] : AITB_POINTS.complete) + (p.bonus ?? 0)
   return pts
 }

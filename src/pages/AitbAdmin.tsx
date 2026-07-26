@@ -18,6 +18,8 @@ export function AitbAdmin() {
   const [newTeam, setNewTeam] = useState('')
   const [newPw, setNewPw] = useState('')
   const [qrActivity, setQrActivity] = useState<number | null>(null)
+  const [showBoardQr, setShowBoardQr] = useState(false)
+  const [showObserverQr, setShowObserverQr] = useState(false)
   const [toast, setToast] = useState('')
   const [timerMins, setTimerMins] = useState('90')
   const { endsAt, remainingMs, timeUp } = useAitbGameTimer()
@@ -252,7 +254,7 @@ export function AitbAdmin() {
                   className="w-16 bg-gray-800/60 rounded-lg px-2 py-2 font-bold text-center outline-none"
                   style={{ border: '1.5px solid rgba(251,191,36,0.35)', color: '#fbbf24' }} />
                 <span className="font-black tabular-nums w-24 text-right" style={{ color: t.color }}>
-                  {progress.filter(p => p.team_id === t.id).reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0)} pts
+                  {progress.filter(p => p.team_id === t.id).reduce((a, p) => a + aitbProgressPoints(p, aitbActivity(p.activity_id)), 0) + (t.adjust || 0)} pts
                 </span>
                 <button onClick={() => deleteTeam(t)} className="text-gray-500 hover:text-red-400 px-1">✕</button>
               </div>
@@ -276,16 +278,26 @@ export function AitbAdmin() {
                 className="flex-1 bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none" style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
               <button onClick={savePassword} className="px-4 rounded-lg font-black" style={{ background: '#fbbf24', color: '#000' }}>Save</button>
             </div>
-            <h2 className="font-black text-lg mb-3">📱 Mission QR codes</h2>
-            <div className="grid grid-cols-5 gap-2">
-              {AITB_ACTIVITIES.map(a => (
-                <button key={a.id} onClick={() => setQrActivity(a.id)}
-                  className="rounded-xl py-2 font-black text-sm transition-all hover:scale-105"
-                  style={{ background: `${a.color}22`, color: a.color, border: `1.5px solid ${a.color}55` }}>
-                  {a.emoji}<br />{a.act}
-                </button>
-              ))}
-            </div>
+            <h2 className="font-black text-lg mb-3">🚀 Team board QR</h2>
+            <p className="text-gray-400 text-sm mb-3">
+              One QR for the whole event. Teams scan once, pick their team, then draw their
+              own missions — self-serve, no queuing at the marshal. Print it and post it at each station.
+            </p>
+            <button onClick={() => setShowBoardQr(true)}
+              className="w-full rounded-2xl py-4 font-black text-lg transition-all hover:scale-[1.02]"
+              style={{ background: '#fbbf2422', color: '#fbbf24', border: '2px solid #fbbf2455' }}>
+              🚀 Show Team Board QR
+            </button>
+            <h2 className="font-black text-lg mb-3 mt-6">🛰️ Observer / cheer QR</h2>
+            <p className="text-gray-400 text-sm mb-3">
+              For the audience &amp; benched teammates. Scan to watch the live race and fire emoji
+              reactions that pop on the projector. (Also shown in the projector&apos;s Race view.)
+            </p>
+            <button onClick={() => setShowObserverQr(true)}
+              className="w-full rounded-2xl py-4 font-black text-lg transition-all hover:scale-[1.02]"
+              style={{ background: '#a855f722', color: '#c084fc', border: '2px solid #a855f755' }}>
+              🛰️ Show Observer QR
+            </button>
           </div>
         </div>
 
@@ -407,14 +419,14 @@ export function AitbAdmin() {
             <tbody>
               {teams.map(t => {
                 const rows = progress.filter(p => p.team_id === t.id)
-                const total = rows.reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0)
+                const total = rows.reduce((a, p) => a + aitbProgressPoints(p, aitbActivity(p.activity_id)), 0) + (t.adjust || 0)
                 return (
                   <tr key={t.id} style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     <td className="text-left font-black py-2" style={{ color: t.color }}>● {t.name}</td>
                     {AITB_ACTIVITIES.map(a => {
                       const p = rows.find(x => x.activity_id === a.id)
                       const label = p?.completed_at ? '✅' : p?.scanned_at ? `🕐${p.steps_done.length}` : '⚪'
-                      const pts = p ? aitbProgressPoints(p) : 0
+                      const pts = p ? aitbProgressPoints(p, a) : 0
                       return (
                         <td key={a.id} className="py-2">
                           <button
@@ -436,7 +448,47 @@ export function AitbAdmin() {
         </div>
       </div>
 
-      {/* QR modal */}
+      {/* Team board QR modal — the self-serve entry point teams scan once */}
+      {showBoardQr && (() => {
+        const url = `${baseUrl}/aitb/home`
+        return (
+          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6" onClick={() => setShowBoardQr(false)}>
+            <div className="text-center" onClick={e => e.stopPropagation()}>
+              <div className="text-2xl font-black mb-1" style={{ color: '#fbbf24' }}>🚀 Team Board</div>
+              <div className="text-gray-400 text-sm mb-4">Scan once → pick your team → draw your own missions</div>
+              <div className="bg-white p-6 rounded-3xl inline-block">
+                <QRCodeSVG value={url} size={min(560, window.innerWidth - 120, window.innerHeight - 260)} />
+              </div>
+              <div className="text-gray-500 text-xs mt-3">{url}</div>
+              <div className="flex gap-2 justify-center mt-4">
+                <button onClick={() => setShowBoardQr(false)} className="px-6 py-2 rounded-xl font-bold" style={{ background: '#fff', color: '#000' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Observer QR modal — audience watch-and-cheer entry point */}
+      {showObserverQr && (() => {
+        const url = `${baseUrl}/aitb/watch`
+        return (
+          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6" onClick={() => setShowObserverQr(false)}>
+            <div className="text-center" onClick={e => e.stopPropagation()}>
+              <div className="text-2xl font-black mb-1" style={{ color: '#c084fc' }}>🛰️ Watch &amp; Cheer</div>
+              <div className="text-gray-400 text-sm mb-4">Scan to watch the live race and react to your team</div>
+              <div className="bg-white p-6 rounded-3xl inline-block">
+                <QRCodeSVG value={url} size={min(560, window.innerWidth - 120, window.innerHeight - 260)} />
+              </div>
+              <div className="text-gray-500 text-xs mt-3">{url}</div>
+              <div className="flex gap-2 justify-center mt-4">
+                <button onClick={() => setShowObserverQr(false)} className="px-6 py-2 rounded-xl font-bold" style={{ background: '#fff', color: '#000' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Per-activity QR modal — admin preview/demo of a single mission page */}
       {qrActivity !== null && (() => {
         const a = aitbActivity(qrActivity)!
         const url = `${baseUrl}/aitb/m/${a.id}`

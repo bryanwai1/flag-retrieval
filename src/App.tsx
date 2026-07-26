@@ -40,6 +40,8 @@ const VotingResults         = lazy(() => import('./pages/VotingResults').then(m 
 const AitbProjector         = lazy(() => import('./pages/AitbProjector').then(m => ({ default: m.AitbProjector })))
 const AitbAdmin             = lazy(() => import('./pages/AitbAdmin').then(m => ({ default: m.AitbAdmin })))
 const AitbMission           = lazy(() => import('./pages/AitbMission').then(m => ({ default: m.AitbMission })))
+const AitbHome              = lazy(() => import('./pages/AitbHome').then(m => ({ default: m.AitbHome })))
+const AitbObserver          = lazy(() => import('./pages/AitbObserver').then(m => ({ default: m.AitbObserver })))
 
 export default function App() {
   return (
@@ -94,6 +96,8 @@ export default function App() {
           <Route path="/voting/results" element={<VotingResults />} />
           <Route path="/voting/results/:pollId" element={<VotingResults />} />
           <Route path="/aitb" element={<AitbProjector />} />
+          <Route path="/aitb/home" element={<AitbHome />} />
+          <Route path="/aitb/watch" element={<AitbObserver />} />
           <Route path="/aitb/admin" element={<AitbAdmin />} />
           <Route path="/aitb/m/:activityId" element={<AitbMission />} />
 

@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { ParticleBackground } from '../components/ParticleBackground'
+import { AitbRaceStage, type Ranked } from '../components/AitbRaceStage'
+import { useAitbReactions } from '../hooks/useAitbReactions'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
+const OBSERVER_URL = (import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')) + '/aitb/watch'
+
 export function AitbProjector() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
   const [now, setNow] = useState(Date.now())
-  const [view, setView] = useState<number | null>(null) // null = scoreboard, 1-10 = game briefing slide
+  const [view, setView] = useState<number | 'galaxy' | null>(null) // null = scoreboard, 'galaxy' = race, 1-10 = briefing
   const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
+  const { reactions } = useAitbReactions()
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return
@@ -47,7 +53,7 @@ export function AitbProjector() {
         return {
           team: t,
           rows,
-          total: rows.reduce((a, p) => a + aitbProgressPoints(p), 0) + (t.adjust || 0),
+          total: rows.reduce((a, p) => a + aitbProgressPoints(p, aitbActivity(p.activity_id)), 0) + (t.adjust || 0),
           completed: rows.filter(p => p.completed_at).length,
         }
       })
@@ -57,8 +63,13 @@ export function AitbProjector() {
   const maxTotal = Math.max(1, ranked[0]?.total ?? 0)
   const medals = ['🥇', '🥈', '🥉']
 
+  // Race view — every team's rocket flying in toward the planet
+  if (view === 'galaxy') {
+    return <GalaxyView ranked={ranked} view={view} setView={setView} reactions={reactions} />
+  }
+
   // Game briefing slide — full details on the big screen
-  if (view !== null) {
+  if (typeof view === 'number') {
     const a = aitbActivity(view)!
     return (
       <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
@@ -225,7 +236,7 @@ function fmtElapsed(ms: number): string {
 
 /* Top nav: 🏆 scoreboard + one button per game, so the host can flash any
    game's full briefing on the projector, then flip back to live scores. */
-function GameNav({ view, setView }: { view: number | null; setView: (v: number | null) => void }) {
+function GameNav({ view, setView }: { view: number | 'galaxy' | null; setView: (v: number | 'galaxy' | null) => void }) {
   return (
     <div className="flex gap-2 justify-center flex-wrap mb-8">
       <a href="/aitb/admin"
@@ -240,6 +251,13 @@ function GameNav({ view, setView }: { view: number | null; setView: (v: number |
           : { background: 'rgba(255,255,255,0.06)', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
         🏆 Scores
       </button>
+      <button onClick={() => setView('galaxy')}
+        className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+        style={view === 'galaxy'
+          ? { background: '#a855f7', color: '#000' }
+          : { background: 'rgba(255,255,255,0.06)', color: '#c084fc', border: '1.5px solid #a855f755' }}>
+        🚀 Race
+      </button>
       {AITB_ACTIVITIES.map(a => (
         <button key={a.id} onClick={() => setView(a.id)}
           className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
@@ -249,6 +267,37 @@ function GameNav({ view, setView }: { view: number | null; setView: (v: number |
           {a.emoji} {a.act}
         </button>
       ))}
+    </div>
+  )
+}
+
+/* Race view: the planet sits at the centre; every team's rocket flies in from
+   its own bearing (distance = completed/10). Rendering + animation + reaction
+   bubbles live in the shared <AitbRaceStage>. A corner QR lets the audience join
+   as observers to watch and cheer. */
+function GalaxyView({ ranked, view, setView, reactions }: {
+  ranked: Ranked[]; view: number | 'galaxy' | null; setView: (v: number | 'galaxy' | null) => void
+  reactions: import('../hooks/useAitbReactions').AitbReaction[]
+}) {
+  return (
+    <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden p-6">
+      <ParticleBackground />
+      <div className="relative z-10">
+        <GameNav view={view} setView={setView} />
+        <AitbRaceStage ranked={ranked} reactions={reactions} />
+      </div>
+
+      {/* Observer QR — audience scans to watch the race and fire reactions. */}
+      <div className="fixed bottom-5 right-5 z-20 flex items-center gap-3 rounded-2xl px-4 py-3"
+        style={{ background: 'rgba(10,8,24,0.82)', border: '1.5px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(6px)' }}>
+        <div className="bg-white rounded-lg p-2">
+          <QRCodeSVG value={OBSERVER_URL} size={96} />
+        </div>
+        <div className="leading-tight">
+          <div className="font-black text-xl">📱 Watch &amp; cheer</div>
+          <div className="text-gray-400 font-bold text-sm">Scan to react to your team</div>
+        </div>
+      </div>
     </div>
   )
 }

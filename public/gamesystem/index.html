@@ -2178,7 +2178,7 @@ function openFlagModal(id){
     qrsvg=qr.createSvgTag({cellSize:4,margin:0,scalable:true});
   }catch(e){ qrsvg="<div style='color:#000;font-size:13px;padding:16px'>QR could not be generated</div>"; }
   const hosted=(location.protocol==="http:"||location.protocol==="https:");
-  const qrCaption=hosted?"📱 Scan to open the mission":"📱 Scan for the mission brief";
+  const qrCaption=hosted?"📱 Scan to open your team board":"📱 Scan for the mission brief";
   const el=document.getElementById("flagModal"); if(!el) return;
   el.innerHTML=`<div class="modal-ov" onclick="if(event.target===this)closeFlagModal()">
     <div class="modal">
@@ -2259,10 +2259,12 @@ function missionCheckin(id){
   toast((t?t.name:"Team")+" checked in — GO! 🚀");
 }
 function qrPayload(g){
-  // Hosted (http/https, e.g. Vercel game hub): deep-link to the mobile mission page.
-  // Offline (file://): embed the brief itself as text.
+  // Hosted (http/https, e.g. Vercel game hub): open the self-serve team board.
+  //   The team picks their team once (localStorage['aitb_my_team']) and then draws
+  //   their own mission cards — no more queuing at the marshal per task.
+  // Offline (file://): no server to reach, so embed the brief itself as text.
   if(location.protocol==="http:"||location.protocol==="https:")
-    return location.origin+location.pathname+"#/m/"+g.id;
+    return location.origin+"/aitb/home";
   return missionText(g);
 }
 function missionText(g){
