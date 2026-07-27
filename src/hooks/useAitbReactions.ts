@@ -31,7 +31,7 @@ function ensureChannel() {
 }
 
 /** Broadcast a reaction to every other client and echo it locally (self:false → no double). */
-export function sendAitbReaction(teamId: string, emoji: string) {
+function sendAitbReaction(teamId: string, emoji: string) {
   ensureChannel()
   const local = { id: nextId(), teamId, emoji }
   listeners.forEach(l => l(local))

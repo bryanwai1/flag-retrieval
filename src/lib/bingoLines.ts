@@ -1,4 +1,4 @@
-export const BINGO_GRID_SIZE = 25
+const BINGO_GRID_SIZE = 25
 
 // All 12 possible bingo lines: 5 rows + 5 cols + 2 diagonals
 export const BINGO_LINES: ReadonlyArray<ReadonlyArray<number>> = [

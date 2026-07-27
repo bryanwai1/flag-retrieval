@@ -26,10 +26,3 @@ if (isSupabaseConfigured) {
 }
 
 export const supabase = _supabase as SupabaseClient
-
-export function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env')
-  }
-  return _supabase
-}

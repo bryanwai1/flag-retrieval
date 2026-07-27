@@ -20,15 +20,13 @@
 // which group reveals worst-first).
 
 export type PrizeKind = 'consolation' | 'consolation_group' | 'third' | 'second' | 'first'
-export type SingletonKind = 'main' | 'intro' | 'holding' | 'lineup' | 'scoreboard' | 'closing'
+type SingletonKind = 'main' | 'intro' | 'holding' | 'lineup' | 'scoreboard' | 'closing'
 export type AwardSlideKind = SingletonKind | PrizeKind
 
-export const SINGLETON_KINDS: SingletonKind[] = ['main', 'intro', 'holding', 'lineup', 'scoreboard', 'closing']
-
 /** Teams shown on a single consolation_group slide. */
-export const CONSOLATION_GROUP_SIZE = 3
+const CONSOLATION_GROUP_SIZE = 3
 
-export function isSingletonKind(kind: string): kind is SingletonKind {
+function isSingletonKind(kind: string): kind is SingletonKind {
   return (
     kind === 'main' ||
     kind === 'intro' ||
@@ -59,7 +57,7 @@ export interface PrizeCounts {
   first_count: number
 }
 
-export const CANONICAL_KINDS: PrizeKind[] = [
+const CANONICAL_KINDS: PrizeKind[] = [
   'first', 'second', 'third', 'consolation', 'consolation_group',
 ]
 
@@ -85,17 +83,6 @@ export function isPrizeKind(kind: string): kind is PrizeKind {
     kind === 'second' ||
     kind === 'first'
   )
-}
-
-/** Parse a slide id into its kind + numeric suffix (suffix null for singletons). */
-export function parseSlideId(id: AwardSlideId): { kind: AwardSlideKind; index: number | null } {
-  if (isSingletonKind(id)) return { kind: id, index: null }
-  const idx = id.lastIndexOf(':')
-  if (idx < 0) throw new Error(`Unknown slide id: ${id}`)
-  const kind = id.slice(0, idx)
-  const idxStr = id.slice(idx + 1)
-  if (!isPrizeKind(kind)) throw new Error(`Unknown slide id: ${id}`)
-  return { kind, index: parseInt(idxStr, 10) }
 }
 
 /** Count how many slides of each prize kind appear in slide_order. */
@@ -182,7 +169,7 @@ export function normalizeSlideOrder(
 }
 
 /** Next unused numeric suffix for a given prize kind. */
-export function nextPrizeId(order: AwardSlideId[], kind: PrizeKind): AwardSlideId {
+function nextPrizeId(order: AwardSlideId[], kind: PrizeKind): AwardSlideId {
   let max = -1
   for (const id of order) {
     if (isSingletonKind(id)) continue

@@ -4,7 +4,7 @@ export interface Point {
   sub: string
 }
 
-export interface Slide {
+interface Slide {
   id: string
   gradientFrom: string
   gradientVia: string
