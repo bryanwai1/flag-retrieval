@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { AitbRaceStage } from '../components/AitbRaceStage'
 import { useAitbReactions, AITB_REACTIONS } from '../hooks/useAitbReactions'
+import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const CHEER_KEY = 'aitb_cheer_team'
+const OBSERVER_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 /**
  * Observer / spectator screen (/aitb/watch). Shows the same live race the
@@ -34,15 +36,7 @@ export function AitbObserver() {
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-    const ch = supabase
-      .channel('aitb-observer')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_progress' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_teams' }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [load])
+  useAitbRealtime('aitb-observer', OBSERVER_SUBS, load)
 
   const ranked = useMemo(() =>
     teams.map(t => {

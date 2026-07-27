@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { aitbActivity, AITB_POINTS, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
+import { aitbActivity, AITB_POINTS, AITB_BONUS_MULT, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
+import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const TEAM_KEY = 'aitb_my_team'
@@ -67,15 +68,13 @@ export function AitbMission() {
     return () => clearInterval(t)
   }, [progress?.scanned_at, progress?.completed_at])
 
-  // Realtime: another phone in the team ticks a step → update here too
-  useEffect(() => {
-    if (!isSupabaseConfigured || !teamId || !activity) return
-    const channel = supabase
-      .channel(`aitb-mission-${teamId}-${activity.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_progress', filter: `team_id=eq.${teamId}` }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [teamId, activity, load])
+  // Realtime: another phone in the team ticks a step → update here too. Filtered
+  // to this team, and hardened against dropped sockets (reconnect + poll).
+  const missionSubs = useMemo(
+    () => (teamId ? [{ table: 'aitb_progress', filter: `team_id=eq.${teamId}` }] : []),
+    [teamId],
+  )
+  useAitbRealtime(`aitb-mission-${teamId ?? 'none'}-${activity?.id ?? 0}`, missionSubs, load)
 
   const pickTeam = (id: string) => {
     localStorage.setItem(TEAM_KEY, id)
@@ -494,7 +493,12 @@ function BonusBar({ elapsedMs, activity, completed, bankedBonus }: {
   const frac = Math.min(1, elapsedMs / (endMin * 60_000))
   const liveBonus = aitbSpeedBonus(elapsedMs, activity)
   const shown = completed ? bankedBonus : liveBonus
-  const maxPts = tiers[0].pts
+  // Awarded bonus is difficulty-multiplied (aitbSpeedBonus), so the milestone
+  // ladder must show the SAME multiplied points — otherwise Normal/Hard missions
+  // display raw tier numbers that never match the "finish now for +X" figure.
+  const mult = AITB_BONUS_MULT[activity.difficulty] ?? 1
+  const tierPts = (i: number) => Math.round(tiers[i].pts * mult)
+  const maxPts = tierPts(0)
   const ratio = maxPts ? shown / maxPts : 0
   const barColor = ratio >= 0.9 ? '#34d399' : ratio >= 0.7 ? '#2dd4bf' : ratio >= 0.5 ? '#fbbf24' : ratio > 0.2 ? '#fb923c' : '#f87171'
   // spark particles fly off the tip in fixed directions with staggered delays
@@ -544,8 +548,8 @@ function BonusBar({ elapsedMs, activity, completed, bankedBonus }: {
       {/* milestone labels: points + the time each milestone ends */}
       <div className="flex text-[10px] font-black mt-1 text-gray-400">
         {tiers.map((t, i) => (
-          <span key={t.uptoMin} style={{ width: `${segWidth(i)}%`, color: !completed && shown === t.pts ? barColor : undefined }}>
-            +{t.pts}
+          <span key={t.uptoMin} style={{ width: `${segWidth(i)}%`, color: !completed && shown === tierPts(i) ? barColor : undefined }}>
+            +{tierPts(i)}
             <span className="block font-bold text-gray-600">≤{fmtMin(t.uptoMin)}</span>
           </span>
         ))}

@@ -3,12 +3,14 @@ import { QRCodeSVG } from 'qrcode.react'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { AitbRaceStage, type Ranked } from '../components/AitbRaceStage'
 import { useAitbReactions } from '../hooks/useAitbReactions'
+import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const OBSERVER_URL = (import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')) + '/aitb/watch'
+const PROJECTOR_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 export function AitbProjector() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
@@ -36,15 +38,7 @@ export function AitbProjector() {
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-    const channel = supabase
-      .channel('aitb-projector')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_progress' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_teams' }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [load])
+  useAitbRealtime('aitb-projector', PROJECTOR_SUBS, load)
 
   const ranked = useMemo(() => {
     return teams

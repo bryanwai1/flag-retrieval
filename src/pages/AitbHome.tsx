@@ -21,11 +21,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
+import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const MAX_ACTIVE = 2
 const TEAM_KEY = 'aitb_my_team'
 const TOTAL = AITB_ACTIVITIES.length
+// Watch every team's progress so the live rank chip updates when rivals score.
+const HOME_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 function randInt(n: number) { return Math.floor(Math.random() * n) }
 function fmtElapsed(ms: number) {
@@ -45,6 +48,7 @@ export function AitbHome() {
   const [teamId, setTeamId] = useState<string | null>(() =>
     (typeof localStorage !== 'undefined' ? localStorage.getItem(TEAM_KEY) : null))
   const [rows, setRows] = useState<AitbProgress[]>([])
+  const [allRows, setAllRows] = useState<AitbProgress[]>([])  // every team's progress → for the live rank chip
   const [loading, setLoading] = useState(true)
 
   const [draw, setDraw] = useState<number[] | null>(null)
@@ -76,29 +80,22 @@ export function AitbHome() {
   // ── Load teams + this team's progress ──────────────────────────────────────
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
-    const { data: teamRows } = await supabase.from('aitb_teams').select('*').order('sort_order').order('created_at')
-    setTeams(teamRows ?? [])
+    const [teamRes, progRes] = await Promise.all([
+      supabase.from('aitb_teams').select('*').order('sort_order').order('created_at'),
+      supabase.from('aitb_progress').select('*'),
+    ])
+    setTeams(teamRes.data ?? [])
+    const all = progRes.data ?? []
+    setAllRows(all)
     const tid = localStorage.getItem(TEAM_KEY)
-    if (tid) {
-      const { data: prog } = await supabase.from('aitb_progress').select('*').eq('team_id', tid)
-      setRows(prog ?? [])
-    } else {
-      setRows([])
-    }
+    setRows(tid ? all.filter(r => r.team_id === tid) : [])
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // ── Realtime: any change to this team's progress → reload (multi-device) ────
-  useEffect(() => {
-    if (!isSupabaseConfigured || !teamId) return
-    const ch = supabase
-      .channel(`aitb-home-${teamId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_progress', filter: `team_id=eq.${teamId}` }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [teamId, load])
+  // ── Realtime (multi-device) + self-heal on reconnect / refocus / poll ───────
+  useAitbRealtime('aitb-home', HOME_SUBS, load)
 
   // ── Live clock ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -120,7 +117,27 @@ export function AitbHome() {
         return { id: r.activity_id, color: a?.color || '#8b5cf6', emoji: a?.emoji || '⭐', name: a?.name || 'Mission', pts: aitbProgressPoints(r, a) }
       }),
     [completedRows])
-  const points = useMemo(() => rows.reduce((s, r) => s + aitbProgressPoints(r, aitbActivity(r.activity_id)), 0), [rows])
+  // This team's manual bonus/penalty — included so the board total matches the
+  // projector (which always adds `adjust`).
+  const myAdjust = useMemo(() => teams.find(t => t.id === teamId)?.adjust ?? 0, [teams, teamId])
+  const points = useMemo(
+    () => rows.reduce((s, r) => s + aitbProgressPoints(r, aitbActivity(r.activity_id)), 0) + myAdjust,
+    [rows, myAdjust])
+  // Live standings across all teams → this team's rank chip.
+  const standings = useMemo(() =>
+    teams.map(t => {
+      const tr = allRows.filter(r => r.team_id === t.id)
+      return {
+        id: t.id,
+        total: tr.reduce((s, r) => s + aitbProgressPoints(r, aitbActivity(r.activity_id)), 0) + (t.adjust || 0),
+        completed: tr.filter(r => r.completed_at).length,
+      }
+    }).sort((a, b) => b.total - a.total || b.completed - a.completed),
+    [teams, allRows])
+  const myRank = useMemo(() => {
+    const i = standings.findIndex(s => s.id === teamId)
+    return i < 0 ? null : i + 1
+  }, [standings, teamId])
   const completedCount = completedRows.length
   const progress = Math.min(1, completedCount / TOTAL)
   const arrived = completedCount >= TOTAL
@@ -205,6 +222,18 @@ export function AitbHome() {
   const startMission = useCallback(async (aid: number) => {
     if (!teamId || busyRef.current || activeRows.length >= MAX_ACTIVE || timeUp) return
     busyRef.current = true; setBusy(true)
+    // Re-check the slot cap against fresh DB state — another phone on this team
+    // may have started a mission since our last sync (the 2-slot cap is otherwise
+    // only enforced in local React state, so two phones could both slip past it).
+    const { data: fresh } = await supabase.from('aitb_progress')
+      .select('scanned_at,completed_at').eq('team_id', teamId)
+    const activeNow = (fresh ?? []).filter(r => r.scanned_at && !r.completed_at).length
+    if (activeNow >= MAX_ACTIVE) {
+      busyRef.current = false; setBusy(false)
+      setDraw(null)
+      await load()
+      return
+    }
     await supabase.from('aitb_progress').upsert(
       { team_id: teamId, activity_id: aid, scanned_at: new Date().toISOString() },
       { onConflict: 'team_id,activity_id', ignoreDuplicates: true },
@@ -302,6 +331,20 @@ export function AitbHome() {
             </div>
           )}
         </header>
+
+        {myRank && teams.length > 1 && (() => {
+          const emoji = ['🥇', '🥈', '🥉'][myRank - 1] ?? '🏆'
+          const c = myRank === 1 ? '#fbbf24' : myRank === 2 ? '#cbd5e1' : myRank === 3 ? '#f59e0b' : '#a48bff'
+          return (
+            <div style={{
+              alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 14px', borderRadius: 999, fontWeight: 800, fontSize: 14, color: c,
+              background: 'rgba(17,12,34,0.7)', border: `1.5px solid ${c}66`,
+            }}>
+              {emoji} Rank #{myRank} <span style={{ opacity: 0.55, fontWeight: 700 }}>of {teams.length}</span>
+            </div>
+          )
+        })()}
 
         {gameEndsAt && !timeUp && (() => {
           const c = gameRemainingMs! < 5 * 60_000 ? '#f87171' : '#fbbf24'

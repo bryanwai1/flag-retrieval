@@ -3,10 +3,12 @@ import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
+import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
 const UNLOCK_KEY = 'aitb_admin_unlocked'
 const TEAM_COLORS = ['#fb7185', '#22d3ee', '#fbbf24', '#34d399', '#a78bfa', '#f472b6', '#60a5fa', '#f59e0b']
+const ADMIN_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 export function AitbAdmin() {
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(UNLOCK_KEY) === '1')
@@ -16,6 +18,7 @@ export function AitbAdmin() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
   const [newTeam, setNewTeam] = useState('')
+  const [bulkText, setBulkText] = useState('')
   const [newPw, setNewPw] = useState('')
   const [qrActivity, setQrActivity] = useState<number | null>(null)
   const [showBoardQr, setShowBoardQr] = useState(false)
@@ -40,15 +43,7 @@ export function AitbAdmin() {
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-    const channel = supabase
-      .channel('aitb-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_progress' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aitb_teams' }, load)
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [load])
+  useAitbRealtime('aitb-admin', ADMIN_SUBS, load)
 
   const tryUnlock = async () => {
     const { data } = await supabase.from('aitb_settings').select('admin_password').eq('id', 1).maybeSingle()
@@ -67,6 +62,35 @@ export function AitbAdmin() {
       sort_order: teams.length,
     })
     setNewTeam('')
+  }
+
+  // Split on newlines OR commas so a pasted list or a single line both work.
+  const parseBulk = (raw: string) => raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+
+  const bulkAddTeams = async () => {
+    const requested = parseBulk(bulkText)
+    if (requested.length === 0) { say('Paste some team names first 🤔'); return }
+    // Skip names that already exist (case-insensitive) and dups within the paste.
+    const seen = new Set(teams.map(t => t.name.toLowerCase()))
+    const names: string[] = []
+    for (const n of requested) {
+      const k = n.toLowerCase()
+      if (seen.has(k)) continue
+      seen.add(k)
+      names.push(n)
+    }
+    if (names.length === 0) { say('Those teams already exist 🤔'); return }
+    const rows = names.map((name, i) => ({
+      name,
+      color: TEAM_COLORS[(teams.length + i) % TEAM_COLORS.length],
+      sort_order: teams.length + i,
+    }))
+    const { error } = await supabase.from('aitb_teams').insert(rows)
+    if (error) { say('Bulk add failed ⚠️'); return }
+    const skipped = requested.length - names.length
+    setBulkText('')
+    say(`Added ${names.length} team${names.length > 1 ? 's' : ''}${skipped ? ` · skipped ${skipped} dup` : ''} 🚀`)
+    load()
   }
 
   const renameTeam = async (id: string, name: string) => {
@@ -156,6 +180,49 @@ export function AitbAdmin() {
     say('All progress reset 🧽')
   }
 
+  // Delete every team (their progress cascades away via the FK) — a full clean
+  // slate before an event, to pair with the bulk-add roster button.
+  const clearAllTeams = async () => {
+    if (teams.length === 0) { say('No teams to clear 🤔'); return }
+    if (!confirm(`Delete ALL ${teams.length} teams and every score? This cannot be undone.`)) return
+    const { error } = await supabase.from('aitb_teams').delete().gte('sort_order', -2147483648)
+    if (error) { say('Clear failed ⚠️'); return }
+    say('All teams cleared 🧹')
+    load()
+  }
+
+  // Download the final standings as a CSV the facilitator can send the client —
+  // rank, total, completion, manual adjust, and the points earned per activity.
+  const exportResults = () => {
+    const standings = teams
+      .map(t => {
+        const rows = progress.filter(p => p.team_id === t.id)
+        const total = rows.reduce((a, p) => a + aitbProgressPoints(p, aitbActivity(p.activity_id)), 0) + (t.adjust || 0)
+        return { t, rows, total, completed: rows.filter(p => p.completed_at).length }
+      })
+      .sort((a, b) => b.total - a.total || b.completed - a.completed)
+    const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+    const header = ['Rank', 'Team', 'Total Points', 'Completed', 'Manual Adjust', ...AITB_ACTIVITIES.map(a => `${a.act} ${a.name}`)]
+    const lines = [header.map(esc).join(',')]
+    standings.forEach((r, i) => {
+      const perAct = AITB_ACTIVITIES.map(a => {
+        const p = r.rows.find(x => x.activity_id === a.id)
+        return p ? aitbProgressPoints(p, a) : 0
+      })
+      lines.push([i + 1, r.t.name, r.total, `${r.completed}/10`, r.t.adjust || 0, ...perAct].map(esc).join(','))
+    })
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `aitb-results-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    say('Results exported ⬇️')
+  }
+
   const baseUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
 
   if (!isSupabaseConfigured) {
@@ -195,8 +262,14 @@ export function AitbAdmin() {
           <a href="/aitb" className="px-4 py-2 rounded-xl font-bold text-sm" style={{ background: '#2dd4bf22', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
             📺 Projector
           </a>
+          <button onClick={exportResults} className="px-4 py-2 rounded-xl font-bold text-sm" style={{ background: '#a3e63522', color: '#a3e635', border: '1.5px solid #a3e63555' }}>
+            ⬇️ Export results
+          </button>
           <button onClick={resetAll} className="px-4 py-2 rounded-xl font-bold text-sm text-red-400" style={{ border: '1.5px solid rgba(248,113,113,0.4)' }}>
             🧽 Reset all
+          </button>
+          <button onClick={clearAllTeams} className="px-4 py-2 rounded-xl font-bold text-sm text-red-400" style={{ border: '1.5px solid rgba(248,113,113,0.4)' }}>
+            🗑️ Clear teams
           </button>
         </div>
 
@@ -266,6 +339,29 @@ export function AitbAdmin() {
                 className="flex-1 bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none" style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
               <button onClick={addTeam} className="px-4 rounded-lg font-black" style={{ background: '#2dd4bf', color: '#000' }}>+ Add</button>
             </div>
+
+            {/* Bulk add — paste a whole roster at once */}
+            <details className="mt-3 rounded-xl overflow-hidden" style={{ border: '1.5px dashed rgba(45,212,191,0.4)' }}>
+              <summary className="px-3 py-2 cursor-pointer list-none font-bold text-sm" style={{ color: '#2dd4bf' }}>
+                ⚡ Bulk add teams
+              </summary>
+              <div className="px-3 pb-3">
+                <p className="text-gray-500 text-xs mb-2">One team per line (or comma-separated). Existing names &amp; duplicates are skipped.</p>
+                <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={5}
+                  placeholder={'Team Alpha\nTeam Bravo\nTeam Charlie'}
+                  className="w-full bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none resize-y"
+                  style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={bulkAddTeams} className="px-4 py-2 rounded-lg font-black" style={{ background: '#2dd4bf', color: '#000' }}>
+                    ⚡ Add {parseBulk(bulkText).length || ''} teams
+                  </button>
+                  {bulkText.trim() && (
+                    <button onClick={() => setBulkText('')} className="px-3 py-2 rounded-lg font-bold text-gray-400 text-sm"
+                      style={{ border: '1.5px solid rgba(255,255,255,0.15)' }}>Clear</button>
+                  )}
+                </div>
+              </div>
+            </details>
           </div>
 
           {/* Password + QR */}
