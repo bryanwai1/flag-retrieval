@@ -9,6 +9,12 @@
       "autoPort": true
     },
     {
+      "name": "flag-retrieval-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5273", "--strictPort"],
+      "port": 5273
+    },
+    {
       "name": "ai-playground",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd /d C:\\ai-playground-site && python -m http.server %PORT%"],

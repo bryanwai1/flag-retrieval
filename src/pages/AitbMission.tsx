@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { aitbActivity, AITB_POINTS, AITB_BONUS_MULT, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
+import { aitbActivity, AITB_POINTS, AITB_BONUS_MULT, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { AitbMissionModule } from '../components/AitbMissionModule'
@@ -32,6 +32,7 @@ export function AitbMission() {
   const [wordsError, setWordsError] = useState('')
   const [wordsSaved, setWordsSaved] = useState(false)
   const [zoomImg, setZoomImg] = useState<number | null>(null)
+  const [capError, setCapError] = useState('')
 
   const wordsCfg = activity?.wordsInput
 
@@ -90,6 +91,18 @@ export function AitbMission() {
   const checkIn = async () => {
     if (!teamId || !activity || busyRef.current || timeUp) return
     busyRef.current = true
+    // Same 2-at-a-time cap the board enforces. Opening a mission page directly
+    // (a station QR, a bookmark, the back button) used to skip the check, so a
+    // team could run three missions at once and out-earn everyone else.
+    const { data: fresh } = await supabase.from('aitb_progress')
+      .select('activity_id,scanned_at,completed_at').eq('team_id', teamId)
+    const activeNow = (fresh ?? []).filter(r =>
+      r.scanned_at && !r.completed_at && r.activity_id !== activity.id).length
+    if (activeNow >= MAX_ACTIVE) {
+      busyRef.current = false
+      setCapError(`You already have ${MAX_ACTIVE} missions running — finish or cancel one on your board first.`)
+      return
+    }
     const { data } = await supabase
       .from('aitb_progress')
       .upsert(
@@ -269,11 +282,20 @@ export function AitbMission() {
 
             {/* Check-in / timer */}
             {!progress?.scanned_at ? (
-              <button onClick={checkIn}
-                className="w-full py-5 rounded-2xl font-black text-xl mb-4 transition-all active:scale-95 animate-pulse"
-                style={{ background: activity.color, color: '#000' }}>
-                🚀 START MISSION (+{AITB_POINTS.scan} pts)
-              </button>
+              <div className="mb-4">
+                <button onClick={checkIn}
+                  className="w-full py-5 rounded-2xl font-black text-xl transition-all active:scale-95 animate-pulse"
+                  style={{ background: activity.color, color: '#000' }}>
+                  🚀 START MISSION (+{AITB_POINTS.scan} pts)
+                </button>
+                {capError && (
+                  <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-bold text-amber-300"
+                    style={{ background: 'rgba(251,191,36,0.12)', border: '1.5px solid rgba(251,191,36,0.4)' }}>
+                    ⛔ {capError}
+                    <a href="/aitb/home" className="block mt-2 underline text-amber-200">🚀 Go to my board</a>
+                  </div>
+                )}
+              </div>
             ) : (
               <BonusBar elapsedMs={elapsedMs} activity={activity}
                 completed={!!progress.completed_at} bankedBonus={progress.bonus} />
@@ -314,6 +336,11 @@ export function AitbMission() {
             {/* Interactive system (Nerf cups / roulette / cards / animals) */}
             {activity.module && progress?.scanned_at && (
               <AitbMissionModule
+                // Keyed by activity+row: two activities can share the same module
+                // component (cards and animals both deal), and without a key React
+                // would reuse the mounted one — carrying one mission's draw over to
+                // the next and locking it with values that were never dealt there.
+                key={`${activity.id}-${progress.id}`}
                 activity={activity}
                 savedWords={progress.words ?? []}
                 disabled={!!progress.completed_at || timeUp}
@@ -381,9 +408,11 @@ export function AitbMission() {
                       <input key={i} value={w}
                         disabled={!!progress.completed_at || timeUp}
                         onChange={e => {
-                          const next = [...wordDrafts]
-                          next[i] = e.target.value
-                          setWordDrafts(next)
+                          // Functional update: a paste/autofill that fills several
+                          // boxes in one tick would otherwise have every handler
+                          // build off the same stale array and keep only the last.
+                          const val = e.target.value
+                          setWordDrafts(prev => prev.map((cur, j) => (j === i ? val : cur)))
                           setWordsError('')
                         }}
                         placeholder={wordsCfg.labels?.[i] ?? `Word ${i + 1}`}

@@ -304,6 +304,10 @@ export function aitbActivity(id: number): AitbActivity | undefined {
   return AITB_ACTIVITIES.find(a => a.id === id)
 }
 
+/** How many missions a team may have running at once. Enforced on the board and
+ *  again on the mission page, so opening a mission directly can't beat the cap. */
+export const AITB_MAX_ACTIVE = 2
+
 /* ── Interactive module content (ported from the offline Game System) ───────── */
 export const AITB_POOLS = {
   cupCharacter: ['A grumpy astronaut', 'A disco unicorn', 'A samurai chef', 'A robot grandma', 'A ninja penguin', 'A wizard toddler', 'A pirate librarian', 'A cyborg cat', 'A viking ballerina', 'A detective sloth', 'A superhero janitor', 'A vampire barista'],

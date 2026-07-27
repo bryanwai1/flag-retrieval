@@ -19,12 +19,12 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, type AitbActivity } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, AITB_MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
-const MAX_ACTIVE = 2
+const MAX_ACTIVE = AITB_MAX_ACTIVE
 const TEAM_KEY = 'aitb_my_team'
 const TOTAL = AITB_ACTIVITIES.length
 // Watch every team's progress so the live rank chip updates when rivals score.
@@ -211,13 +211,21 @@ export function AitbHome() {
   // ── Actions ────────────────────────────────────────────────────────────────
   const pickTeam = (id: string) => { localStorage.setItem(TEAM_KEY, id); setTeamId(id); setLoading(true); load() }
 
-  const drawCards = useCallback(() => {
-    if (activeRows.length >= MAX_ACTIVE || draw || timeUp) return
+  // Deal a fresh hand of 3. Deliberately does NOT look at `draw`, so it can also
+  // re-roll a hand that is already on screen (↻ Discard & redraw).
+  const rollCards = useCallback(() => {
     const started = new Set(rows.map(r => r.activity_id))          // any activity with a row (active or done)
     const pool = AITB_ACTIVITIES.filter(a => !started.has(a.id)).map(a => a.id)
     for (let i = pool.length - 1; i > 0; i--) { const j = randInt(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]] }
     setDraw(pool.slice(0, 3))
-  }, [activeRows, draw, rows, timeUp])
+  }, [rows])
+
+  const canRoll = activeRows.length < MAX_ACTIVE && !timeUp
+
+  const drawCards = useCallback(() => {
+    if (!canRoll || draw) return
+    rollCards()
+  }, [canRoll, draw, rollCards])
 
   const startMission = useCallback(async (aid: number) => {
     if (!teamId || busyRef.current || activeRows.length >= MAX_ACTIVE || timeUp) return
@@ -501,7 +509,10 @@ export function AitbHome() {
                 </div>}
             <div className="rd-sheet-foot">
               <button className="rd-ghost" onClick={() => setDraw(null)}>Done</button>
-              <button className="rd-ghost" onClick={() => { setDraw(null); setTimeout(drawCards, 60) }} disabled={activeRows.length >= MAX_ACTIVE}>↻ Discard &amp; redraw</button>
+              {/* Re-rolls in place via rollCards. The old form cleared the hand and
+                  re-called drawCards on a timeout, but that closure still saw the
+                  pre-clear `draw`, so it bailed and the sheet just closed. */}
+              <button className="rd-ghost" onClick={() => { if (canRoll) rollCards() }} disabled={!canRoll}>↻ Discard &amp; redraw</button>
             </div>
           </div>
         </div>
