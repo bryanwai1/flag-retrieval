@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { aitbActivity, AITB_POINTS, AITB_BONUS_MULT, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
+import { AitbMissionModule } from '../components/AitbMissionModule'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const TEAM_KEY = 'aitb_my_team'
@@ -130,6 +131,17 @@ export function AitbMission() {
       setWordsSaved(true)
       setTimeout(() => setWordsSaved(false), 2500)
     }
+  }
+
+  // Interactive module result (cups / roulette / cards / animals) → words[]
+  const saveWords = async (words: string[]) => {
+    if (!progress || progress.completed_at || timeUp || busyRef.current) return
+    busyRef.current = true
+    const { data } = await supabase
+      .from('aitb_progress').update({ words })
+      .eq('id', progress.id).select().maybeSingle()
+    busyRef.current = false
+    if (data) setProgress(data)
   }
 
   // Admin-password completion → +300 + speed bonus
@@ -275,6 +287,24 @@ export function AitbMission() {
                 )
               })}
             </div>
+
+            {/* Optional reassuring disclaimer (e.g. act 04 tree photos) */}
+            {activity.note && (
+              <div className="rounded-2xl px-4 py-3 mb-5 flex items-start gap-2"
+                style={{ background: `${activity.color}12`, border: `2px solid ${activity.color}44` }}>
+                <p className="text-sm font-bold leading-relaxed" style={{ color: activity.color }}>{activity.note}</p>
+              </div>
+            )}
+
+            {/* Interactive system (Nerf cups / roulette / cards / animals) */}
+            {activity.module && progress?.scanned_at && (
+              <AitbMissionModule
+                activity={activity}
+                savedWords={progress.words ?? []}
+                disabled={!!progress.completed_at || timeUp}
+                onSave={saveWords}
+              />
+            )}
 
             {/* Playable reference games (act 02) */}
             {activity.demos && (

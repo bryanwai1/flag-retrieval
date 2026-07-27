@@ -3,6 +3,10 @@
 // Steps are written so "a 6-year-old understands" — keep them short and fun.
 // tagline = one punchy line; desc = full facilitator description; learning = outcome.
 
+// Interactive in-app systems on the mission page. Each stores its result into
+// aitb_progress.words (positions match AITB_MODULE_SLOTS) → live in the admin.
+export type AitbModule = 'cups' | 'roulette' | 'cards' | 'animals'
+
 export type AitbActivity = {
   id: number
   act: string
@@ -33,6 +37,11 @@ export type AitbActivity = {
   demos?: { emoji: string; label: string; sub: string; url: string }[]
   /** Sample photo gallery shown on the mission page (act 08 target images). */
   gallery?: { img: string; label: string }[]
+  /** Optional reassuring disclaimer shown as a callout on the mission page. */
+  note?: string
+  /** Interactive in-app system rendered on the mission page (Nerf cup picker,
+   *  roulette spin, card / animal draw). Results save to aitb_progress.words. */
+  module?: AitbModule
 }
 
 export const AITB_ACTIVITIES: AitbActivity[] = [
@@ -52,7 +61,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🔫', '📢', '📺', '🧩', '🎨'],
     apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg', difficulty: 'Easy',
     props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
-    wordsInput: { count: 3, title: '🧩 Your 3 secret words', hint: 'Type the words from your red, blue and yellow cups!', labels: ['🔴 Red cup word', '🔵 Blue cup word', '🟡 Yellow cup word'] },
+    module: 'cups',
     bonusTiers: [{ uptoMin: 2.5, pts: 1000 }, { uptoMin: 5, pts: 800 }, { uptoMin: 7.5, pts: 600 }, { uptoMin: 10, pts: 400 }, { uptoMin: 12.5, pts: 200 }],
   },
   {
@@ -112,6 +121,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
     apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg', difficulty: 'Hard',
     props: [],
+    note: "📸 Can't get the tree photos into your app? No worries — that's totally okay! Just focus on the facts and your mini game or quiz.",
     bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },
   {
@@ -130,6 +140,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🎡', '✍️', '🎵', '💃', '🎤'],
     apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg', difficulty: 'Normal',
     props: ['Portable speaker (play the AI song for the dance)'],
+    module: 'roulette',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
@@ -148,6 +159,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
     stepEmojis: ['🃏', '🚫', '🎭', '🤖', '🍿'],
     apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg', difficulty: 'Normal',
     props: [],
+    module: 'cards',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
@@ -202,19 +214,20 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 9, act: '09', emoji: '🐘', color: '#2dd4bf', name: 'Found Object Animals',
     outType: 'Animated Interaction Video',
-    tagline: 'Build animals from random stuff — AI makes them come ALIVE!',
-    desc: 'Each team gets 2 animal archetypes. Teams gather random found objects and arrange them flat on the ground to form the shape of each animal. Photograph, use AI to bring the shape to life as a realistic animal, then animate the two animals interacting.',
+    tagline: 'Draw 2 surprise animals — build them, then bring them to life with AI!',
+    desc: 'Tap the in-app randomizer to get 2 surprise animals. Recreate each one from physical items found indoors or outdoors — or simply draw them. Photograph your creations, use AI to bring them to life as realistic animals, then animate the two interacting.',
     learning: 'Creative resourcefulness, spatial composition, and full AI pipeline from flat-lay to motion.',
     steps: [
-      'Get your 2 animals (like Tiger + Elephant).',
-      'Collect stuff — leaves, shoes, spoons, anything!',
-      'Arrange it all into animal shapes on the floor.',
+      'Tap DRAW to get your 2 surprise animals!',
+      'Build each from found items (indoors/outdoors) — or draw them!',
+      'Finish both animal shapes and snap a photo.',
       'Photo it — AI makes them REAL animals!',
       'AI animates your 2 animals playing together.',
     ],
-    stepEmojis: ['🦁', '🧺', '🖼️', '📸', '🎬'],
+    stepEmojis: ['🎲', '🧺', '🖼️', '📸', '🎬'],
     apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg', difficulty: 'Hard',
-    props: ['2 animal archetype cards per team', 'Collection basket for found objects'],
+    props: ['Collection basket for found objects', 'Paper + markers (for teams who prefer to draw)'],
+    module: 'animals',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
   },
   {
@@ -239,6 +252,83 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
 
 export function aitbActivity(id: number): AitbActivity | undefined {
   return AITB_ACTIVITIES.find(a => a.id === id)
+}
+
+/* ── Interactive module content (ported from the offline Game System) ───────── */
+export const AITB_POOLS = {
+  cupCharacter: ['A grumpy astronaut', 'A disco unicorn', 'A samurai chef', 'A robot grandma', 'A ninja penguin', 'A wizard toddler', 'A pirate librarian', 'A cyborg cat', 'A viking ballerina', 'A detective sloth', 'A superhero janitor', 'A vampire barista'],
+  cupAction: ['riding a rocket', 'breakdancing', 'brewing potions', 'surfing on lava', 'juggling planets', 'escaping a maze', 'taming a dragon', 'stealing a giant cookie', 'arm-wrestling a bear', 'painting the sky', 'deep-sea diving', 'racing a cheetah'],
+  cupScene: ['in a neon jungle', 'on the moon', 'inside a volcano', 'in a candy kingdom', 'in an underwater city', 'in a haunted mansion', 'atop a skyscraper', 'in a desert oasis', 'in a cyberpunk market', 'in an ancient temple', 'on a floating island', 'in a frozen tundra'],
+  genre: ['K-Pop', 'Dangdut', 'Bollywood', 'EDM Anthem', 'Country Ballad', 'Opera', 'Hip-Hop', 'Reggae', 'Smooth Jazz', '70s Disco', 'Lo-fi Chill', 'Broadway Musical', 'Acoustic Café', 'Joget', 'Nursery Rhyme'],
+  topic: ['Nasi Lemak', 'KPI Targets', 'The Boss', 'Monday Mornings', 'The Office Coffee', 'Traffic Jams', 'The Team WhatsApp Group', 'The Broken Printer', 'Working Overtime', 'Annual Leave', 'Endless Zoom Calls', 'The Company Canteen', 'Impossible Deadlines', 'Teh Tarik'],
+  country: ['Ancient Egypt', 'The Roman Empire', 'Feudal Japan', 'The Aztec Empire', 'Viking Norse', 'Ancient Greece', 'Mughal India', 'Ming Dynasty China', 'The Ottoman Empire', 'The Mali Empire', 'Babylon', 'The Inca Empire'],
+  cardChar: ['A Warrior Queen', 'An Exiled Prince', 'A Blind Prophet', 'A Rogue General', 'A Young Blacksmith', 'A Court Jester', 'A Masked Assassin', 'A Wandering Monk', 'A Pirate Captain', 'A Fallen Knight', 'A Street Orphan', 'A High Priestess'],
+  cardScene: ['A burning city', 'A royal coronation', 'A desert ambush', 'A stormy sea battle', 'A secret tunnel escape', 'A grand feast betrayal', 'A duel at dawn', 'A sacred temple ritual', 'A crowded market chase', 'A frozen mountain pass'],
+  style: ['Slow-motion epic', 'Cartoon / animated', 'Horror movie', 'Old-school black & white'],
+  animal: ['Tiger', 'Elephant', 'Penguin', 'Octopus', 'Kangaroo', 'Giraffe', 'Crocodile', 'Peacock', 'Sloth', 'Flamingo', 'Rhino', 'Gorilla', 'Dolphin', 'Owl', 'Panda', 'Cheetah'],
+} as const
+
+export type AitbPoolKey = keyof typeof AITB_POOLS
+
+export type AitbModuleSlot = { pool: AitbPoolKey; label: string; emoji: string }
+
+/** Ordered result slots per module. Word positions in aitb_progress.words map
+ *  1:1 onto this array, and each slot draws its options from `pool`. */
+export const AITB_MODULE_SLOTS: Record<AitbModule, AitbModuleSlot[]> = {
+  cups: [
+    { pool: 'cupCharacter', label: 'Character', emoji: '🔴' },
+    { pool: 'cupAction', label: 'Action', emoji: '🔵' },
+    { pool: 'cupScene', label: 'Scene', emoji: '🟡' },
+  ],
+  roulette: [
+    { pool: 'genre', label: 'Genre', emoji: '🎸' },
+    { pool: 'topic', label: 'Topic', emoji: '🎯' },
+  ],
+  cards: [
+    { pool: 'country', label: 'Civilization', emoji: '🏛️' },
+    { pool: 'cardChar', label: 'Character', emoji: '🎭' },
+    { pool: 'cardScene', label: 'Scene', emoji: '🎬' },
+    { pool: 'style', label: 'Style', emoji: '🎨' },
+  ],
+  animals: [
+    { pool: 'animal', label: 'Animal 1', emoji: '🐾' },
+    { pool: 'animal', label: 'Animal 2', emoji: '🐾' },
+  ],
+}
+
+/** How a module is played: pick from lists, spin one slot at a time, or deal
+ *  every slot at once (and never re-deal). */
+export const AITB_MODULE_MODE: Record<AitbModule, 'pick' | 'spin' | 'deal'> = {
+  cups: 'pick', roulette: 'spin', cards: 'deal', animals: 'deal',
+}
+
+/* ── Reel artwork (one generated image per pool item) ────────────────────────
+   Pools listed here have a picture for every option at
+   /public/aitb/reel/<pool>/<slug>.webp. A module upgrades from a text reel to
+   an image slot-machine once every one of its slot pools has art. */
+export const AITB_REEL_POOLS: AitbPoolKey[] = ['country', 'cardChar', 'cardScene', 'style', 'animal', 'genre', 'topic']
+
+/** Filename-safe slug — must match the saved image filenames exactly. */
+export function aitbSlug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** Public path to the reel image for one pool item. */
+export function aitbReelImage(pool: AitbPoolKey, item: string): string {
+  return `/aitb/reel/${pool}/${aitbSlug(item)}.webp`
+}
+
+/** True when every slot of a module has generated art (→ image slot-machine). */
+export function aitbModuleHasImages(mod: AitbModule): boolean {
+  return AITB_MODULE_SLOTS[mod].every(s => AITB_REEL_POOLS.includes(s.pool))
+}
+
+/** Labels for each stored word of an activity (interactive module OR typed
+ *  wordsInput), so the admin can show "Genre: K-Pop". null = stores no words. */
+export function aitbResultLabels(a: AitbActivity): string[] | null {
+  if (a.module) return AITB_MODULE_SLOTS[a.module].map(s => `${s.emoji} ${s.label}`)
+  if (a.wordsInput) return a.wordsInput.labels ?? Array.from({ length: a.wordsInput.count }, (_, i) => `Word ${i + 1}`)
+  return null
 }
 
 /* ---------- Scoring ----------

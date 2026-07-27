@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus, aitbResultLabels } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
@@ -397,14 +397,21 @@ export function AitbAdmin() {
           </div>
         </div>
 
-        {/* Team word submissions — Nerf (3) + Ping Pong (7), live via realtime */}
-        <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
-          <h2 className="font-black text-lg mb-1">📝 Team words</h2>
-          <p className="text-gray-400 text-sm mb-4">Words each team typed on their phone — updates live.</p>
+        {/* Team words / results — collapsed behind one button to keep the admin tidy */}
+        <details className="rounded-3xl mb-8 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+          <summary className="flex items-center gap-3 px-6 py-5 cursor-pointer list-none">
+            <h2 className="font-black text-lg">📝 Team words</h2>
+            <span className="text-gray-400 text-sm hidden sm:inline">— what each team submitted, updates live</span>
+            <span className="flex-1" />
+            <span className="text-gray-500 font-bold text-sm whitespace-nowrap">Tap to show ▾</span>
+          </summary>
+          <div className="px-6 pb-6">
           <div className="grid lg:grid-cols-2 gap-4">
-            {AITB_ACTIVITIES.filter(a => a.wordsInput).map(a => (
+            {AITB_ACTIVITIES.filter(a => a.module || a.wordsInput).map(a => {
+              const labels = aitbResultLabels(a) ?? []
+              return (
               <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
-                <div className="font-black mb-2" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name} ({a.wordsInput!.count} words)</div>
+                <div className="font-black mb-2" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name} ({labels.length} words)</div>
                 {teams.map(t => {
                   const p = progress.find(x => x.team_id === t.id && x.activity_id === a.id)
                   const words = p?.words ?? []
@@ -417,7 +424,7 @@ export function AitbAdmin() {
                             {words.map((w, i) => (
                               <span key={i} className="px-2 py-0.5 rounded-full text-xs font-bold"
                                 style={{ background: `${a.color}22`, color: a.color, border: `1px solid ${a.color}55` }}>
-                                {w}
+                                {labels[i] ? `${labels[i]}: ${w}` : w}
                               </span>
                             ))}
                           </span>}
@@ -426,29 +433,37 @@ export function AitbAdmin() {
                 })}
                 {teams.length === 0 && <div className="text-gray-600 text-sm">No teams yet.</div>}
               </div>
-            ))}
+              )
+            })}
           </div>
-        </div>
+          </div>
+        </details>
 
-        {/* Station props — what the marshal hands each team */}
-        <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
-          <h2 className="font-black text-lg mb-1">🎒 Station props</h2>
-          <p className="text-gray-400 text-sm mb-4">Hand these to the team at each station.</p>
-          <div className="grid md:grid-cols-2 gap-3">
-            {AITB_ACTIVITIES.filter(a => a.props.length > 0).map(a => (
-              <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
-                <div className="font-black mb-1" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name}</div>
-                <ul className="text-sm text-gray-300">
-                  {a.props.map(p => <li key={p} className="mb-0.5">▪ {p}</li>)}
-                </ul>
-              </div>
-            ))}
+        {/* Station props — collapsed behind one button to keep the admin tidy */}
+        <details className="rounded-3xl mb-8 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
+          <summary className="flex items-center gap-3 px-6 py-5 cursor-pointer list-none">
+            <h2 className="font-black text-lg">🎒 Station props</h2>
+            <span className="text-gray-400 text-sm hidden sm:inline">— hand these to each team at their station</span>
+            <span className="flex-1" />
+            <span className="text-gray-500 font-bold text-sm whitespace-nowrap">Tap to show ▾</span>
+          </summary>
+          <div className="px-6 pb-6">
+            <div className="grid md:grid-cols-2 gap-3">
+              {AITB_ACTIVITIES.filter(a => a.props.length > 0).map(a => (
+                <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
+                  <div className="font-black mb-1" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name}</div>
+                  <ul className="text-sm text-gray-300">
+                    {a.props.map(p => <li key={p} className="mb-0.5">▪ {p}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <p className="text-gray-500 text-sm mt-3">
+              📱 No props needed (phones only):{' '}
+              {AITB_ACTIVITIES.filter(a => a.props.length === 0).map(a => `${a.emoji} ${a.act}`).join(' · ')}
+            </p>
           </div>
-          <p className="text-gray-500 text-sm mt-3">
-            📱 No props needed (phones only):{' '}
-            {AITB_ACTIVITIES.filter(a => a.props.length === 0).map(a => `${a.emoji} ${a.act}`).join(' · ')}
-          </p>
-        </div>
+        </details>
 
         {/* Game details */}
         <div className="rounded-3xl p-6 mb-8" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
