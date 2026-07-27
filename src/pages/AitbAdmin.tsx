@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus, aitbResultLabels } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity, aitbSpeedBonus } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
+import { AitbAppLinks } from '../components/AitbAppLinks'
+import { AitbSubmissions } from '../components/AitbSubmissions'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
 const UNLOCK_KEY = 'aitb_admin_unlocked'
@@ -397,47 +399,8 @@ export function AitbAdmin() {
           </div>
         </div>
 
-        {/* Team words / results — collapsed behind one button to keep the admin tidy */}
-        <details className="rounded-3xl mb-8 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
-          <summary className="flex items-center gap-3 px-6 py-5 cursor-pointer list-none">
-            <h2 className="font-black text-lg">📝 Team words</h2>
-            <span className="text-gray-400 text-sm hidden sm:inline">— what each team submitted, updates live</span>
-            <span className="flex-1" />
-            <span className="text-gray-500 font-bold text-sm whitespace-nowrap">Tap to show ▾</span>
-          </summary>
-          <div className="px-6 pb-6">
-          <div className="grid lg:grid-cols-2 gap-4">
-            {AITB_ACTIVITIES.filter(a => a.module || a.wordsInput).map(a => {
-              const labels = aitbResultLabels(a) ?? []
-              return (
-              <div key={a.id} className="rounded-2xl px-4 py-3" style={{ background: `${a.color}0d`, border: `1.5px solid ${a.color}44` }}>
-                <div className="font-black mb-2" style={{ color: a.color }}>{a.emoji} {a.act} — {a.name} ({labels.length} words)</div>
-                {teams.map(t => {
-                  const p = progress.find(x => x.team_id === t.id && x.activity_id === a.id)
-                  const words = p?.words ?? []
-                  return (
-                    <div key={t.id} className="flex items-start gap-2 mb-1.5">
-                      <span className="font-bold text-sm whitespace-nowrap" style={{ color: t.color }}>● {t.name}</span>
-                      {words.length === 0
-                        ? <span className="text-gray-600 text-sm">— not submitted</span>
-                        : <span className="flex flex-wrap gap-1">
-                            {words.map((w, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded-full text-xs font-bold"
-                                style={{ background: `${a.color}22`, color: a.color, border: `1px solid ${a.color}55` }}>
-                                {labels[i] ? `${labels[i]}: ${w}` : w}
-                              </span>
-                            ))}
-                          </span>}
-                    </div>
-                  )
-                })}
-                {teams.length === 0 && <div className="text-gray-600 text-sm">No teams yet.</div>}
-              </div>
-              )
-            })}
-          </div>
-          </div>
-        </details>
+        {/* What each team got — one button per game, updates live */}
+        <AitbSubmissions teams={teams} progress={progress} />
 
         {/* Station props — collapsed behind one button to keep the admin tidy */}
         <details className="rounded-3xl mb-8 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.08)' }}>
@@ -499,14 +462,7 @@ export function AitbAdmin() {
                       <li key={i} className="mb-1">{a.stepEmojis[i]} <b>{i + 1}.</b> {s}</li>
                     ))}
                   </ol>
-                  <div className="flex flex-wrap gap-2">
-                    {a.apps.map(x => (
-                      <span key={x} className="px-2.5 py-1 rounded-full text-xs font-bold"
-                        style={{ background: `${a.color}22`, color: a.color, border: `1px solid ${a.color}55` }}>
-                        {x}
-                      </span>
-                    ))}
-                  </div>
+                  <AitbAppLinks apps={a.apps} color={a.color} />
                 </div>
               </div>
             </details>

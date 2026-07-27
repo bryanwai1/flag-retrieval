@@ -23,6 +23,10 @@ type ModuleProps = {
   savedWords: string[]
   disabled: boolean
   onSave: (words: string[]) => void
+  /** aitb_progress row id. Namespaces the spin counter so an admin reset (which
+   *  deletes the row) hands the next attempt a clean 2 spins, and so switching
+   *  teams on one phone never inherits the other team's burnt spins. */
+  progressId: string
 }
 
 type SubProps = {
@@ -31,14 +35,42 @@ type SubProps = {
   savedWords: string[]
   disabled: boolean
   onSave: (words: string[]) => void
+  /** localStorage namespace for this activity — used to remember spins used. */
+  storeKey: string
 }
 
-export function AitbMissionModule({ activity, savedWords, disabled, onSave }: ModuleProps) {
+/* Each roulette wheel may be spun at most twice: the first spin plus one
+   re-spin. After that the wheel locks, so a team can't keep re-rolling for a
+   genre/topic they like.
+
+   The count is per-device (localStorage), keyed by the progress row so an admin
+   reset starts everyone fresh. Because a second phone can't know how many spins
+   the first one used, a wheel whose value this device did NOT spin is treated as
+   fully used — erring strict, so a team can't farm extra re-rolls by passing the
+   mission around their phones. The spinning phone keeps its own count either way. */
+const MAX_SPINS = 2
+
+function readSpins(key: string, n: number): number[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(key) || 'null')
+    if (Array.isArray(arr)) return Array.from({ length: n }, (_, i) => Number(arr[i]) || 0)
+  } catch { /* corrupt or unavailable — start fresh */ }
+  return Array.from({ length: n }, () => 0)
+}
+
+function writeSpins(key: string, arr: number[]) {
+  try { localStorage.setItem(key, JSON.stringify(arr)) } catch { /* private mode — cap is best-effort */ }
+}
+
+export function AitbMissionModule({ activity, savedWords, disabled, onSave, progressId }: ModuleProps) {
   const mod = activity.module
   if (!mod) return null
   const slots = AITB_MODULE_SLOTS[mod]
   const mode = AITB_MODULE_MODE[mod]
-  const sub: SubProps = { color: activity.color, slots, savedWords, disabled, onSave }
+  const sub: SubProps = {
+    color: activity.color, slots, savedWords, disabled, onSave,
+    storeKey: `aitb_spins_${activity.id}_${progressId}`,
+  }
   if (mode === 'pick') return <CupsPicker {...sub} />
   if (mode === 'spin') return aitbModuleHasImages(mod) ? <ImageSpinModule {...sub} /> : <SpinModule {...sub} />
   return aitbModuleHasImages(mod) ? <ImageDealModule {...sub} /> : <TextDealModule {...sub} />
@@ -99,8 +131,55 @@ function CupsPicker({ color, slots, savedWords, disabled, onSave }: SubProps) {
   )
 }
 
+/* The ready-to-use song brief, built from the two wheels. Slot order is
+   [Genre, Topic] (AITB_MODULE_SLOTS.roulette), so the sentence reads
+   "Create a song about The Office Coffee in a Nursery Rhyme Style". */
+function SongPrompt({ genre, topic, color }: { genre: string; topic: string; color: string }) {
+  const sentence = `Create a song about ${topic} in a ${genre} Style`
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(sentence)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) })
+      .catch(() => { /* clipboard blocked — the text is on screen to type */ })
+  }
+  return (
+    <div className="rounded-2xl px-4 py-3 mt-3" style={{ background: `${color}18`, border: `2px solid ${color}` }}>
+      <div className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">🎤 Your song brief</div>
+      <div className="font-black text-base leading-snug" style={{ color }}>“{sentence}”</div>
+      <button onClick={copy}
+        className="w-full mt-2.5 py-2 rounded-xl font-black text-sm transition-all active:scale-95"
+        style={{ background: color, color: '#000' }}>
+        {copied ? '✅ Copied!' : '📋 Copy this prompt'}
+      </button>
+      <div className="text-gray-400 text-xs font-bold mt-2">
+        Paste it into Suno to make your song — then invent the dance! 💃
+      </div>
+    </div>
+  )
+}
+
 // ── Roulette: spin each wheel one at a time ──────────────────────────────────
-function SpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
+function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
+  const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
+
+  // A wheel already spun elsewhere (teammate's phone) is locked here — this
+  // device can't know how many of the team's 2 spins are left, so it assumes none.
+  useEffect(() => {
+    setSpins(prev => {
+      const next = prev.map((c, i) => (savedWords[i] && c === 0 ? MAX_SPINS : c))
+      if (next.every((c, i) => c === prev[i])) return prev
+      writeSpins(storeKey, next)
+      return next
+    })
+  }, [savedWords, storeKey])
+
+  const bumpSpin = (i: number) => setSpins(prev => {
+    const next = [...prev]
+    next[i] = (next[i] || 0) + 1
+    writeSpins(storeKey, next)
+    return next
+  })
+
   const [vals, setVals] = useState<string[]>(() => slots.map((_, i) => savedWords[i] ?? ''))
   const [flash, setFlash] = useState<Record<number, string>>({})
   const [spinning, setSpinning] = useState<number | null>(null)
@@ -110,7 +189,7 @@ function SpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
   }, [savedWords, slots])
 
   const spin = (i: number) => {
-    if (disabled || spinning !== null) return
+    if (disabled || spinning !== null || (spins[i] || 0) >= MAX_SPINS) return
     setSpinning(i)
     const pool = AITB_POOLS[slots[i].pool]
     let ticks = 0
@@ -120,6 +199,9 @@ function SpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
         clearInterval(iv)
         const final = pool[Math.floor(Math.random() * pool.length)]
         setFlash(f => { const n = { ...f }; delete n[i]; return n })
+        // Charge the spin only once a result actually lands, so a reel that gets
+        // interrupted (tab backgrounded to open Suno, phone locked) costs nothing.
+        bumpSpin(i)
         setVals(prev => { const next = [...prev]; next[i] = final; onSave(next); return next })
         setSpinning(null)
       }
@@ -128,11 +210,14 @@ function SpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
 
   return (
     <div className="mb-6">
-      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🎡 Spin both wheels — one at a time</div>
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+        🎡 Spin both wheels — {MAX_SPINS} spins each, then it locks!
+      </div>
       <div className="grid grid-cols-2 gap-3">
         {slots.map((s, i) => {
           const shown = flash[i] ?? vals[i]
           const isSpin = spinning === i
+          const left = MAX_SPINS - (spins[i] || 0)
           return (
             <div key={i} className="rounded-2xl p-4 flex flex-col items-center text-center gap-2"
               style={{ background: 'rgba(255,255,255,0.04)', border: `2px solid ${vals[i] ? color : 'rgba(255,255,255,0.1)'}` }}>
@@ -141,17 +226,23 @@ function SpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
                 style={{ color: shown ? '#fff' : '#6b7280', filter: isSpin ? 'blur(0.5px)' : 'none' }}>
                 {shown || '—'}
               </div>
-              <button onClick={() => spin(i)} disabled={disabled || spinning !== null}
+              <button onClick={() => spin(i)} disabled={disabled || spinning !== null || left <= 0}
                 className="w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
                 style={{ background: color, color: '#000' }}>
-                {isSpin ? 'Spinning…' : vals[i] ? '🔄 Spin again' : `🎡 Spin ${i + 1}`}
+                {isSpin ? 'Spinning…' : left <= 0 ? '🔒 Locked' : vals[i] ? `🔄 Last spin (${left})` : `🎡 Spin ${i + 1}`}
               </button>
+              <div className="text-[10px] font-bold" style={{ color: left > 0 ? '#94a3b8' : '#f87171' }}>
+                {left > 0 ? `${left} spin${left > 1 ? 's' : ''} left` : 'No spins left'}
+              </div>
             </div>
           )
         })}
       </div>
       {vals.every(Boolean) && spinning === null && (
-        <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
+        <>
+          <SongPrompt genre={vals[0]} topic={vals[1]} color={color} />
+          <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
+        </>
       )}
     </div>
   )
@@ -290,11 +381,12 @@ function ImageDealModule({ color, slots, savedWords, disabled, onSave }: SubProp
 }
 
 // ── Roulette (image slot-machine): spin each wheel one at a time ─────────────
-function ImageSpinModule({ color, slots, savedWords, disabled, onSave }: SubProps) {
+function ImageSpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
   const seed = () => slots.map((_, i) => savedWords[i] ?? '')
   const [vals, setVals] = useState<string[]>(seed)
   const [finals, setFinals] = useState<string[]>(seed)
   const [spinning, setSpinning] = useState<number | null>(null)
+  const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
 
   // Re-seed from realtime unless we've already spun on this device.
   useEffect(() => {
@@ -302,17 +394,34 @@ function ImageSpinModule({ color, slots, savedWords, disabled, onSave }: SubProp
     setFinals(prev => (prev.some(Boolean) ? prev : seed()))
   }, [savedWords, slots])
 
+  // A wheel already spun elsewhere is locked here — see MAX_SPINS note.
+  useEffect(() => {
+    setSpins(prev => {
+      const next = prev.map((c, i) => (savedWords[i] && c === 0 ? MAX_SPINS : c))
+      if (next.every((c, i) => c === prev[i])) return prev
+      writeSpins(storeKey, next)
+      return next
+    })
+  }, [savedWords, storeKey])
+
   useEffect(() => {
     slots.forEach(s => AITB_POOLS[s.pool].forEach(item => { const im = new Image(); im.src = aitbReelImage(s.pool, item) }))
   }, [slots])
 
   const spin = (i: number) => {
-    if (disabled || spinning !== null) return
+    if (disabled || spinning !== null || (spins[i] || 0) >= MAX_SPINS) return
     const pool = AITB_POOLS[slots[i].pool]
     const final = pool[Math.floor(Math.random() * pool.length)]
     setFinals(prev => { const n = [...prev]; n[i] = final; return n })
     setSpinning(i)
     setTimeout(() => {
+      // Charge the spin only when the reel lands — an interrupted spin is free.
+      setSpins(prev => {
+        const next = [...prev]
+        next[i] = (next[i] || 0) + 1
+        writeSpins(storeKey, next)
+        return next
+      })
       setVals(prev => { const n = [...prev]; n[i] = final; onSave(n); return n })
       setSpinning(null)
     }, SPIN_BASE + 200)
@@ -320,22 +429,33 @@ function ImageSpinModule({ color, slots, savedWords, disabled, onSave }: SubProp
 
   return (
     <div className="mb-6">
-      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🎰 Spin both wheels — one at a time</div>
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+        🎰 Spin both wheels — {MAX_SPINS} spins each, then it locks!
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        {slots.map((s, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            <ImageReel pool={s.pool} color={color} label={s.label} emoji={s.emoji}
-              final={finals[i] || null} spinning={spinning === i} durationMs={SPIN_BASE} />
-            <button onClick={() => spin(i)} disabled={disabled || spinning !== null}
-              className="w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
-              style={{ background: color, color: '#000' }}>
-              {spinning === i ? 'Spinning…' : vals[i] ? '🔄 Spin again' : `🎡 Spin ${i + 1}`}
-            </button>
-          </div>
-        ))}
+        {slots.map((s, i) => {
+          const left = MAX_SPINS - (spins[i] || 0)
+          return (
+            <div key={i} className="flex flex-col gap-2">
+              <ImageReel pool={s.pool} color={color} label={s.label} emoji={s.emoji}
+                final={finals[i] || null} spinning={spinning === i} durationMs={SPIN_BASE} />
+              <button onClick={() => spin(i)} disabled={disabled || spinning !== null || left <= 0}
+                className="w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: color, color: '#000' }}>
+                {spinning === i ? 'Spinning…' : left <= 0 ? '🔒 Locked' : vals[i] ? `🔄 Last spin (${left})` : `🎡 Spin ${i + 1}`}
+              </button>
+              <div className="text-[10px] font-bold text-center" style={{ color: left > 0 ? '#94a3b8' : '#f87171' }}>
+                {left > 0 ? `${left} spin${left > 1 ? 's' : ''} left` : 'No spins left'}
+              </div>
+            </div>
+          )
+        })}
       </div>
       {vals.every(Boolean) && spinning === null && (
-        <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
+        <>
+          <SongPrompt genre={vals[0]} topic={vals[1]} color={color} />
+          <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
+        </>
       )}
     </div>
   )

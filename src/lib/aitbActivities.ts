@@ -44,6 +44,56 @@ export type AitbActivity = {
   module?: AitbModule
 }
 
+/* ── AI tool registry ────────────────────────────────────────────────────────
+   Every name in an activity's `apps` list is looked up here so the mission page,
+   the projector briefing and the admin can render it as a real button that opens
+   the tool in the player's browser. A name with no entry (or no url) still shows
+   as a plain pill, so adding a tool name never breaks a screen.
+   `note` is surfaced once per screen, grouped — e.g. "Sign in with Google". */
+export type AitbApp = { url: string; note?: string; sub?: string }
+
+export const AITB_APPS: Record<string, AitbApp> = {
+  // Battle-mode arena — one place to make an image OR a video, models side by side
+  'Arena':      { url: 'https://arena.ai', sub: 'Battle mode → Image or Video' },
+  // Music
+  'Suno':       { url: 'https://suno.com', sub: 'AI song in ~60 seconds' },
+  // App / game building (all Google sign-in except Kimi)
+  'AI Studio':  { url: 'https://aistudio.google.com', note: 'Sign in with your Google account', sub: 'Google AI Studio' },
+  'Canva AI':   { url: 'https://www.canva.com', note: 'Sign in with your Google account', sub: 'Magic Studio / Canva Code' },
+  'Antigravity':{ url: 'https://antigravity.google', note: 'Sign in with your Google account', sub: 'Google’s agentic builder' },
+  'Kimi':       { url: 'https://www.kimi.com', sub: 'Free — no Google needed' },
+  // General chat assistants (also great for images)
+  'ChatGPT':    { url: 'https://chatgpt.com' },
+  'Gemini':     { url: 'https://gemini.google.com', note: 'Sign in with your Google account' },
+  'Copilot':    { url: 'https://copilot.microsoft.com' },
+  'Claude':     { url: 'https://claude.ai' },
+  // Image
+  'Nano Banana':{ url: 'https://gemini.google.com', note: 'Sign in with your Google account', sub: 'Gemini’s image model' },
+  'Ideogram':   { url: 'https://ideogram.ai' },
+  // Video
+  'Kling':      { url: 'https://app.klingai.com' },
+  'Veo (Flow)': { url: 'https://labs.google/fx/tools/flow', note: 'Sign in with your Google account', sub: 'Google Flow' },
+  'Higgsfield': { url: 'https://higgsfield.ai' },
+  // Web-app builders
+  'Lovable':    { url: 'https://lovable.dev' },
+  'Bolt':       { url: 'https://bolt.new' },
+}
+
+export function aitbApp(name: string): AitbApp | undefined {
+  return AITB_APPS[name]
+}
+
+/** Unique `note` lines for a set of app names, so a screen can show the
+ *  "Sign in with your Google account" hint once instead of per button. */
+export function aitbAppNotes(names: string[]): string[] {
+  const seen = new Set<string>()
+  for (const n of names) {
+    const note = AITB_APPS[n]?.note
+    if (note) seen.add(note)
+  }
+  return [...seen]
+}
+
 export const AITB_ACTIVITIES: AitbActivity[] = [
   {
     id: 1, act: '01', emoji: '🎯', color: '#fb7185', name: 'Nerf Prompt Cups',
@@ -59,7 +109,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Ask AI to make the picture and score points!',
     ],
     stepEmojis: ['🔫', '📢', '📺', '🧩', '🎨'],
-    apps: ['Ideogram', 'NanoBanana', 'ChatGPT'], mins: 10, hero: '/aitb/hero1.jpg', difficulty: 'Easy',
+    apps: ['Arena', 'ChatGPT', 'Gemini', 'Copilot', 'Ideogram'], mins: 10, hero: '/aitb/hero1.jpg', difficulty: 'Easy',
     props: ['Nerf blaster + darts', 'Red / blue / yellow cup sets (numbered)', 'Secret word slips inside each cup', 'Table to line up the cups'],
     module: 'cups',
     bonusTiers: [{ uptoMin: 2.5, pts: 1000 }, { uptoMin: 5, pts: 800 }, { uptoMin: 7.5, pts: 600 }, { uptoMin: 10, pts: 400 }, { uptoMin: 12.5, pts: 200 }],
@@ -78,7 +128,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Other team tries your games. Best games win!',
     ],
     stepEmojis: ['🙋', '🤖', '⏱️', '🎮', '🏆'],
-    apps: ['AI Studio', 'Canva', 'Antigravity'], mins: 15, hero: '/aitb/hero2.jpg', difficulty: 'Hard',
+    apps: ['AI Studio', 'Canva AI', 'Antigravity', 'Kimi'], mins: 15, hero: '/aitb/hero2.jpg', difficulty: 'Hard',
     props: [],
     demos: [
       { emoji: '🍄', label: 'Super Jumpman', sub: 'the Mario one', url: '/gamesystem/index.html?v=2#/play/jump' },
@@ -101,7 +151,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'AI turns it into a REAL castle — with your team on top!',
     ],
     stepEmojis: ['🪢', '🙌', '🏗️', '📸', '🏰'],
-    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero3.jpg', difficulty: 'Normal',
+    apps: ['Arena', 'ChatGPT', 'Gemini', 'Copilot', 'Nano Banana'], mins: 12, hero: '/aitb/hero3.jpg', difficulty: 'Normal',
     props: ['Rubber band with 6–8 strings tied on', 'Stack of cups (8–10) for the castle'],
     bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
   },
@@ -119,7 +169,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Share your app with a QR code!',
     ],
     stepEmojis: ['🔍', '📷', '💻', '🧠', '📲'],
-    apps: ['Claude', 'Lovable', 'Bolt'], mins: 20, hero: '/aitb/hero4.jpg', difficulty: 'Hard',
+    apps: ['Canva AI', 'AI Studio', 'Antigravity', 'Kimi', 'Claude'], mins: 20, hero: '/aitb/hero4.jpg', difficulty: 'Hard',
     props: [],
     note: "📸 Can't get the tree photos into your app? No worries — that's totally okay! Just focus on the facts and your mini game or quiz.",
     bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
@@ -138,7 +188,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Perform it live for the crowd!',
     ],
     stepEmojis: ['🎡', '✍️', '🎵', '💃', '🎤'],
-    apps: ['Suno', 'Claude', 'ChatGPT'], mins: 15, hero: '/aitb/hero5.jpg', difficulty: 'Normal',
+    apps: ['Suno', 'ChatGPT', 'Claude'], mins: 15, hero: '/aitb/hero5.jpg', difficulty: 'Normal',
     props: ['Portable speaker (play the AI song for the dance)'],
     module: 'roulette',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
@@ -157,7 +207,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Watch it together on the big screen!',
     ],
     stepEmojis: ['🃏', '🚫', '🎭', '🤖', '🍿'],
-    apps: ['Kling', 'Veo', 'Hailuo'], mins: 15, hero: '/aitb/hero6.jpg', difficulty: 'Normal',
+    apps: ['Arena', 'Kling', 'Veo (Flow)', 'Higgsfield'], mins: 15, hero: '/aitb/hero6.jpg', difficulty: 'Normal',
     props: [],
     module: 'cards',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
@@ -176,7 +226,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Pitch your ad like a TV star!',
     ],
     stepEmojis: ['🏓', '🔤', '📝', '🤖', '🌟'],
-    apps: ['Claude', 'ChatGPT', 'Ideogram'], mins: 12, hero: '/aitb/hero7.jpg', difficulty: 'Normal',
+    apps: ['Arena', 'ChatGPT', 'Gemini', 'Copilot', 'Claude'], mins: 12, hero: '/aitb/hero7.jpg', difficulty: 'Normal',
     props: ['26 cups labelled A–Z', 'Ping pong balls (6+)', 'Table for the cup grid'],
     wordsInput: { count: 7, title: '🔤 Your 7 words', hint: 'Type the 7 words that use ALL your collected letters!' },
     bonusTiers: [{ uptoMin: 3, pts: 1000 }, { uptoMin: 6, pts: 800 }, { uptoMin: 9, pts: 600 }, { uptoMin: 12, pts: 400 }, { uptoMin: 15, pts: 200 }],
@@ -195,7 +245,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Faster ✅ from the marshal = more points!',
     ],
     stepEmojis: ['👀', '🔁', '🎨', '🙋', '⚡'],
-    apps: ['NanoBanana', 'Ideogram', 'ChatGPT'], mins: 12, hero: '/aitb/hero8.jpg', difficulty: 'Easy',
+    apps: ['Arena', 'ChatGPT', 'Gemini', 'Copilot', 'Nano Banana'], mins: 12, hero: '/aitb/hero8.jpg', difficulty: 'Easy',
     props: [],
     gallery: [
       { img: '/gamesystem/edit1.jpg', label: '3D cartoon' },
@@ -225,7 +275,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'AI animates your 2 animals playing together.',
     ],
     stepEmojis: ['🎲', '🧺', '🖼️', '📸', '🎬'],
-    apps: ['NanoBanana', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg', difficulty: 'Hard',
+    apps: ['Arena', 'Nano Banana', 'Gemini', 'Kling', 'Higgsfield'], mins: 15, hero: '/aitb/hero9.jpg', difficulty: 'Hard',
     props: ['Collection basket for found objects', 'Paper + markers (for teams who prefer to draw)'],
     module: 'animals',
     bonusTiers: [{ uptoMin: 4, pts: 1000 }, { uptoMin: 8, pts: 800 }, { uptoMin: 11, pts: 600 }, { uptoMin: 15, pts: 400 }, { uptoMin: 19, pts: 200 }],
@@ -244,7 +294,7 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
       'Tell the story: A Day in the Life!',
     ],
     stepEmojis: ['🎨', '📷', '🤖', '🔒', '📖'],
-    apps: ['NanoBanana', 'ChatGPT', 'Ideogram'], mins: 20, hero: '/aitb/hero10.jpg', difficulty: 'Hard',
+    apps: ['Arena', 'ChatGPT', 'Gemini', 'Copilot', 'Nano Banana'], mins: 20, hero: '/aitb/hero10.jpg', difficulty: 'Hard',
     props: [],
     bonusTiers: [{ uptoMin: 5, pts: 1000 }, { uptoMin: 10, pts: 800 }, { uptoMin: 15, pts: 600 }, { uptoMin: 20, pts: 400 }, { uptoMin: 25, pts: 200 }],
   },

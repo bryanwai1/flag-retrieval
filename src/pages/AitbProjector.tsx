@@ -7,16 +7,23 @@ import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
+import { AitbAppLinks } from '../components/AitbAppLinks'
+import { AitbTitleSlide, AitbQrSlide, AitbHowItWorksSlide } from '../components/AitbSlides'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
-const OBSERVER_URL = (import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')) + '/aitb/watch'
+const BASE_URL = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+const OBSERVER_URL = BASE_URL + '/aitb/watch'
+const PLAYER_URL = BASE_URL + '/aitb/home'
 const PROJECTOR_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
+
+/** Which screen the projector is showing. Numbers are per-game briefings. */
+type View = number | 'galaxy' | 'title' | 'join' | 'watch' | 'how' | null
 
 export function AitbProjector() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
   const [now, setNow] = useState(Date.now())
-  const [view, setView] = useState<number | 'galaxy' | null>(null) // null = scoreboard, 'galaxy' = race, 1-10 = briefing
+  const [view, setView] = useState<View>(null) // null = scoreboard, 'galaxy' = race, 1-10 = briefing
   const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
   const { reactions } = useAitbReactions()
 
@@ -62,6 +69,22 @@ export function AitbProjector() {
     return <GalaxyView ranked={ranked} view={view} setView={setView} reactions={reactions} />
   }
 
+  // Presentation slides — title, the two join QRs, and the how-it-works brief.
+  // The nav floats over them so the host can flip back without leaving the deck.
+  if (view === 'title' || view === 'join' || view === 'watch' || view === 'how') {
+    return (
+      <div className="relative">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-30 max-w-[96vw]">
+          <GameNav view={view} setView={setView} />
+        </div>
+        {view === 'title' && <AitbTitleSlide />}
+        {view === 'join' && <AitbQrSlide kind="player" url={PLAYER_URL} />}
+        {view === 'watch' && <AitbQrSlide kind="observer" url={OBSERVER_URL} />}
+        {view === 'how' && <AitbHowItWorksSlide />}
+      </div>
+    )
+  }
+
   // Game briefing slide — full details on the big screen
   if (typeof view === 'number') {
     const a = aitbActivity(view)!
@@ -90,13 +113,8 @@ export function AitbProjector() {
               <h1 className="text-6xl font-black leading-tight mb-5">{a.emoji} {a.name}</h1>
               <p className="text-3xl font-bold leading-snug mb-5" style={{ color: a.color }}>{a.tagline}</p>
               <p className="text-gray-400 text-lg leading-relaxed mb-6">{a.desc}</p>
-              <div className="flex flex-wrap gap-3 mb-8">
-                {a.apps.map(x => (
-                  <span key={x} className="px-5 py-2 rounded-full text-xl font-bold"
-                    style={{ background: `${a.color}22`, color: a.color, border: `2px solid ${a.color}66` }}>
-                    {x}
-                  </span>
-                ))}
+              <div className="mb-8">
+                <AitbAppLinks apps={a.apps} color={a.color} size="lg" />
               </div>
               {/* Opens the interactive game screen (cup board, roulette wheels,
                   card draw, arcade...) from the embedded Game System app */}
@@ -228,9 +246,19 @@ function fmtElapsed(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-/* Top nav: 🏆 scoreboard + one button per game, so the host can flash any
-   game's full briefing on the projector, then flip back to live scores. */
-function GameNav({ view, setView }: { view: number | 'galaxy' | null; setView: (v: number | 'galaxy' | null) => void }) {
+/* Top nav: the opening slides (title → join QRs → how it works), 🏆 scoreboard,
+   the race, and one button per game, so the host can flash any screen on the
+   projector and flip straight back to live scores. */
+function GameNav({ view, setView }: { view: View; setView: (v: View) => void }) {
+  const slideBtn = (v: View, label: string, color: string) => (
+    <button onClick={() => setView(v)}
+      className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+      style={view === v
+        ? { background: color, color: '#000' }
+        : { background: 'rgba(255,255,255,0.06)', color, border: `1.5px solid ${color}55` }}>
+      {label}
+    </button>
+  )
   return (
     <div className="flex gap-2 justify-center flex-wrap mb-8">
       <a href="/aitb/admin"
@@ -238,6 +266,10 @@ function GameNav({ view, setView }: { view: number | 'galaxy' | null; setView: (
         style={{ background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1.5px solid rgba(255,255,255,0.2)' }}>
         ← Admin
       </a>
+      {slideBtn('title', '✨ Title', '#e879f9')}
+      {slideBtn('join', '📱 Join QR', '#fbbf24')}
+      {slideBtn('watch', '🛰️ Watch QR', '#c084fc')}
+      {slideBtn('how', '📋 How it works', '#38bdf8')}
       <button onClick={() => setView(null)}
         className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
         style={view === null
@@ -270,7 +302,7 @@ function GameNav({ view, setView }: { view: number | 'galaxy' | null; setView: (
    bubbles live in the shared <AitbRaceStage>. A corner QR lets the audience join
    as observers to watch and cheer. */
 function GalaxyView({ ranked, view, setView, reactions }: {
-  ranked: Ranked[]; view: number | 'galaxy' | null; setView: (v: number | 'galaxy' | null) => void
+  ranked: Ranked[]; view: View; setView: (v: View) => void
   reactions: import('../hooks/useAitbReactions').AitbReaction[]
 }) {
   return (

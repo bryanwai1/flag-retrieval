@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AitbTeam, AitbProgress } from '../types/database'
 import type { AitbReaction } from '../hooks/useAitbReactions'
 
@@ -24,6 +24,19 @@ function jitterOf(id: string): number {
  */
 export function AitbRaceStage({ ranked, reactions }: { ranked: Ranked[]; reactions: AitbReaction[] }) {
   const N = Math.max(1, ranked.length)
+
+  // Each team keeps its OWN lane (bearing) for the whole event. `ranked` is
+  // sorted by score, so using its index would re-bearing every rocket the moment
+  // anyone scored — teams visibly swapped places around the planet. Lanes come
+  // from the team's stable sort_order instead, so scoring only ever moves a
+  // rocket *inward* along its own line.
+  const laneOf = useMemo(() => {
+    const stable = [...ranked].sort((a, b) =>
+      (a.team.sort_order ?? 0) - (b.team.sort_order ?? 0) || a.team.id.localeCompare(b.team.id))
+    const m: Record<string, number> = {}
+    stable.forEach((r, idx) => { m[r.team.id] = idx })
+    return m
+  }, [ranked])
 
   // Flame boost when a team's completed count goes up (i.e. the rocket moves).
   const prevCompleted = useRef<Record<string, number>>({})
@@ -57,11 +70,12 @@ export function AitbRaceStage({ ranked, reactions }: { ranked: Ranked[]; reactio
         <img src="/rocket-dash/planet.png" alt="planet" className="w-full h-full object-contain relative rd-race-spin" style={{ filter: 'drop-shadow(0 0 40px rgba(120,220,255,.4))' }} />
       </div>
 
-      {ranked.map(({ team, total, completed }, i) => {
+      {ranked.map(({ team, total, completed }) => {
         const landed = completed >= 10
         const frac = Math.min(1, completed / 10)
         const dist = landed ? DOCK : OUTER - frac * (OUTER - INNER)
-        const angle = (i / N) * 2 * Math.PI - Math.PI / 2
+        // Bearing is fixed per team (never the score-sorted index) — see laneOf.
+        const angle = ((laneOf[team.id] ?? 0) / N) * 2 * Math.PI - Math.PI / 2
         const ox = Math.cos(angle), oy = Math.sin(angle)
         const x = 50 + dist * ox
         const y = 50 + dist * oy

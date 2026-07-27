@@ -5,6 +5,8 @@ import { aitbActivity, AITB_POINTS, AITB_BONUS_MULT, aitbSpeedBonus, aitbProgres
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { AitbMissionModule } from '../components/AitbMissionModule'
+import { AitbAppLinks } from '../components/AitbAppLinks'
+import { useAitbReactions, AITB_REACTIONS } from '../hooks/useAitbReactions'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const TEAM_KEY = 'aitb_my_team'
@@ -134,13 +136,19 @@ export function AitbMission() {
   }
 
   // Interactive module result (cups / roulette / cards / animals) → words[]
+  // Deliberately NOT gated on the shared busyRef: that guard serialises
+  // check-in/step/complete writes, and borrowing it here silently dropped a
+  // spin result whenever a teammate happened to tick a step mid-reel — losing
+  // the draw the team can no longer re-roll. This write is idempotent (it just
+  // sets words), so it only needs its own in-flight guard.
+  const savingWordsRef = useRef(false)
   const saveWords = async (words: string[]) => {
-    if (!progress || progress.completed_at || timeUp || busyRef.current) return
-    busyRef.current = true
+    if (!progress || progress.completed_at || timeUp || savingWordsRef.current) return
+    savingWordsRef.current = true
     const { data } = await supabase
       .from('aitb_progress').update({ words })
       .eq('id', progress.id).select().maybeSingle()
-    busyRef.current = false
+    savingWordsRef.current = false
     if (data) setProgress(data)
   }
 
@@ -187,14 +195,21 @@ export function AitbMission() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-24">
-      {/* Admin-only back button — players scan a QR per activity, no browsing */}
-      {isAdmin && (
+      {/* Back button. Admins go to the admin panel; a player who has already
+          picked their team goes to their board (score + draw new missions). */}
+      {isAdmin ? (
         <a href="/aitb/admin"
           className="fixed top-3 left-3 z-[70] px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
           style={{ background: 'rgba(17,24,39,0.75)', color: '#2dd4bf', border: '1.5px solid #2dd4bf66' }}>
           ← Admin
         </a>
-      )}
+      ) : team ? (
+        <a href="/aitb/home"
+          className="fixed top-3 left-3 z-[70] px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
+          style={{ background: 'rgba(17,24,39,0.8)', color: '#a78bfa', border: '1.5px solid #a78bfa66' }}>
+          🚀 My board
+        </a>
+      ) : null}
       {/* Whole-game countdown pill */}
       {gameEndsAt && !timeUp && (
         <div className="fixed top-3 right-3 z-40 px-4 py-2 rounded-xl font-black text-sm tabular-nums backdrop-blur"
@@ -303,6 +318,7 @@ export function AitbMission() {
                 savedWords={progress.words ?? []}
                 disabled={!!progress.completed_at || timeUp}
                 onSave={saveWords}
+                progressId={progress.id}
               />
             )}
 
@@ -392,15 +408,10 @@ export function AitbMission() {
               </>
             )}
 
-            {/* Apps */}
-            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 Your AI tools</div>
-            <div className="flex flex-wrap gap-2 mb-5">
-              {activity.apps.map(a => (
-                <span key={a} className="px-3 py-1.5 rounded-full text-sm font-bold"
-                  style={{ background: `${activity.color}22`, color: activity.color, border: `1.5px solid ${activity.color}55` }}>
-                  {a}
-                </span>
-              ))}
+            {/* Apps — tap to open the tool in your browser */}
+            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 Your AI tools — tap to open</div>
+            <div className="mb-5">
+              <AitbAppLinks apps={activity.apps} color={activity.color} />
             </div>
 
             {/* Full details — tucked away so the page stays fun */}
@@ -428,6 +439,16 @@ export function AitbMission() {
                 🏁 DONE? CALL THE MARSHAL!
               </button>
             ) : null}
+
+            {/* Cheer bar — fire emoji that float off your rocket on the projector */}
+            <CheerBar teamId={team.id} teamName={team.name} teamColor={team.color} />
+
+            {/* Back to the team board: live score + draw the next mission */}
+            <a href="/aitb/home"
+              className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-black text-base mt-3 transition-all active:scale-95"
+              style={{ background: 'rgba(167,139,250,0.14)', border: '2px solid #a78bfa66', color: '#a78bfa' }}>
+              🚀 Back to my board — score &amp; new missions
+            </a>
           </>
         )}
       </div>
@@ -494,6 +515,43 @@ export function AitbMission() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* Players can cheer their own team straight from the mission page — the emoji
+   broadcasts on the shared reaction channel and floats off this team's rocket on
+   the projector and on every observer's phone. Purely cosmetic: no points. */
+function CheerBar({ teamId, teamName, teamColor }: { teamId: string; teamName: string; teamColor: string }) {
+  const { sendReaction } = useAitbReactions({ listen: false })
+  const [sent, setSent] = useState('')
+
+  const fire = (emoji: string) => {
+    sendReaction(teamId, emoji)
+    setSent(emoji)
+    setTimeout(() => setSent(''), 1200)
+  }
+
+  return (
+    <div className="rounded-2xl px-4 py-3 mt-5" style={{ background: 'rgba(255,255,255,0.04)', border: `2px solid ${teamColor}44` }}>
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+        📣 Cheer <span style={{ color: teamColor }}>{teamName}</span> on the big screen
+      </div>
+      <div className="flex justify-between gap-2">
+        {AITB_REACTIONS.map(e => (
+          <button key={e} onClick={() => fire(e)} aria-label={`Send ${e}`}
+            className="flex-1 text-3xl h-14 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+            style={{
+              background: sent === e ? `${teamColor}33` : 'rgba(255,255,255,0.07)',
+              border: `1.5px solid ${sent === e ? teamColor : 'rgba(255,255,255,0.14)'}`,
+            }}>
+            {e}
+          </button>
+        ))}
+      </div>
+      <div className="text-gray-500 text-xs font-bold mt-2 text-center">
+        {sent ? `${sent} sent to the projector!` : 'Tap an emoji — it pops on the projector 🎉'}
+      </div>
     </div>
   )
 }

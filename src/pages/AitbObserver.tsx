@@ -49,6 +49,19 @@ export function AitbObserver() {
     }).sort((a, b) => b.total - a.total || b.completed - a.completed),
     [teams, progress])
 
+  // Teams with a mission checked in but not yet signed off = on a station now.
+  const nowPlaying = useMemo(() =>
+    ranked
+      .map(({ team, rows }) => ({
+        team,
+        missions: rows
+          .filter(p => p.scanned_at && !p.completed_at)
+          .map(p => aitbActivity(p.activity_id))
+          .filter((a): a is NonNullable<typeof a> => !!a),
+      }))
+      .filter(x => x.missions.length > 0),
+    [ranked])
+
   const cheerTeam = teams.find(t => t.id === cheerId) || null
   const pickTeam = (id: string) => { setCheerId(id); try { localStorage.setItem(CHEER_KEY, id) } catch { /* ignore */ } }
   const fire = (emoji: string) => { if (cheerTeam) sendReaction(cheerTeam.id, emoji) }
@@ -72,6 +85,31 @@ export function AitbObserver() {
         </div>
 
         <AitbRaceStage ranked={ranked} reactions={reactions} />
+
+        {/* Now playing — which mission each team is on right now */}
+        {nowPlaying.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[11px] font-black tracking-widest uppercase text-gray-400 mb-1.5 text-center">
+              🎯 Playing right now
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {nowPlaying.map(({ team, missions }) => (
+                <div key={team.id} className="flex items-center gap-2 rounded-xl px-3 py-2"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: `1.5px solid ${team.color}44` }}>
+                  <span className="font-black text-sm whitespace-nowrap" style={{ color: team.color }}>● {team.name}</span>
+                  <span className="flex flex-wrap gap-1.5 justify-end flex-1">
+                    {missions.map(m => (
+                      <span key={m.id} className="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
+                        style={{ background: `${m.color}22`, color: m.color, border: `1px solid ${m.color}55` }}>
+                        {m.emoji} {m.name}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Reaction dock */}
