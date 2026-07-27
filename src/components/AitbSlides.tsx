@@ -43,12 +43,17 @@ export function AitbTitleSlide() {
           <span className="aitb-eyebrow-dot" /> LIVE TEAM CHALLENGE
         </div>
 
+        {/* Letters animate individually, but each WORD is one nowrap unit so a
+            narrow projector can only ever break between words — never mid-word
+            (which produced "AI TEAM BUILDIN" + an orphan "G" below ~1645px). */}
         <h1 className="aitb-bigtitle" aria-label={TITLE}>
-          {TITLE.split('').map((ch, i) => (
-            <span key={i} className="aitb-letter" style={{ animationDelay: `${0.24 + i * 0.055}s` }}>
-              {ch === ' ' ? ' ' : ch}
+          {(() => { let n = 0; return TITLE.split(' ').map(word => (
+            <span key={word} className="aitb-word">
+              {word.split('').map((ch, j) => (
+                <span key={j} className="aitb-letter" style={{ animationDelay: `${0.24 + n++ * 0.055}s` }}>{ch}</span>
+              ))}
             </span>
-          ))}
+          )) })()}
           <span className="aitb-shine" />
         </h1>
 
@@ -178,7 +183,9 @@ export function AitbHowItWorksSlide() {
 
 /* ── Shared slide styling ──────────────────────────────────────────────────── */
 const SLIDE_CSS = `
-.aitb-slide{position:relative;min-height:100vh;width:100%;overflow:hidden;background:#07050f;color:#fff;
+/* --aitb-slide-h lets the projector deck reserve room for its nav bar, so slide
+   content is never laid out under it. Defaults to the full viewport. */
+.aitb-slide{position:relative;min-height:var(--aitb-slide-h,100vh);width:100%;overflow:hidden;background:#07050f;color:#fff;
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
 .aitb-nebula{position:absolute;inset:0;z-index:0;background:
   radial-gradient(60% 45% at 22% 18%,rgba(168,85,247,.30),transparent 62%),
@@ -201,9 +208,11 @@ const SLIDE_CSS = `
 @keyframes aitb-fadeup{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
 /* ---- title slide ---- */
-.aitb-title-inner{position:relative;z-index:3;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:40px;text-align:center;}
-.aitb-bigtitle{position:relative;font-size:clamp(56px,10.5vw,168px);font-weight:900;line-height:.95;letter-spacing:-.02em;margin:6px 0 2px;
-  display:flex;flex-wrap:wrap;justify-content:center;overflow:hidden;padding:0 4px;}
+.aitb-title-inner{position:relative;z-index:3;min-height:var(--aitb-slide-h,100vh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:40px;text-align:center;}
+.aitb-bigtitle{position:relative;font-size:clamp(44px,8.4vw,150px);font-weight:900;line-height:.95;letter-spacing:-.02em;margin:6px 0 2px;
+  display:flex;flex-wrap:wrap;justify-content:center;gap:0 .28em;overflow:hidden;padding:0 4px;}
+/* one word = one unwrappable unit (letters inside still animate separately) */
+.aitb-word{display:inline-flex;white-space:nowrap;}
 .aitb-letter{display:inline-block;background:linear-gradient(120deg,#fff 12%,#c4b5fd 40%,#67e8f9 62%,#f0abfc 88%);
   -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 8px 40px rgba(168,85,247,.55));
   animation:aitb-letterin .85s cubic-bezier(.2,1.1,.3,1) both;}
@@ -234,7 +243,7 @@ const SLIDE_CSS = `
 @keyframes aitb-corepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.11)}}
 
 /* ---- QR slides ---- */
-.aitb-qr-inner{position:relative;z-index:3;min-height:100vh;display:grid;grid-template-columns:1fr auto;align-items:center;gap:6vw;padding:6vh 6vw;}
+.aitb-qr-inner{position:relative;z-index:3;min-height:var(--aitb-slide-h,100vh);display:grid;grid-template-columns:1fr auto;align-items:center;gap:6vw;padding:6vh 6vw;}
 .aitb-qr-title{font-size:clamp(40px,6.6vw,104px);font-weight:900;line-height:1.02;margin:14px 0 18px;
   background:linear-gradient(120deg,#fff,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;
   animation:aitb-fadeup .9s ease .12s both;}
@@ -257,7 +266,7 @@ const SLIDE_CSS = `
 .aitb-qr-hint{font-size:clamp(15px,1.4vw,22px);font-weight:800;color:var(--accent);}
 
 /* ---- how it works ---- */
-.aitb-how-inner{position:relative;z-index:3;min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:3vh;padding:5vh 5vw;}
+.aitb-how-inner{position:relative;z-index:3;min-height:var(--aitb-slide-h,100vh);display:flex;flex-direction:column;justify-content:center;gap:3vh;padding:5vh 5vw;}
 .aitb-how-head{text-align:center;}
 .aitb-how-title{font-size:clamp(32px,4.6vw,74px);font-weight:900;line-height:1.05;margin-top:12px;
   background:linear-gradient(120deg,#fff,#c4b5fd 55%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;
@@ -278,4 +287,15 @@ const SLIDE_CSS = `
   background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.16);
   font-size:clamp(14px,1.35vw,23px);font-weight:800;color:#e2e8f0;animation:aitb-fadeup .7s ease both;}
 .aitb-how-rule-emoji{font-size:1.3em;}
+
+/* Short projectors / windowed Chrome (≤900px tall): trim the title slide's
+   decorative orbit and gaps so the tagline never falls below the fold. */
+@media (max-height:900px){
+  .aitb-title-inner{gap:12px;padding:24px;}
+  .aitb-orbit-wrap{width:min(220px,26vh);height:min(220px,26vh);}
+  .aitb-bigtitle{font-size:clamp(40px,7.4vw,120px);}
+  .aitb-how-inner{gap:2vh;padding:3vh 4vw;}
+  .aitb-how-card{padding:min(16px,1.8vh) min(18px,1.8vw);}
+  .aitb-how-rule{padding:9px 16px;}
+}
 `

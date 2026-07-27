@@ -19,6 +19,36 @@ const PROJECTOR_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 /** Which screen the projector is showing. Numbers are per-game briefings. */
 type View = number | 'galaxy' | 'title' | 'join' | 'watch' | 'how' | null
 
+/** Height reserved for the deck nav above a slide (one row of buttons). */
+const NAV_H = 64
+
+/** The four presentation slides + the way back to the live screens. Deliberately
+ *  short so it always fits one row — see the slide-view comment. */
+const SLIDE_TABS: { v: View; label: string; color: string }[] = [
+  { v: 'title', label: '✨ Title', color: '#e879f9' },
+  { v: 'join', label: '📱 Join QR', color: '#fbbf24' },
+  { v: 'watch', label: '🛰️ Watch QR', color: '#c084fc' },
+  { v: 'how', label: '📋 How it works', color: '#38bdf8' },
+  { v: null, label: '🏆 Scores', color: '#2dd4bf' },
+  { v: 'galaxy', label: '🚀 Race', color: '#a855f7' },
+]
+
+function SlideNav({ view, setView }: { view: View; setView: (v: View) => void }) {
+  return (
+    <>
+      {SLIDE_TABS.map(t => (
+        <button key={String(t.v)} onClick={() => setView(t.v)}
+          className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+          style={view === t.v
+            ? { background: t.color, color: '#000' }
+            : { background: 'rgba(255,255,255,0.06)', color: t.color, border: `1.5px solid ${t.color}55` }}>
+          {t.label}
+        </button>
+      ))}
+    </>
+  )
+}
+
 export function AitbProjector() {
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
@@ -72,10 +102,15 @@ export function AitbProjector() {
   // Presentation slides — title, the two join QRs, and the how-it-works brief.
   // The nav floats over them so the host can flip back without leaving the deck.
   if (view === 'title' || view === 'join' || view === 'watch' || view === 'how') {
+    // The nav sits in normal flow above the slide and the slide shrinks by
+    // NAV_H to match, so buttons can never overlap the headline. While
+    // presenting, only the deck buttons show — the 10 per-game buttons would
+    // wrap into rows tall enough to cover the title; 🏆 Scores brings them back.
     return (
-      <div className="relative">
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-30 max-w-[96vw]">
-          <GameNav view={view} setView={setView} />
+      <div className="bg-gray-950" style={{ ['--aitb-slide-h' as string]: `calc(100vh - ${NAV_H}px)` }}>
+        <div className="flex items-center justify-center flex-wrap gap-2 px-4"
+          style={{ height: NAV_H }}>
+          <SlideNav view={view} setView={setView} />
         </div>
         {view === 'title' && <AitbTitleSlide />}
         {view === 'join' && <AitbQrSlide kind="player" url={PLAYER_URL} />}
