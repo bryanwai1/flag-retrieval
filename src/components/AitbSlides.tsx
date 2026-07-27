@@ -10,6 +10,7 @@
  */
 import { QRCodeSVG } from 'qrcode.react'
 import { AITB_POINTS } from '../lib/aitbActivities'
+import { AitbClientLogo, type AitbLogo } from './AitbClientLogo'
 
 const TITLE = 'AI TEAM BUILDING'
 
@@ -181,6 +182,60 @@ export function AitbHowItWorksSlide() {
   )
 }
 
+/* ── Opening / closing speech slides ────────────────────────────────────────
+   Deliberately bare: these are up while someone is talking, so there is nothing
+   for the room to read instead of listening. Client logo, one headline, one
+   line underneath. The logo is omitted entirely when none is set, and the
+   layout stays centred either way. */
+export function AitbSpeechSlide({ kind, logo, subline }: {
+  kind: 'opening' | 'closing'
+  logo: AitbLogo | null
+  /** Client or event name under the headline. */
+  subline?: string
+}) {
+  const opening = kind === 'opening'
+  const accent = opening ? '#38bdf8' : '#fbbf24'
+  const stars = Array.from({ length: 70 }, (_, i) => ({
+    left: (i * 41.7) % 100,
+    top: (i * 57.9) % 100,
+    size: 1 + ((i * 17) % 5) * 0.5,
+    delay: ((i * 9) % 40) / 10,
+    dur: 2.6 + ((i * 13) % 30) / 10,
+  }))
+
+  return (
+    <div className="aitb-slide aitb-speech" style={{ ['--accent' as string]: accent }}>
+      <style>{SLIDE_CSS}</style>
+      <div className="aitb-nebula" />
+      <div className="aitb-grid" />
+      {stars.map((s, i) => (
+        <span key={i} className="aitb-star"
+          style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s` }} />
+      ))}
+
+      <div className="aitb-speech-inner">
+        <div className="aitb-eyebrow">
+          <span className="aitb-eyebrow-dot" /> {opening ? 'WELCOME ABOARD' : "THAT'S A WRAP"}
+        </div>
+
+        {logo && (
+          <div className="aitb-speech-logo">
+            <AitbClientLogo logo={logo} height={140} />
+          </div>
+        )}
+
+        <h1 className="aitb-speech-title">{opening ? 'Welcome' : 'Thank you'}</h1>
+
+        <div className="aitb-speech-sub">{subline?.trim() || 'AI Team Building'}</div>
+
+        <div className="aitb-speech-tag">
+          {opening ? '10 missions · 2 at a time · fastest team wins' : 'You built all of that with AI today 🎉'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Shared slide styling ──────────────────────────────────────────────────── */
 const SLIDE_CSS = `
 /* --aitb-slide-h lets the projector deck reserve room for its nav bar, so slide
@@ -288,6 +343,20 @@ const SLIDE_CSS = `
   font-size:clamp(14px,1.35vw,23px);font-weight:800;color:#e2e8f0;animation:aitb-fadeup .7s ease both;}
 .aitb-how-rule-emoji{font-size:1.3em;}
 
+/* ---- opening / closing speech slides ---- */
+.aitb-speech-inner{position:relative;z-index:3;min-height:var(--aitb-slide-h,100vh);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:min(26px,3vh);padding:5vh 6vw;text-align:center;}
+.aitb-speech-logo{animation:aitb-pop .9s cubic-bezier(.2,1.1,.3,1) .18s both;line-height:0;}
+.aitb-speech-title{font-size:clamp(52px,9vw,168px);font-weight:900;line-height:.98;letter-spacing:-.025em;
+  background:linear-gradient(120deg,#fff 15%,var(--accent) 55%,#f0abfc 95%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 10px 46px color-mix(in srgb,var(--accent) 45%,transparent));
+  animation:aitb-fadeup .95s ease .32s both;}
+.aitb-speech-sub{font-size:clamp(22px,3.1vw,50px);font-weight:800;color:#e9d5ff;letter-spacing:.01em;
+  max-width:24ch;animation:aitb-fadeup .95s ease .5s both;}
+.aitb-speech-tag{font-size:clamp(15px,1.7vw,26px);font-weight:800;letter-spacing:.13em;color:#94a3b8;
+  animation:aitb-fadeup .95s ease .68s both;}
+
 /* Short projectors / windowed Chrome (≤900px tall): trim the title slide's
    decorative orbit and gaps so the tagline never falls below the fold. */
 @media (max-height:900px){
@@ -297,5 +366,7 @@ const SLIDE_CSS = `
   .aitb-how-inner{gap:2vh;padding:3vh 4vw;}
   .aitb-how-card{padding:min(16px,1.8vh) min(18px,1.8vw);}
   .aitb-how-rule{padding:9px 16px;}
+  .aitb-speech-inner{gap:min(16px,2vh);padding:3vh 5vw;}
+  .aitb-speech-title{font-size:clamp(44px,7.6vw,124px);}
 }
 `

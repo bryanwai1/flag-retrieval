@@ -8,7 +8,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { AITB_ACTIVITIES, aitbProgressPoints, aitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { AitbAppLinks } from '../components/AitbAppLinks'
-import { AitbTitleSlide, AitbQrSlide, AitbHowItWorksSlide } from '../components/AitbSlides'
+import { AitbTitleSlide, AitbQrSlide, AitbHowItWorksSlide, AitbSpeechSlide } from '../components/AitbSlides'
+import { useAitbLogo } from '../components/AitbClientLogo'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const BASE_URL = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
@@ -17,20 +18,23 @@ const PLAYER_URL = BASE_URL + '/aitb/home'
 const PROJECTOR_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 /** Which screen the projector is showing. Numbers are per-game briefings. */
-type View = number | 'galaxy' | 'title' | 'join' | 'watch' | 'how' | null
+type View = number | 'galaxy' | 'title' | 'join' | 'watch' | 'how' | 'opening' | 'closing' | null
 
 /** Height reserved for the deck nav above a slide (one row of buttons). */
 const NAV_H = 64
 
-/** The four presentation slides + the way back to the live screens. Deliberately
- *  short so it always fits one row — see the slide-view comment. */
+/** The presentation slides + the way back to the live screens, in run-sheet
+ *  order. Labels stay short so the row never wraps onto the slide — see the
+ *  slide-view comment. */
 const SLIDE_TABS: { v: View; label: string; color: string }[] = [
+  { v: 'opening', label: '👋 Opening', color: '#38bdf8' },
   { v: 'title', label: '✨ Title', color: '#e879f9' },
   { v: 'join', label: '📱 Join QR', color: '#fbbf24' },
   { v: 'watch', label: '🛰️ Watch QR', color: '#c084fc' },
   { v: 'how', label: '📋 How it works', color: '#38bdf8' },
   { v: null, label: '🏆 Scores', color: '#2dd4bf' },
   { v: 'galaxy', label: '🚀 Race', color: '#a855f7' },
+  { v: 'closing', label: '🎬 Closing', color: '#fbbf24' },
 ]
 
 function SlideNav({ view, setView }: { view: View; setView: (v: View) => void }) {
@@ -56,6 +60,7 @@ export function AitbProjector() {
   const [view, setView] = useState<View>(null) // null = scoreboard, 'galaxy' = race, 1-10 = briefing
   const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
   const { reactions } = useAitbReactions()
+  const logo = useAitbLogo()
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured) return
@@ -101,7 +106,8 @@ export function AitbProjector() {
 
   // Presentation slides — title, the two join QRs, and the how-it-works brief.
   // The nav floats over them so the host can flip back without leaving the deck.
-  if (view === 'title' || view === 'join' || view === 'watch' || view === 'how') {
+  if (view === 'opening' || view === 'title' || view === 'join' || view === 'watch'
+    || view === 'how' || view === 'closing') {
     // The nav sits in normal flow above the slide and the slide shrinks by
     // NAV_H to match, so buttons can never overlap the headline. While
     // presenting, only the deck buttons show — the 10 per-game buttons would
@@ -112,10 +118,12 @@ export function AitbProjector() {
           style={{ height: NAV_H }}>
           <SlideNav view={view} setView={setView} />
         </div>
+        {view === 'opening' && <AitbSpeechSlide kind="opening" logo={logo} subline={logo?.subline} />}
         {view === 'title' && <AitbTitleSlide />}
         {view === 'join' && <AitbQrSlide kind="player" url={PLAYER_URL} />}
         {view === 'watch' && <AitbQrSlide kind="observer" url={OBSERVER_URL} />}
         {view === 'how' && <AitbHowItWorksSlide />}
+        {view === 'closing' && <AitbSpeechSlide kind="closing" logo={logo} subline={logo?.subline} />}
       </div>
     )
   }
@@ -286,7 +294,7 @@ function fmtElapsed(ms: number): string {
    projector and flip straight back to live scores. */
 function GameNav({ view, setView }: { view: View; setView: (v: View) => void }) {
   const slideBtn = (v: View, label: string, color: string) => (
-    <button onClick={() => setView(v)}
+    <button key={String(v)} onClick={() => setView(v)}
       className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
       style={view === v
         ? { background: color, color: '#000' }
@@ -301,24 +309,9 @@ function GameNav({ view, setView }: { view: View; setView: (v: View) => void }) 
         style={{ background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1.5px solid rgba(255,255,255,0.2)' }}>
         ← Admin
       </a>
-      {slideBtn('title', '✨ Title', '#e879f9')}
-      {slideBtn('join', '📱 Join QR', '#fbbf24')}
-      {slideBtn('watch', '🛰️ Watch QR', '#c084fc')}
-      {slideBtn('how', '📋 How it works', '#38bdf8')}
-      <button onClick={() => setView(null)}
-        className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
-        style={view === null
-          ? { background: '#2dd4bf', color: '#000' }
-          : { background: 'rgba(255,255,255,0.06)', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
-        🏆 Scores
-      </button>
-      <button onClick={() => setView('galaxy')}
-        className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
-        style={view === 'galaxy'
-          ? { background: '#a855f7', color: '#000' }
-          : { background: 'rgba(255,255,255,0.06)', color: '#c084fc', border: '1.5px solid #a855f755' }}>
-        🚀 Race
-      </button>
+      {/* Same list the slide deck's own nav uses, so a tab added there can
+          never go missing here (Opening and Closing did exactly that). */}
+      {SLIDE_TABS.map(t => slideBtn(t.v, t.label, t.color))}
       {AITB_ACTIVITIES.map(a => (
         <button key={a.id} onClick={() => setView(a.id)}
           className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"

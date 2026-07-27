@@ -6,6 +6,7 @@ import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import { AitbAppLinks } from '../components/AitbAppLinks'
 import { AitbSubmissions } from '../components/AitbSubmissions'
+import { AitbLogoUpload } from '../components/AitbLogoUpload'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
 const UNLOCK_KEY = 'aitb_admin_unlocked'
@@ -396,6 +397,8 @@ export function AitbAdmin() {
               style={{ background: '#a855f722', color: '#c084fc', border: '2px solid #a855f755' }}>
               🛰️ Show Observer QR
             </button>
+
+            <AitbLogoUpload />
           </div>
         </div>
 
