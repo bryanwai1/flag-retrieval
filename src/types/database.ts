@@ -238,6 +238,26 @@ export interface BingoAccount {
   facilitator_host: string | null
   /** NULL = access never expires. */
   access_expires_at: string | null
+  /** Name the helper typed on the join page — anonymous logins have no email. */
+  display_name: string | null
+  /** Which event pass this facilitator joined through (NULL = not from a pass). */
+  facilitator_session_id: string | null
+  created_at: string
+}
+
+/** A shareable event pass: one link + PIN that turns helpers into facilitators. */
+export interface BingoFacilitatorSession {
+  id: string
+  code: string
+  pin: string
+  host_id: string
+  label: string
+  expires_at: string
+  /** NULL = unlimited seats. */
+  max_uses: number | null
+  uses: number
+  revoked: boolean
+  created_by: string | null
   created_at: string
 }
 

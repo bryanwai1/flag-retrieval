@@ -23,6 +23,8 @@ interface BingoAuthValue {
   signInWithPassword: (email: string, password: string) => Promise<void>
   signUpWithPassword: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>
   signInWithGoogle: (redirectTo?: string) => Promise<void>
+  /** Event-pass crew logins: no email, no password, no approval queue. */
+  signInAnonymously: () => Promise<void>
   signOut: () => Promise<void>
   refreshAccount: () => Promise<void>
 }
@@ -125,6 +127,16 @@ export function BingoAuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }, [])
 
+  const signInAnonymously = useCallback(async () => {
+    const { data, error } = await supabase.auth.signInAnonymously()
+    if (error) throw error
+    // The join page redeems the pass immediately after this resolves, so the
+    // account row must exist by then. onAuthStateChange defers loadAccount to
+    // a macrotask (see below), which is too late — load it inline instead.
+    setSession(data.session)
+    await loadAccount(data.session?.user.id)
+  }, [loadAccount])
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setAccount(null)
@@ -153,6 +165,7 @@ export function BingoAuthProvider({ children }: { children: ReactNode }) {
     signInWithPassword,
     signUpWithPassword,
     signInWithGoogle,
+    signInAnonymously,
     signOut,
     refreshAccount,
   }

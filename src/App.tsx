@@ -32,6 +32,7 @@ const BingoDashBriefingSlides = lazy(() => import('./pages/BingoDashBriefingSlid
 const BingoDashTeamMembers  = lazy(() => import('./pages/BingoDashTeamMembers').then(m => ({ default: m.BingoDashTeamMembers })))
 const BingoDashAllTeamsMembers = lazy(() => import('./pages/BingoDashAllTeamsMembers').then(m => ({ default: m.BingoDashAllTeamsMembers })))
 const BingoDashAccounts     = lazy(() => import('./pages/BingoDashAccounts').then(m => ({ default: m.BingoDashAccounts })))
+const BingoDashJoinCrew     = lazy(() => import('./pages/BingoDashJoinCrew').then(m => ({ default: m.BingoDashJoinCrew })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 const VotingAdmin           = lazy(() => import('./pages/VotingAdmin').then(m => ({ default: m.VotingAdmin })))
@@ -75,6 +76,9 @@ export default function App() {
             {/* Invite-link landing: login/signup when signed out, approval gate
                 while pending, straight to the admin once approved */}
             <Route path="/bingo-dash/login" element={<RequireBingoAdmin><Navigate to="/bingo-dash/admin" replace /></RequireBingoAdmin>} />
+            {/* Crew pass landing — deliberately NOT behind RequireBingoAdmin:
+                helpers arrive signed out and the page signs them in itself */}
+            <Route path="/bingo-dash/join-crew/:code" element={<BingoDashJoinCrew />} />
           </Route>
           <Route path="/bingo-dash/projector" element={<BingoDashProjector />} />
           <Route path="/bingo-dash/projector/:sectionSlug" element={<BingoDashProjector />} />
