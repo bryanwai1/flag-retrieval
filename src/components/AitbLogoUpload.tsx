@@ -14,7 +14,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import {
-  AitbClientLogo, analyzeLogoPlate, fileToLogoDataUrl, readAitbLogo, writeAitbLogo,
+  AitbClientLogo, analyzeLogoPlate, fileToLogoDataUrl, readAitbLogo, retrimLogoDataUrl,
+  writeAitbLogo,
   type AitbLogo, type AitbLogoPlate, type AitbResolvedPlate,
 } from './AitbClientLogo'
 
@@ -56,6 +57,19 @@ export function AitbLogoUpload() {
     }
   }
 
+  // Logos saved before the upload started cropping still carry their export
+  // margins, which the slides would render as a big empty plate. Tighten them
+  // once, here, rather than making anyone notice and re-upload. `retrim` returns
+  // null when there's nothing left to cut, so this settles after one pass.
+  useEffect(() => {
+    if (!logo?.src) return
+    let live = true
+    retrimLogoDataUrl(logo.src).then(next => {
+      if (live && next) persist({ ...logo, src: next })
+    })
+    return () => { live = false }
+  }, [logo?.src])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const onPick = async (file: File | undefined) => {
     if (!file) return
     setBusy(true); setError('')
@@ -93,7 +107,7 @@ export function AitbLogoUpload() {
           border: '2px dashed rgba(255,255,255,0.16)',
         }}>
         {logo?.src
-          ? <AitbClientLogo logo={logo} height={92} />
+          ? <AitbClientLogo logo={logo} height="92px" />
           : <div className="text-center text-gray-500 font-bold text-sm">
               No logo yet<br /><span className="text-xs">the slides just show the headline</span>
             </div>}

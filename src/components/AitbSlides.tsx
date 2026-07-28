@@ -184,9 +184,12 @@ export function AitbHowItWorksSlide() {
 
 /* ── Opening / closing speech slides ────────────────────────────────────────
    Deliberately bare: these are up while someone is talking, so there is nothing
-   for the room to read instead of listening. Client logo, one headline, one
-   line underneath. The logo is omitted entirely when none is set, and the
-   layout stays centred either way. */
+   for the room to read instead of listening.
+
+   The event name is the hero, not the greeting — "Welcome to" is a small line
+   leading into it, and the logo sits above as a credit rather than the subject.
+   The logo is omitted entirely when none is set, and the layout stays centred
+   either way. */
 export function AitbSpeechSlide({ kind, logo, subline }: {
   kind: 'opening' | 'closing'
   logo: AitbLogo | null
@@ -195,13 +198,20 @@ export function AitbSpeechSlide({ kind, logo, subline }: {
 }) {
   const opening = kind === 'opening'
   const accent = opening ? '#38bdf8' : '#fbbf24'
-  const stars = Array.from({ length: 70 }, (_, i) => ({
+  const hero = subline?.trim() || 'AI Team Building'
+  const stars = Array.from({ length: 110 }, (_, i) => ({
     left: (i * 41.7) % 100,
     top: (i * 57.9) % 100,
     size: 1 + ((i * 17) % 5) * 0.5,
     delay: ((i * 9) % 40) / 10,
     dur: 2.6 + ((i * 13) % 30) / 10,
   }))
+  // Streaks that cross the slide behind the text on a long loop.
+  const shooters = [
+    { top: '12%', left: '-14%', delay: '1.8s', dur: '8s' },
+    { top: '58%', left: '-22%', delay: '5.4s', dur: '11s' },
+    { top: '33%', left: '-8%', delay: '9.1s', dur: '9.5s' },
+  ]
 
   return (
     <div className="aitb-slide aitb-speech" style={{ ['--accent' as string]: accent }}>
@@ -213,6 +223,11 @@ export function AitbSpeechSlide({ kind, logo, subline }: {
           style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s` }} />
       ))}
 
+      {shooters.map((s, i) => (
+        <span key={i} className="aitb-shoot"
+          style={{ top: s.top, left: s.left, animationDelay: s.delay, animationDuration: s.dur }} />
+      ))}
+
       <div className="aitb-speech-inner">
         <div className="aitb-eyebrow">
           <span className="aitb-eyebrow-dot" /> {opening ? 'WELCOME ABOARD' : "THAT'S A WRAP"}
@@ -220,16 +235,27 @@ export function AitbSpeechSlide({ kind, logo, subline }: {
 
         {logo && (
           <div className="aitb-speech-logo">
-            <AitbClientLogo logo={logo} height={140} />
+            <AitbClientLogo logo={logo} height="clamp(46px, 7.6vh, 96px)" maxAspect={4.2} />
           </div>
         )}
 
-        <h1 className="aitb-speech-title">{opening ? 'Welcome' : 'Thank you'}</h1>
+        <div className="aitb-speech-kicker">{opening ? 'Welcome to' : 'Thank you for playing'}</div>
 
-        <div className="aitb-speech-sub">{subline?.trim() || 'AI Team Building'}</div>
+        {/* Same per-letter reveal as the title slide: each WORD stays one nowrap
+            unit so a narrow projector can only break between words. */}
+        <h1 className="aitb-speech-hero" aria-label={hero}>
+          {(() => { let n = 0; return hero.split(' ').map((word, w) => (
+            <span key={`${word}-${w}`} className="aitb-word">
+              {word.split('').map((ch, j) => (
+                <span key={j} className="aitb-letter" style={{ animationDelay: `${0.5 + n++ * 0.05}s` }}>{ch}</span>
+              ))}
+            </span>
+          )) })()}
+          <span className="aitb-shine" />
+        </h1>
 
         <div className="aitb-speech-tag">
-          {opening ? '10 missions · 2 at a time · fastest team wins' : 'You built all of that with AI today 🎉'}
+          {opening ? 'Prepare to be astounded' : 'You just built the future'}
         </div>
       </div>
     </div>
@@ -346,16 +372,33 @@ const SLIDE_CSS = `
 /* ---- opening / closing speech slides ---- */
 .aitb-speech-inner{position:relative;z-index:3;min-height:var(--aitb-slide-h,100vh);display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:min(26px,3vh);padding:5vh 6vw;text-align:center;}
-.aitb-speech-logo{animation:aitb-pop .9s cubic-bezier(.2,1.1,.3,1) .18s both;line-height:0;}
-.aitb-speech-title{font-size:clamp(52px,9vw,168px);font-weight:900;line-height:.98;letter-spacing:-.025em;
-  background:linear-gradient(120deg,#fff 15%,var(--accent) 55%,#f0abfc 95%);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 10px 46px color-mix(in srgb,var(--accent) 45%,transparent));
-  animation:aitb-fadeup .95s ease .32s both;}
-.aitb-speech-sub{font-size:clamp(22px,3.1vw,50px);font-weight:800;color:#e9d5ff;letter-spacing:.01em;
-  max-width:24ch;animation:aitb-fadeup .95s ease .5s both;}
-.aitb-speech-tag{font-size:clamp(15px,1.7vw,26px);font-weight:800;letter-spacing:.13em;color:#94a3b8;
-  animation:aitb-fadeup .95s ease .68s both;}
+/* Pop in, then drift for as long as the slide is up. Both animate the transform
+   property, so the drift is declared second and takes over once the pop ends. */
+.aitb-speech-logo{line-height:0;
+  animation:aitb-pop .9s cubic-bezier(.2,1.1,.3,1) .18s both, aitb-drift 6.5s ease-in-out 1.2s infinite;}
+.aitb-speech-kicker{font-size:clamp(17px,2.2vw,38px);font-weight:800;letter-spacing:.05em;color:#c4b5fd;
+  animation:aitb-fadeup .9s ease .34s both;}
+.aitb-speech-hero{position:relative;font-size:clamp(44px,8.4vw,150px);font-weight:900;line-height:.96;
+  letter-spacing:-.025em;margin:2px 0;display:flex;flex-wrap:wrap;justify-content:center;gap:0 .28em;
+  overflow:hidden;padding:0 4px;}
+/* Recolour the shared letter gradient to whichever slide this is. */
+.aitb-speech-hero .aitb-letter{background:linear-gradient(120deg,#fff 12%,var(--accent) 46%,#f0abfc 88%);
+  -webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 8px 44px color-mix(in srgb,var(--accent) 50%,transparent));}
+.aitb-speech-tag{font-size:clamp(16px,2vw,32px);font-weight:900;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--accent);
+  animation:aitb-fadeup .9s ease .95s both, aitb-tagglow 2.8s ease-in-out 1.9s infinite;}
+@keyframes aitb-drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+@keyframes aitb-tagglow{0%,100%{opacity:.7;text-shadow:none}
+  50%{opacity:1;text-shadow:0 0 28px color-mix(in srgb,var(--accent) 65%,transparent)}}
+/* Streaks crossing behind the text. */
+.aitb-shoot{position:absolute;z-index:2;width:min(210px,16vw);height:2px;border-radius:2px;opacity:0;
+  background:linear-gradient(90deg,transparent,#fff);filter:drop-shadow(0 0 9px rgba(255,255,255,.9));
+  animation:aitb-shoot 9s ease-in infinite;}
+@keyframes aitb-shoot{0%{opacity:0;transform:translate(0,0) rotate(20deg) scaleX(.25)}
+  6%{opacity:.95}
+  22%{opacity:0;transform:translate(128vw,46vh) rotate(20deg) scaleX(1)}
+  100%{opacity:0;transform:translate(128vw,46vh) rotate(20deg) scaleX(1)}}
 
 /* Short projectors / windowed Chrome (≤900px tall): trim the title slide's
    decorative orbit and gaps so the tagline never falls below the fold. */
@@ -367,6 +410,6 @@ const SLIDE_CSS = `
   .aitb-how-card{padding:min(16px,1.8vh) min(18px,1.8vw);}
   .aitb-how-rule{padding:9px 16px;}
   .aitb-speech-inner{gap:min(16px,2vh);padding:3vh 5vw;}
-  .aitb-speech-title{font-size:clamp(44px,7.6vw,124px);}
+  .aitb-speech-hero{font-size:clamp(38px,7.2vw,116px);}
 }
 `
