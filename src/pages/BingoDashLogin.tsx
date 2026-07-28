@@ -1,6 +1,35 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useBingoAuth } from '../hooks/useBingoAuth'
 import { ParticleBackground } from '../components/ParticleBackground'
+
+/**
+ * Event-day shortcut.
+ *
+ * On the day, signing in through Google is the thing most likely to go wrong —
+ * wrong account picked, popup blocked, someone else's session already on the
+ * laptop. This signs straight into the shared event account instead.
+ *
+ * Configure with two build-time vars:
+ *   VITE_EVENT_LOGIN_EMAIL     the account to sign in as
+ *   VITE_EVENT_LOGIN_PASSWORD  its password — optional
+ *
+ * With both set, the button is a single tap. With only the email set, it fills
+ * the address and leaves the password to be typed.
+ *
+ * ⚠️ Vite inlines VITE_* values into the built JavaScript, which is public. A
+ * password set here is readable by anyone who opens the site — treat it as
+ * published, not secret. Keep the blast radius small: point this at a
+ * facilitator account (never the owner, so it cannot reach the Accounts page)
+ * with access_expires_at set to just after the event, so an extracted password
+ * stops working on its own. Rotate it after each event.
+ */
+const EVENT_LOGIN_EMAIL = (import.meta.env.VITE_EVENT_LOGIN_EMAIL as string | undefined)?.trim() ?? ''
+const EVENT_LOGIN_PASSWORD = (import.meta.env.VITE_EVENT_LOGIN_PASSWORD as string | undefined) ?? ''
+const LAST_EMAIL_KEY = 'bingo_last_login_email'
+
+function readLastLoginEmail(): string {
+  try { return localStorage.getItem(LAST_EMAIL_KEY)?.trim() ?? '' } catch { return '' }
+}
 
 export function BingoDashLogin() {
   const { signInWithPassword, signUpWithPassword, signInWithGoogle } = useBingoAuth()
@@ -10,6 +39,10 @@ export function BingoDashLogin() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const passwordRef = useRef<HTMLInputElement>(null)
+  // Read once on mount: a device that has signed in before can offer that
+  // account even when no build-time email is configured.
+  const [eventEmail] = useState(() => EVENT_LOGIN_EMAIL || readLastLoginEmail())
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,6 +50,9 @@ export function BingoDashLogin() {
     try {
       if (mode === 'login') {
         await signInWithPassword(email, password)
+        // Remember what worked, so the next event-day login on this device is
+        // one tap even if no email was configured at build time.
+        try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()) } catch { /* private mode — skip */ }
       } else {
         const { needsConfirmation } = await signUpWithPassword(email, password)
         if (needsConfirmation) {
@@ -29,6 +65,25 @@ export function BingoDashLogin() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  // One tap when both vars are configured; otherwise fill the address and let
+  // the password be typed. The configured pair is used together — pairing a
+  // configured password with a remembered address would just fail.
+  const oneTap = !!(EVENT_LOGIN_EMAIL && EVENT_LOGIN_PASSWORD)
+
+  const handleEventLogin = async () => {
+    setMode('login'); setError(''); setNotice('')
+    if (!oneTap) { setEmail(eventEmail); passwordRef.current?.focus(); return }
+    setEmail(EVENT_LOGIN_EMAIL); setPassword(EVENT_LOGIN_PASSWORD)
+    setBusy(true)
+    try {
+      await signInWithPassword(EVENT_LOGIN_EMAIL, EVENT_LOGIN_PASSWORD)
+      try { localStorage.setItem(LAST_EMAIL_KEY, EVENT_LOGIN_EMAIL) } catch { /* private mode */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Event login failed')
       setBusy(false)
     }
   }
@@ -56,6 +111,24 @@ export function BingoDashLogin() {
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+          {mode === 'login' && (oneTap || eventEmail) && (
+            <>
+              <button
+                type="button" onClick={handleEventLogin} disabled={busy}
+                className="w-full py-3.5 rounded-2xl font-black uppercase tracking-wider text-sm
+                  bg-amber-400 text-gray-900 hover:bg-amber-300 active:scale-95 transition-all
+                  disabled:opacity-50"
+              >
+                {busy && oneTap ? 'Signing in…' : '🎪 Marshal login'}
+              </button>
+              <p className="text-gray-400 text-xs text-center mt-2 mb-4 break-all">
+                {oneTap
+                  ? 'Shared event account — no sign-up, no approval needed.'
+                  : <>Fills in <b className="text-gray-300">{eventEmail}</b> — just type the password.</>}
+              </p>
+            </>
+          )}
+
           <button
             onClick={handleGoogle}
             disabled={busy}
@@ -83,6 +156,7 @@ export function BingoDashLogin() {
               className="w-full px-4 py-3 rounded-2xl bg-black/30 border-2 border-white/15 text-white placeholder-white/30 focus:border-purple-500 outline-none transition-colors"
             />
             <input
+              ref={passwordRef}
               type="password" required value={password} minLength={6}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               onChange={e => setPassword(e.target.value)} placeholder="Password"
