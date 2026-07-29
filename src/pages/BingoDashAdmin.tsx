@@ -440,6 +440,25 @@ function CategoryGroupBlock({
 // Remember which board the admin was editing across navigations (e.g. Preview → back)
 const ADMIN_SECTION_KEY = 'bingo-dash-admin-section-id'
 
+/**
+ * Explain a board write that didn't stick.
+ *
+ * The "tenant update" policy on bingo_sections requires BOTH
+ * can_use_game('bingo') AND bingo_can_write(owner_id). When either fails the
+ * UPDATE matches zero rows rather than raising, so Start game / Set live /
+ * timer changes used to fail completely silently and read as a dead button.
+ */
+function boardWriteFailureMessage(dbMessage?: string): string {
+  return [
+    "Couldn't save that change to the board.",
+    '',
+    'This usually means the account is not enabled for Bingo Dash — ask the',
+    'main account holder to open Accounts and check that it is Approved, that',
+    'the "Bingo Dash" toggle is ON, and that any temporary access has not expired.',
+    dbMessage ? `\nDatabase said: ${dbMessage}` : '',
+  ].join('\n')
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export function BingoDashAdmin() {
   const navigate = useNavigate()
@@ -626,6 +645,13 @@ export function BingoDashAdmin() {
   const allCategories = [...new Set(scopedTasks.map(t => t.category).filter(Boolean))].sort() as string[]
   // Timer + alarm + marshal password + photo toggle are per board (bingo_sections).
   const currentBoard = sections.find(s => s.id === currentSectionId) ?? null
+  // Where THIS account's players actually land. /bingo-dash resolves its board
+  // from the single global bingo_settings pointer, which set_active_board only
+  // moves for the owner — so it always serves the house board. Sub accounts must
+  // use their own slug or they (and their players) get someone else's game.
+  const playerViewPath = myOwnerValue === null
+    ? '/bingo-dash'
+    : currentBoard ? `/bingo-dash/play/${currentBoard.slug}` : '/bingo-dash'
   const isTimerRunning = !!currentBoard?.timer_end_at && new Date(currentBoard.timer_end_at) > new Date()
 
   // Library view: candidates for "Add to Grid" across sections.
@@ -1054,6 +1080,9 @@ export function BingoDashAdmin() {
   }
 
   const toggleSectionGameStarted = async (sectionId: string, started: boolean) => {
+    // Snapshot for rollback: the UI flips optimistically, so a write the
+    // database rejects would otherwise show as LIVE until the next refetch.
+    const prevSections = sections
     if (started) {
       // Lock every other board OF THIS ACCOUNT and make this one live for its
       // players. Other accounts' boards are never touched.
@@ -1061,14 +1090,28 @@ export function BingoDashAdmin() {
       if (isOwner) setSettings(prev => prev ? { ...prev, active_section_id: sectionId } : prev)
       setMyActiveBoard(sectionId)
       const otherIds = myBoards.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
-      await Promise.all([
-        supabase.from('bingo_sections').update({ game_started: true }).eq('id', sectionId),
-        otherIds.length > 0 ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds) : Promise.resolve(),
+      const [liveRes, othersRes, rpcRes] = await Promise.all([
+        supabase.from('bingo_sections').update({ game_started: true }).eq('id', sectionId).select('id'),
+        otherIds.length > 0
+          ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds).select('id')
+          : Promise.resolve({ error: null, data: [] as { id: string }[] }),
         supabase.rpc('set_active_board', { p_section: sectionId }),
       ])
+      // Zero rows updated means RLS refused it — that is the failure to report,
+      // not just a thrown error.
+      const failure = liveRes.error ?? othersRes.error ?? rpcRes.error
+      if (failure || liveRes.data?.length !== 1) {
+        setSections(prevSections)
+        alert(boardWriteFailureMessage(failure?.message))
+      }
     } else {
       setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: false } : s))
-      await supabase.from('bingo_sections').update({ game_started: false }).eq('id', sectionId)
+      const { data, error } = await supabase
+        .from('bingo_sections').update({ game_started: false }).eq('id', sectionId).select('id')
+      if (error || data?.length !== 1) {
+        setSections(prevSections)
+        alert(boardWriteFailureMessage(error?.message))
+      }
     }
   }
 
@@ -1144,8 +1187,12 @@ export function BingoDashAdmin() {
     if (!currentSectionId) return
     setTimerSaving(true)
     try {
-      const { data } = await supabase.from('bingo_sections').update(patch).eq('id', currentSectionId).select().single()
-      if (data) setSections(prev => prev.map(s => s.id === data.id ? data : s))
+      const { data, error } = await supabase.from('bingo_sections').update(patch).eq('id', currentSectionId).select().single()
+      if (data) { setSections(prev => prev.map(s => s.id === data.id ? data : s)); return }
+      // A row-level-security rejection is not an error here — the UPDATE simply
+      // matches zero rows, so .single() fails and the change vanishes silently.
+      // Say so out loud instead: this is what made the timer look broken.
+      alert(boardWriteFailureMessage(error?.message))
     } finally { setTimerSaving(false) }
   }
 
@@ -1868,7 +1915,7 @@ export function BingoDashAdmin() {
             >
               Join Link / QR
             </button>
-            <a href="/bingo-dash" target="_blank" rel="noopener noreferrer"
+            <a href={playerViewPath} target="_blank" rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg text-sm font-medium text-violet-400 border border-violet-800 hover:bg-violet-950/60 transition-colors">
               Player View ↗
             </a>
@@ -2302,7 +2349,7 @@ export function BingoDashAdmin() {
                 Drag tiles to reorder · Drag from list to place · Hover to move ◀▶ or remove ✕
               </p>
             </div>
-            <a href="/bingo-dash" target="_blank" rel="noopener noreferrer"
+            <a href={playerViewPath} target="_blank" rel="noopener noreferrer"
               className="text-xs text-violet-500 hover:text-violet-700 transition-colors">
               Preview ↗
             </a>

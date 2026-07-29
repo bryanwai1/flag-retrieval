@@ -66,7 +66,7 @@ export function BingoDashParticipant() {
   const isSnakeLadder = searchParams.get('from') === 'snake-ladder'
   const snakeTileParam = searchParams.get('tile')
   const snakeTile = snakeTileParam ? parseInt(snakeTileParam, 10) : null
-  const backPath = isSnakeLadder ? '/snake-ladder' : '/bingo-dash'
+  const [backPath, setBackPath] = useState(isSnakeLadder ? '/snake-ladder' : '/bingo-dash')
   const { team, loading: teamLoading, isRegistered, leaveTeam } = useBingoDashTeam()
   const isObserver = !isSnakeLadder && localStorage.getItem('bingo-dash-member-role') === 'observer'
   const { pages, loading: pagesLoading } = useBingoTaskPages(taskId)
@@ -101,6 +101,27 @@ export function BingoDashParticipant() {
   const [answerInputs, setAnswerInputs] = useState<string[]>([])
   const [carouselIdx, setCarouselIdx] = useState(0)
   const letterRefs = useRef<(HTMLInputElement | null)[][]>([])
+
+  // Send the player back to THEIR OWN board. /bingo-dash always resolves the
+  // house board (the global bingo_settings pointer only moves for the owner),
+  // so a sub account's player finishing a tile would otherwise land in someone
+  // else's game. Only diverge when the team's board isn't the global one, so
+  // the owner's players keep the exact route they have today.
+  useEffect(() => {
+    if (isSnakeLadder || !team?.section_id) return
+    let cancelled = false
+    ;(async () => {
+      const [{ data: settings }, { data: section }] = await Promise.all([
+        supabase.from('bingo_settings').select('active_section_id').eq('id', 'main').maybeSingle(),
+        supabase.from('bingo_sections').select('slug').eq('id', team.section_id).maybeSingle(),
+      ])
+      if (cancelled || !section?.slug) return
+      if (settings?.active_section_id !== team.section_id) {
+        setBackPath(`/bingo-dash/play/${section.slug}`)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isSnakeLadder, team?.section_id])
 
   const focusLetter = useCallback((rowIdx: number, charIdx: number) => {
     letterRefs.current[rowIdx]?.[charIdx]?.focus()
@@ -284,7 +305,7 @@ export function BingoDashParticipant() {
               You need to pick your group before you can complete this task.
             </p>
             <button
-              onClick={() => navigate('/bingo-dash')}
+              onClick={() => navigate(backPath)}
               className="px-6 py-3 rounded-2xl text-white font-black text-base"
               style={{ backgroundColor: '#a855f7', boxShadow: '0 8px 24px #a855f744' }}
             >
