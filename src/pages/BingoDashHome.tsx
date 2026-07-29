@@ -709,6 +709,48 @@ export function BingoDashHome() {
     return () => { supabase.removeChannel(channel) }
   }, [sectionId])
 
+  // iOS Safari suspends realtime WebSockets when the tab is backgrounded or the
+  // screen locks, so participants miss the "game started" UPDATE and appear stuck
+  // until they refresh. These two effects make the page self-heal without one.
+
+  // 1. Re-sync whenever the page becomes visible / regains focus (e.g. after unlock).
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState !== 'visible') return
+      if (sectionId) {
+        supabase.from('bingo_sections').select('*').eq('id', sectionId).single()
+          .then(({ data }) => {
+            if (!data) return
+            setSection(prev => prev ? { ...prev, ...data } : data)
+            setBoardNote(data.board_note ?? '')
+            setBoardNoteEvery(data.board_note_every ?? 0)
+          })
+      }
+      if (team?.id) {
+        supabase.from('bingo_scans').select('*').eq('team_id', team.id)
+          .then(({ data }) => { if (data) setScans(data) })
+      }
+    }
+    document.addEventListener('visibilitychange', resync)
+    window.addEventListener('focus', resync)
+    return () => {
+      document.removeEventListener('visibilitychange', resync)
+      window.removeEventListener('focus', resync)
+    }
+  }, [sectionId, team?.id])
+
+  // 2. While the game is locked, poll for the start as a fallback for a dead socket.
+  useEffect(() => {
+    if (!sectionId || section?.game_started) return
+    const id = setInterval(() => {
+      supabase.from('bingo_sections').select('game_started').eq('id', sectionId).single()
+        .then(({ data }) => {
+          if (data?.game_started) setSection(prev => prev ? { ...prev, game_started: true } : prev)
+        })
+    }, 4000)
+    return () => clearInterval(id)
+  }, [sectionId, section?.game_started])
+
   // Load this team's scans
   useEffect(() => {
     if (!team) { setScans([]); return }
@@ -751,6 +793,37 @@ export function BingoDashHome() {
     return (
       <>
         <JoinScreen onJoin={async (teamId, pwd) => { await joinTeamById(teamId, pwd) }} />
+        <TimeUpAlarm settings={section} />
+      </>
+    )
+  }
+
+  // Locked board: registered players wait here until the admin sets it live.
+  // Mirrors the gate on /bingo-dash/play/:sectionSlug (BingoDashJoin).
+  if (section && !section.game_started) {
+    return (
+      <>
+        <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+          <ParticleBackground />
+          <div className="relative z-10 text-center animate-slide-up">
+            <div className="text-6xl mb-5">⏳</div>
+            <h1 className="text-4xl font-black text-white tracking-tight mb-2">Game Not Started Yet</h1>
+            <p className="text-purple-400 font-bold text-base mb-1">{section.name}</p>
+            <p className="text-gray-400 text-sm mb-8">
+              You're in <span className="text-white font-bold">{team!.name}</span>. Hang tight — the game will begin soon!
+            </p>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-600 text-xs mt-2">Waiting for facilitator to start the game...</p>
+            </div>
+            <button
+              onClick={leaveTeam}
+              className="mt-10 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              Switch Team
+            </button>
+          </div>
+        </div>
         <TimeUpAlarm settings={section} />
       </>
     )
