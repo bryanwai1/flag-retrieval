@@ -120,6 +120,8 @@ type RankedTeam = {
   total: number
   bingos: number
   tasksDone: number
+  /** When this team last scored; earlier wins a tie. Infinity = never scored. */
+  reachedAt: number
 }
 
 function AwardShow({ sectionSlug }: { sectionSlug: string }) {
@@ -179,6 +181,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
           total: team.bonus_points ?? 0,
           bingos: 0,
           tasksDone: 0,
+          reachedAt: Infinity,
         }))
         .sort(rankCompare)
     }
@@ -194,6 +197,10 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
         const t = slots[i]
         return t && completedIds.has(t.id)
       })).length
+      const reachedAt = teamScans.reduce(
+        (latest, sc) => sc.completed_at ? Math.max(latest, Date.parse(sc.completed_at)) : latest,
+        0,
+      )
       return {
         team,
         basePoints,
@@ -201,6 +208,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
         total: basePoints + bonusPoints,
         bingos,
         tasksDone: completedIds.size,
+        reachedAt: reachedAt || Infinity,
       }
     })
     computed.sort(rankCompare)
@@ -438,6 +446,10 @@ function rankCompare(a: RankedTeam, b: RankedTeam): number {
     b.total - a.total ||
     b.bingos - a.bingos ||
     b.tasksDone - a.tasksDone ||
+    // Dead heat on score: the team that got there first ranks higher. Falling
+    // through to the name here ranked a genuine tie alphabetically, which is
+    // what let a later finisher take the higher award.
+    a.reachedAt - b.reachedAt ||
     a.team.name.localeCompare(b.team.name)
   )
 }

@@ -18,6 +18,12 @@ type Row = {
   bonus: number
   bingos: number
   tasksDone: number
+  /**
+   * When this team last scored — the moment they reached their current total.
+   * Ties are broken in favour of whoever got there first, so a team that
+   * matches the leader later does not leapfrog them. Infinity = never scored.
+   */
+  reachedAt: number
 }
 
 export function BingoDashProjector() {
@@ -129,7 +135,11 @@ export function BingoDashProjector() {
     const bingos = completedBingoLines(slots, completedIds).length
     const tasksDone = completedIds.size
     const bonus = team.bonus_points ?? 0
-    return { team, points, bonus, bingos, tasksDone }
+    const reachedAt = teamScans.reduce((latest, s) => {
+      if (!s.completed || !gridTaskIds.has(s.task_id) || !s.completed_at) return latest
+      return Math.max(latest, Date.parse(s.completed_at))
+    }, 0)
+    return { team, points, bonus, bingos, tasksDone, reachedAt: reachedAt || Infinity }
   })
 
   // When the "Total after Bonus" view is on, rank by Bingo points + manual bonus points.
@@ -137,7 +147,11 @@ export function BingoDashProjector() {
   rows.sort((a, b) => {
     if (scoreOf(b) !== scoreOf(a)) return scoreOf(b) - scoreOf(a)
     if (b.bingos !== a.bingos) return b.bingos - a.bingos
-    return b.tasksDone - a.tasksDone
+    if (b.tasksDone !== a.tasksDone) return b.tasksDone - a.tasksDone
+    // Dead heat on every score component: first to get there stays ahead.
+    // Without this the order fell back to the team list, so a team matching
+    // the leader later could appear above them.
+    return a.reachedAt - b.reachedAt
   })
 
   const rankColors = ['#fbbf24', '#cbd5e1', '#d97706']

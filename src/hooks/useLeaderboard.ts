@@ -56,8 +56,18 @@ export function useLeaderboard(ownerValue: string | null = null) {
     return () => { supabase.removeChannel(channel) }
   }, [fetchLeaderboard])
 
-  const byFlags = [...entries].sort((a, b) => b.flagsCompleted - a.flagsCompleted || a.teamName.localeCompare(b.teamName))
-  const byPoints = [...entries].sort((a, b) => b.pointsGathered - a.pointsGathered || a.teamName.localeCompare(b.teamName))
+  // On a tie, the team that got there first ranks higher — lastCompletedAt was
+  // already being tracked for exactly this but the sort fell straight through
+  // to the team name, which ranked a genuine tie alphabetically.
+  const finishedFirst = (a: LeaderboardEntry, b: LeaderboardEntry) => {
+    const at = a.lastCompletedAt ? Date.parse(a.lastCompletedAt) : Infinity
+    const bt = b.lastCompletedAt ? Date.parse(b.lastCompletedAt) : Infinity
+    return at - bt
+  }
+  const byFlags = [...entries].sort((a, b) =>
+    b.flagsCompleted - a.flagsCompleted || finishedFirst(a, b) || a.teamName.localeCompare(b.teamName))
+  const byPoints = [...entries].sort((a, b) =>
+    b.pointsGathered - a.pointsGathered || finishedFirst(a, b) || a.teamName.localeCompare(b.teamName))
 
   return { byFlags, byPoints, loading }
 }

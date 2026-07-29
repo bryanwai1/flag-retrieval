@@ -1084,14 +1084,25 @@ export function BingoDashAdmin() {
     // database rejects would otherwise show as LIVE until the next refetch.
     const prevSections = sections
     if (started) {
+      // Start the countdown with the game. A board with time on the clock that
+      // is not already running gets its timer_end_at set here, so the
+      // facilitator does not have to remember a second button at the whistle.
+      const board = sections.find(s => s.id === sectionId)
+      const alreadyRunning = !!board?.timer_end_at && new Date(board.timer_end_at).getTime() > Date.now()
+      const startPatch: Partial<BingoSection> = { game_started: true }
+      if (!alreadyRunning && (board?.timer_seconds ?? 0) > 0) {
+        startPatch.timer_end_at = new Date(Date.now() + (board!.timer_seconds ?? 0) * 1000).toISOString()
+      }
       // Lock every other board OF THIS ACCOUNT and make this one live for its
       // players. Other accounts' boards are never touched.
-      setSections(prev => prev.map(s => isMineRow(s.owner_id) ? { ...s, game_started: s.id === sectionId } : s))
+      setSections(prev => prev.map(s => isMineRow(s.owner_id)
+        ? (s.id === sectionId ? { ...s, ...startPatch } : { ...s, game_started: false })
+        : s))
       if (isOwner) setSettings(prev => prev ? { ...prev, active_section_id: sectionId } : prev)
       setMyActiveBoard(sectionId)
       const otherIds = myBoards.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
       const [liveRes, othersRes, rpcRes] = await Promise.all([
-        supabase.from('bingo_sections').update({ game_started: true }).eq('id', sectionId).select('id'),
+        supabase.from('bingo_sections').update(startPatch).eq('id', sectionId).select('id'),
         otherIds.length > 0
           ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds).select('id')
           : Promise.resolve({ error: null, data: [] as { id: string }[] }),
