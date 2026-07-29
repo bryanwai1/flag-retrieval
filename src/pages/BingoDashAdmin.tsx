@@ -1954,6 +1954,17 @@ export function BingoDashAdmin() {
                 Accounts
               </button>
             )}
+            {/* A trainer lead runs their own crew; a facilitator is on someone
+                else's, so they get no invite of their own. */}
+            {!isOwner && !account?.facilitator_host && (
+              <button
+                onClick={() => navigate('/bingo-dash/crew')}
+                title="Invite helpers to facilitate your event"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-sky-400 border border-sky-800 hover:bg-sky-950/60 transition-colors"
+              >
+                My crew
+              </button>
+            )}
             <div className="flex items-center gap-2 pl-2 border-l border-white/10">
               <span className="hidden md:block text-[11px] text-gray-500 max-w-[140px] truncate" title={account?.email ?? ''}>
                 {account?.email}

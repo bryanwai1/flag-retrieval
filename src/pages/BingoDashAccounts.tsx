@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useBingoAuth } from '../hooks/useBingoAuth'
-import type { BingoAccount, BingoSection, BingoFacilitatorSession } from '../types/database'
+import { FacilitatorSessions } from '../components/FacilitatorSessions'
+import type { BingoAccount, BingoSection } from '../types/database'
 
 const STATUS_STYLES: Record<BingoAccount['status'], string> = {
   pending:  'bg-amber-400/15 text-amber-300 border-amber-400/40',
@@ -21,34 +22,20 @@ const FACILITATOR_DURATIONS = [
 const fmtExpiry = (iso: string) =>
   new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 
-/** How long a crew pass stays open. Most events fit inside a working day. */
-const SESSION_DURATIONS = [
-  { label: '4 hours',  hours: 4 },
-  { label: '8 hours',  hours: 8 },
-  { label: '12 hours', hours: 12 },
-  { label: '24 hours', hours: 24 },
-  { label: '2 days',   hours: 48 },
-]
-
-const crewUrl = (code: string) => `${window.location.origin}/bingo-dash/join-crew/${code}`
-
-/** One paste into the crew's WhatsApp group — link and PIN travel together. */
-const shareText = (s: BingoFacilitatorSession) =>
-  `${s.label} — facilitator access\n${crewUrl(s.code)}\nPIN: ${s.pin}\n\nOpen the link, enter your name and the PIN. Access ends ${fmtExpiry(s.expires_at)}.`
-
-function CopyButton({ text, label, className = '' }: { text: string; label: string; className?: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      }}
-      className={className || 'px-3 py-2 rounded-xl text-xs font-black bg-purple-600 hover:bg-purple-500 text-white transition-colors flex-shrink-0'}>
-      {copied ? '✓ Copied' : label}
-    </button>
-  )
+/**
+ * How long a request has been sitting there. Triaging Pending is really a
+ * question of "who has been waiting longest", so lead with the age and keep
+ * the exact timestamp on hover.
+ */
+function ago(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
+  if (mins < 1)    return 'just now'
+  if (mins < 60)   return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24)  return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30)   return `${days}d ago`
+  return new Date(iso).toLocaleDateString([], { dateStyle: 'medium' })
 }
 
 function GameToggle({ label, on, busy, onToggle }: {
@@ -81,25 +68,16 @@ export function BingoDashAccounts() {
   const [facHost, setFacHost] = useState('')
   const [facHours, setFacHours] = useState(24)
   const inviteUrl = `${window.location.origin}/bingo-dash/login`
-  // Crew passes: one shareable link + PIN per event
-  const [sessions, setSessions] = useState<BingoFacilitatorSession[]>([])
-  const [newLabel, setNewLabel] = useState('')
-  const [newHost, setNewHost] = useState('')
-  const [newHours, setNewHours] = useState(12)
-  const [newSeats, setNewSeats] = useState('')
-  const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
-    const [accountsRes, boardsRes, settingsRes, sessionsRes] = await Promise.all([
+    const [accountsRes, boardsRes, settingsRes] = await Promise.all([
       supabase.from('bingo_accounts').select('*').order('created_at', { ascending: false }),
       supabase.from('bingo_sections').select('*').is('owner_id', null).order('sort_order'),
       supabase.from('bingo_settings').select('template_section_id').eq('id', 'main').maybeSingle(),
-      supabase.from('bingo_facilitator_sessions').select('*').order('created_at', { ascending: false }),
     ])
     if (accountsRes.data) setAccounts(accountsRes.data as BingoAccount[])
     if (boardsRes.data) setBoards(boardsRes.data as BingoSection[])
     if (settingsRes.data) setTemplateId(settingsRes.data.template_section_id ?? null)
-    if (sessionsRes.data) setSessions(sessionsRes.data as BingoFacilitatorSession[])
     setLoading(false)
   }, [])
 
@@ -183,46 +161,6 @@ export function BingoDashAccounts() {
     } finally { setBusyId(null) }
   }
 
-  const createSession = async () => {
-    setCreating(true)
-    setNotice('')
-    try {
-      const seats = Number(newSeats)
-      const { error } = await supabase.rpc('create_facilitator_session', {
-        p_label: newLabel.trim() || 'Event session',
-        p_host: newHost || me?.id,
-        p_hours: newHours,
-        p_max_uses: Number.isFinite(seats) && seats > 0 ? seats : null,
-      })
-      if (error) throw error
-      setNewLabel(''); setNewSeats('')
-      await load()
-    } catch (err) {
-      setNotice(err instanceof Error ? `Could not create session: ${err.message}` : 'Could not create session')
-    } finally { setCreating(false) }
-  }
-
-  const endSession = async (s: BingoFacilitatorSession) => {
-    setBusyId(s.id)
-    setNotice('')
-    try {
-      const { error } = await supabase.rpc('end_facilitator_session', { p_id: s.id })
-      if (error) throw error
-      setNotice(`"${s.label}" closed — every facilitator on that pass has been signed out of your boards.`)
-      await load()
-    } catch (err) {
-      setNotice(err instanceof Error ? `Could not end session: ${err.message}` : 'Could not end session')
-    } finally { setBusyId(null) }
-  }
-
-  const deleteSession = async (s: BingoFacilitatorSession) => {
-    setBusyId(s.id)
-    try {
-      await supabase.from('bingo_facilitator_sessions').delete().eq('id', s.id)
-      await load()
-    } finally { setBusyId(null) }
-  }
-
   const removeFacilitator = async (a: BingoAccount) => {
     setBusyId(a.id)
     try {
@@ -251,7 +189,7 @@ export function BingoDashAccounts() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-white font-bold text-sm truncate">{a.display_name ?? a.email ?? a.id}</p>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center flex-wrap gap-2 mt-1">
             <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status]}`}>
               {a.status}
             </span>
@@ -269,6 +207,9 @@ export function BingoDashAccounts() {
                 facilitator
               </span>
             )}
+            <span className="text-[11px] text-gray-500" title={fmtExpiry(a.created_at)}>
+              {a.status === 'pending' ? 'Requested' : 'Signed up'} {ago(a.created_at)}
+            </span>
             {a.id === me?.id && <span className="text-[11px] text-gray-500">you</span>}
           </div>
         </div>
@@ -390,120 +331,7 @@ export function BingoDashAccounts() {
           <p className="text-gray-400 animate-pulse">Loading…</p>
         ) : (
           <div className="flex flex-col gap-8">
-            <section className="px-4 py-4 rounded-2xl bg-sky-400/5 border border-sky-400/20">
-              <h2 className="text-white text-sm font-black uppercase tracking-widest mb-2">
-                🎪 Facilitator sessions
-              </h2>
-              <p className="text-gray-400 text-xs mb-4">
-                For <b className="text-gray-300">your own crew</b>. Create a pass, send the link + PIN to the group,
-                and everyone lands on <b className="text-gray-300">your</b> boards — same teams, same scoreboard.
-                No sign-up, no approval, and access dies on its own when the pass expires.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <input
-                  value={newLabel} onChange={e => setNewLabel(e.target.value)}
-                  placeholder="Event name (e.g. Nestlé KL — 15 Aug)"
-                  className="flex-1 min-w-[180px] px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm placeholder-white/25 focus:border-sky-500 outline-none transition-colors"
-                />
-                <select value={newHours} onChange={e => setNewHours(Number(e.target.value))}
-                  className="px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm focus:border-sky-500 outline-none transition-colors">
-                  {SESSION_DURATIONS.map(d => <option key={d.hours} value={d.hours}>{d.label}</option>)}
-                </select>
-                <input
-                  value={newSeats} onChange={e => setNewSeats(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Seats" inputMode="numeric"
-                  title="Maximum facilitators — leave blank for unlimited"
-                  className="w-20 px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm placeholder-white/25 focus:border-sky-500 outline-none transition-colors"
-                />
-                {hostOptions.length > 1 && (
-                  <select value={newHost || me?.id || ''} onChange={e => setNewHost(e.target.value)}
-                    title="Whose boards this crew works on"
-                    className="px-3 py-2 rounded-xl bg-black/30 border-2 border-white/15 text-white text-sm focus:border-sky-500 outline-none transition-colors">
-                    {hostOptions.map(h => (
-                      <option key={h.id} value={h.id}>
-                        {h.role === 'owner' ? 'My boards' : h.email ?? h.id}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button onClick={createSession} disabled={creating}
-                  className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 hover:bg-sky-500 text-white transition-colors disabled:opacity-50">
-                  {creating ? 'Creating…' : '+ New session'}
-                </button>
-              </div>
-
-              {sessions.length === 0 ? (
-                <p className="text-gray-500 text-sm">No sessions yet — create one before your next event.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {sessions.map(s => {
-                    const crew = accounts.filter(a => a.facilitator_session_id === s.id)
-                    const dead = s.revoked || new Date(s.expires_at).getTime() <= Date.now()
-                    const hostName = accounts.find(a => a.id === s.host_id)
-                    return (
-                      <div key={s.id} className={`px-4 py-3 rounded-2xl border ${
-                        dead ? 'bg-white/[0.02] border-white/10 opacity-60' : 'bg-black/20 border-sky-400/25'
-                      }`}>
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div className="min-w-0">
-                            <p className="text-white font-bold text-sm">{s.label}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {dead
-                                ? <span className="text-red-300">{s.revoked ? 'Closed' : 'Expired'} · {fmtExpiry(s.expires_at)}</span>
-                                : <>Ends {fmtExpiry(s.expires_at)}</>}
-                              {' · '}{s.uses}{s.max_uses ? `/${s.max_uses}` : ''} joined
-                              {hostOptions.length > 1 && hostName?.role !== 'owner' && <> · for {hostName?.email}</>}
-                            </p>
-                          </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            {!dead && (
-                              <>
-                                <CopyButton text={shareText(s)} label="Copy invite" />
-                                <button onClick={() => endSession(s)} disabled={busyId === s.id}
-                                  title="Close the pass and immediately sign out everyone who joined it"
-                                  className="px-3 py-2 rounded-xl text-xs font-black bg-white/10 hover:bg-red-500/80 text-white transition-colors disabled:opacity-50">
-                                  End session
-                                </button>
-                              </>
-                            )}
-                            {dead && (
-                              <button onClick={() => deleteSession(s)} disabled={busyId === s.id}
-                                className="px-3 py-2 rounded-xl text-xs font-bold text-white/60 border border-white/20 hover:bg-white/10 transition-colors disabled:opacity-50">
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {!dead && (
-                          <div className="flex items-center gap-2 mt-3">
-                            <code className="flex-1 min-w-0 truncate px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-gray-300 text-xs">
-                              {crewUrl(s.code)}
-                            </code>
-                            <div className="px-3 py-2 rounded-xl bg-amber-400/15 border border-amber-400/40 flex-shrink-0">
-                              <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-wider">PIN </span>
-                              <span className="text-amber-200 font-black tracking-[0.2em] text-sm">{s.pin}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {crew.length > 0 && (
-                          <div className="flex items-center flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/10">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mr-1">Crew:</span>
-                            {crew.map(c => (
-                              <span key={c.id} className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/10 text-gray-300 border border-white/10">
-                                {c.display_name || c.email || 'guest'}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
+            <FacilitatorSessions />
 
             <section className="px-4 py-4 rounded-2xl bg-white/5 border border-white/10">
               <h2 className="text-white text-sm font-black uppercase tracking-widest mb-2">Client sign-up link</h2>

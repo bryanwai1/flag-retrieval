@@ -33,6 +33,7 @@ const BingoDashTeamMembers  = lazy(() => import('./pages/BingoDashTeamMembers').
 const BingoDashAllTeamsMembers = lazy(() => import('./pages/BingoDashAllTeamsMembers').then(m => ({ default: m.BingoDashAllTeamsMembers })))
 const BingoDashAccounts     = lazy(() => import('./pages/BingoDashAccounts').then(m => ({ default: m.BingoDashAccounts })))
 const BingoDashJoinCrew     = lazy(() => import('./pages/BingoDashJoinCrew').then(m => ({ default: m.BingoDashJoinCrew })))
+const BingoDashCrew         = lazy(() => import('./pages/BingoDashCrew').then(m => ({ default: m.BingoDashCrew })))
 const SnakeLadderBoard      = lazy(() => import('./pages/SnakeLadderBoard').then(m => ({ default: m.SnakeLadderBoard })))
 const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then(m => ({ default: m.SnakeLadderAdmin })))
 const VotingAdmin           = lazy(() => import('./pages/VotingAdmin').then(m => ({ default: m.VotingAdmin })))
@@ -73,6 +74,10 @@ export default function App() {
             <Route path="/bingo-dash/admin" element={<RequireBingoAdmin game="bingo"><BingoDashAdmin /></RequireBingoAdmin>} />
             <Route path="/bingo-dash/admin/task/:taskId" element={<RequireBingoAdmin game="bingo"><BingoDashTaskEdit /></RequireBingoAdmin>} />
             <Route path="/bingo-dash/accounts" element={<RequireBingoAdmin ownerOnly><BingoDashAccounts /></RequireBingoAdmin>} />
+            {/* Crew passes for an approved trainer lead — their own event only.
+                Any approved account may open it; the page and the RPC both
+                refuse a facilitator, who has no tenant to invite anyone onto */}
+            <Route path="/bingo-dash/crew" element={<RequireBingoAdmin><BingoDashCrew /></RequireBingoAdmin>} />
             {/* Invite-link landing: login/signup when signed out, approval gate
                 while pending, straight to the admin once approved */}
             <Route path="/bingo-dash/login" element={<RequireBingoAdmin><Navigate to="/bingo-dash/admin" replace /></RequireBingoAdmin>} />
