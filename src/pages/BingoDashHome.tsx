@@ -462,13 +462,6 @@ function BoardScreen({
   // Letters earned: 1st bingo → B, 2nd → BI, etc. (capped at 5)
   const lettersEarned = BINGO_WORD.slice(0, Math.min(completedBingoCount, 5))
 
-  // Row completions for the side BINGO letters (rows 0-4)
-  const rowCompleted = [0, 1, 2, 3, 4].map(rowIdx =>
-    BINGO_LINES[rowIdx].every(slotIdx => {
-      const task = slots[slotIdx]
-      return task && getStatus(task.id) === 'completed'
-    })
-  )
 
   // Stable dep key so the detection effect only runs when the set of
   // completed line indices actually changes (not on every render).
@@ -573,47 +566,20 @@ function BoardScreen({
               <p className="text-sm mt-1">Ask your facilitator to configure the grid</p>
             </div>
           ) : (
-            <div className="flex gap-2 items-start">
-              {/* BINGO letters column — one per row */}
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                {BINGO_WORD.split('').map((letter, rowIdx) => {
-                  const earned = rowCompleted[rowIdx]
-                  return (
-                    <div
-                      key={letter}
-                      className="flex items-center justify-center rounded-lg aspect-square transition-all duration-500"
-                      style={{
-                        width: 22,
-                        backgroundColor: earned ? '#a855f7' : 'rgba(255,255,255,0.05)',
-                        color: earned ? '#fff' : 'rgba(255,255,255,0.2)',
-                        fontWeight: 900,
-                        fontSize: 13,
-                        letterSpacing: '0.05em',
-                        boxShadow: earned ? '0 0 12px #a855f7aa' : 'none',
-                      }}
-                    >
-                      {letter}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Grid */}
-              <div className="grid grid-cols-5 gap-2 flex-1">
-                {slots.map((task, i) =>
-                  task ? (
-                    <BingoTile
-                      key={task.id}
-                      task={task}
-                      status={getStatus(task.id)}
-                      isInBingoLine={bingoSlots.has(i)}
-                      onClick={() => navigate(`/bingo-dash/task/${task.id}`)}
-                    />
-                  ) : (
-                    <EmptyTile key={`empty-${i}`} />
-                  )
-                )}
-              </div>
+            <div className="grid grid-cols-5 gap-2">
+              {slots.map((task, i) =>
+                task ? (
+                  <BingoTile
+                    key={task.id}
+                    task={task}
+                    status={getStatus(task.id)}
+                    isInBingoLine={bingoSlots.has(i)}
+                    onClick={() => navigate(`/bingo-dash/task/${task.id}`)}
+                  />
+                ) : (
+                  <EmptyTile key={`empty-${i}`} />
+                )
+              )}
             </div>
           )}
         </div>
