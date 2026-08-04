@@ -86,7 +86,7 @@ export function AitbQrSlide({ kind, url }: { kind: 'player' | 'observer'; url: s
   const accent = player ? '#fbbf24' : '#c084fc'
   const steps = player
     ? ['Scan the QR', 'Pick your team — once', 'Draw & start missions']
-    : ['Scan the QR', 'Pick a team to cheer', 'Fire emoji — they pop up here!']
+    : ['Scan the QR', 'Pick the team you follow', 'See their missions live + cheer']
 
   return (
     <div className="aitb-slide aitb-qr" style={{ ['--accent' as string]: accent }}>
@@ -98,12 +98,12 @@ export function AitbQrSlide({ kind, url }: { kind: 'player' | 'observer'; url: s
         <div className="aitb-qr-left">
           <div className="aitb-eyebrow"><span className="aitb-eyebrow-dot" /> {player ? 'PLAYERS' : 'EVERYONE ELSE'}</div>
           <h1 className="aitb-qr-title">
-            {player ? <>Scan to<br />join the race</> : <>Watch &amp;<br />cheer live</>}
+            {player ? <>Scan to<br />join the race</> : <>Follow your<br />team live</>}
           </h1>
           <p className="aitb-qr-lead">
             {player
               ? 'One scan gets your team on the board. Pick your team once — this phone remembers it.'
-              : 'Not playing? Follow every rocket live and fire emoji that pop on this screen.'}
+              : 'See your team’s missions as they happen — running now, banked, still to go — and fire emoji that pop on this screen.'}
           </p>
           <ol className="aitb-qr-steps">
             {steps.map((s, i) => (

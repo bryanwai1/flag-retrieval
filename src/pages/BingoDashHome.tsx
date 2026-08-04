@@ -5,6 +5,9 @@ import { fetchBoardTasks } from '../lib/boardCards'
 import { useBingoDashTeam } from '../hooks/useBingoDashTeam'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
+import { TileFace } from '../components/BingoTileFace'
+import { IncomingDuelBanner } from '../components/ContestCard'
+import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BoardTimer } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
@@ -220,16 +223,20 @@ function BingoTile({
   task,
   status,
   isInBingoLine,
+  display,
   onClick,
 }: {
   task: BingoTask
   status: TileStatus
   isInBingoLine: boolean
+  display: TileDisplay
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      title={task.title}
+      aria-label={task.title}
       className="relative rounded-xl overflow-hidden flex flex-col items-center justify-center aspect-square transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
       style={{
         backgroundColor: task.hex_code,
@@ -263,14 +270,8 @@ function BingoTile({
         <div className="absolute top-1.5 right-1.5 z-10 w-2.5 h-2.5 rounded-full border-2 border-white/80" />
       )}
 
-      <div className="relative z-0 px-2 py-2 text-center flex flex-col items-center gap-1">
-        <p className="text-white/70 text-[9px] font-black uppercase tracking-widest leading-none">
-          {task.color}
-        </p>
-        <h3 className="text-white font-black text-[11px] leading-tight line-clamp-3">
-          {task.title}
-        </h3>
-      </div>
+      {/* Icon or words — whichever this board is set to in the admin */}
+      <TileFace task={task} display={display} />
 
       {/* Points badge */}
       {(task.points ?? 0) > 0 && (
@@ -398,6 +399,7 @@ function BoardScreen({
   settings,
   boardNote,
   boardNoteEvery,
+  tileDisplay,
   onLeave,
 }: {
   team: { id: string; name: string }
@@ -406,6 +408,7 @@ function BoardScreen({
   settings: BoardTimer | null
   boardNote: string
   boardNoteEvery: number
+  tileDisplay: TileDisplay
   onLeave: () => void
 }) {
   const navigate = useNavigate()
@@ -574,6 +577,7 @@ function BoardScreen({
                     task={task}
                     status={getStatus(task.id)}
                     isInBingoLine={bingoSlots.has(i)}
+                    display={tileDisplay}
                     onClick={() => navigate(`/bingo-dash/task/${task.id}`)}
                   />
                 ) : (
@@ -804,8 +808,12 @@ export function BingoDashHome() {
         settings={section}
         boardNote={boardNote}
         boardNoteEvery={boardNoteEvery}
+        tileDisplay={normalizeTileDisplay(section?.tile_display)}
         onLeave={leaveTeam}
       />
+      {/* Another team can challenge us at any moment — the banner has to reach
+          players wherever they are on the board, not only inside a card. */}
+      {team && sectionId && <IncomingDuelBanner team={team} sectionId={sectionId} />}
       <TimeUpAlarm settings={section} />
     </>
   )

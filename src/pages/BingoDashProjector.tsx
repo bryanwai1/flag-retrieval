@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoBoardCard } from '../types/database'
+import { duelBonusByTeam } from '../hooks/useBingoDuels'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoBoardCard, BingoDuel } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds))
@@ -14,7 +15,11 @@ function formatTime(totalSeconds: number): string {
 
 type Row = {
   team: BingoTeam
+  /** Tile points + contest bonuses won in duels — everything earned in play. */
   points: number
+  /** Contest bonus alone, so the board can show where a duel win landed. */
+  duelBonus: number
+  /** Manual bonus the admin adds during the award ceremony. */
   bonus: number
   bingos: number
   tasksDone: number
@@ -37,6 +42,7 @@ export function BingoDashProjector() {
   const [scans, setScans] = useState<BingoScan[]>([])
   const [settings, setSettings] = useState<BingoSettings | null>(null)
   const [sections, setSections] = useState<BingoSection[]>([])
+  const [duels, setDuels] = useState<BingoDuel[]>([])
   const [timerDisplay, setTimerDisplay] = useState('00:00')
   const [timerRunning, setTimerRunning] = useState(false)
   const [showBonus, setShowBonus] = useState(false)
@@ -44,13 +50,14 @@ export function BingoDashProjector() {
   // Initial load
   useEffect(() => {
     const load = async () => {
-      const [tasksRes, boardCardsRes, teamsRes, scansRes, sectionsRes, settingsRes] = await Promise.all([
+      const [tasksRes, boardCardsRes, teamsRes, scansRes, sectionsRes, settingsRes, duelsRes] = await Promise.all([
         supabase.from('bingo_tasks').select('*'),
         supabase.from('bingo_board_cards').select('*').order('slot'),
         supabase.from('bingo_teams').select('*').order('created_at'),
         supabase.from('bingo_scans').select('*'),
         supabase.from('bingo_sections').select('*').order('sort_order'),
         supabase.from('bingo_settings').select('*').eq('id', 'main').single(),
+        supabase.from('bingo_duels').select('*').eq('status', 'done'),
       ])
       if (tasksRes.data) setTasks(tasksRes.data)
       if (boardCardsRes.data) setBoardCards(boardCardsRes.data)
@@ -58,6 +65,7 @@ export function BingoDashProjector() {
       if (scansRes.data) setScans(scansRes.data)
       if (sectionsRes.data) setSections(sectionsRes.data)
       if (settingsRes.data) setSettings(settingsRes.data)
+      if (duelsRes.data) setDuels(duelsRes.data)
     }
     load()
   }, [])
@@ -89,6 +97,10 @@ export function BingoDashProjector() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_sections' }, async () => {
         const { data } = await supabase.from('bingo_sections').select('*').order('sort_order')
         if (data) setSections(data)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_duels' }, async () => {
+        const { data } = await supabase.from('bingo_duels').select('*').eq('status', 'done')
+        if (data) setDuels(data)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -125,21 +137,40 @@ export function BingoDashProjector() {
     .sort((a, b) => a.sort_order - b.sort_order)
   const slots = buildBingoSlots(gridTasks)
 
+  // Contest bonuses won in duels. A winning DEFENDER has no tile to hang points
+  // on, so this is the only place their win shows up.
+  const duelBonuses = duelBonusByTeam(duels)
+
   const rows: Row[] = sectionTeams.map(team => {
     const teamScans = scans.filter(s => s.team_id === team.id)
     const gridTaskIds = new Set(gridTasks.map(t => t.id))
     const completedIds = new Set(teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).map(s => s.task_id))
-    const points = gridTasks.reduce(
+    const tilePoints = gridTasks.reduce(
       (sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0,
     )
+    const duelBonus = duelBonuses.get(team.id) ?? 0
     const bingos = completedBingoLines(slots, completedIds).length
     const tasksDone = completedIds.size
     const bonus = team.bonus_points ?? 0
-    const reachedAt = teamScans.reduce((latest, s) => {
+    const lastScan = teamScans.reduce((latest, s) => {
       if (!s.completed || !gridTaskIds.has(s.task_id) || !s.completed_at) return latest
       return Math.max(latest, Date.parse(s.completed_at))
     }, 0)
-    return { team, points, bonus, bingos, tasksDone, reachedAt: reachedAt || Infinity }
+    // A duel win is a scoring moment too, so it counts for tie-breaking.
+    const lastDuel = duels.reduce((latest, d) => {
+      if (d.winner_team_id !== team.id || !d.resolved_at) return latest
+      return Math.max(latest, Date.parse(d.resolved_at))
+    }, 0)
+    const reachedAt = Math.max(lastScan, lastDuel)
+    return {
+      team,
+      points: tilePoints + duelBonus,
+      duelBonus,
+      bonus,
+      bingos,
+      tasksDone,
+      reachedAt: reachedAt || Infinity,
+    }
   })
 
   // When the "Total after Bonus" view is on, rank by Bingo points + manual bonus points.
@@ -251,6 +282,12 @@ export function BingoDashProjector() {
                           <span className="text-violet-300">{row.points} bingo</span>
                           <span className="text-gray-600"> + </span>
                           <span className="text-amber-400">{row.bonus} bonus</span>
+                        </p>
+                      ) : row.duelBonus > 0 ? (
+                        // Surface duel winnings — otherwise a defender who won
+                        // reads as having scored from nowhere.
+                        <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">
+                          pts <span className="text-red-300">· incl. {row.duelBonus} duel</span>
                         </p>
                       ) : (
                         <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">pts</p>

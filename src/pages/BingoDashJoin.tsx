@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase'
 import { fetchBoardTasks } from '../lib/boardCards'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
+import { TileFace } from '../components/BingoTileFace'
+import { IncomingDuelBanner } from '../components/ContestCard'
+import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
 
 /* ── helpers ─────────────────────────────────────────────────────────────────── */
@@ -339,13 +342,15 @@ function JoinScreen({
 /* ── Bingo Tile ──────────────────────────────────────────────────────────────── */
 
 function BingoTile({
-  task, status, isInBingoLine, onClick,
+  task, status, isInBingoLine, display, onClick,
 }: {
-  task: BingoTask; status: TileStatus; isInBingoLine: boolean; onClick: () => void
+  task: BingoTask; status: TileStatus; isInBingoLine: boolean; display: TileDisplay; onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      title={task.title}
+      aria-label={task.title}
       className="relative rounded-lg overflow-hidden flex items-center justify-center aspect-square transition-all duration-200 active:scale-95 focus:outline-none"
       style={{
         backgroundColor: task.hex_code,
@@ -373,9 +378,8 @@ function BingoTile({
       {status === 'scanned' && (
         <div className="absolute top-1 right-1 z-10 w-2 h-2 rounded-full border-2 border-white/80" />
       )}
-      <div className="relative z-0 px-1 py-1 text-center">
-        <h3 className="text-white font-black text-[9px] leading-tight line-clamp-3">{task.title}</h3>
-      </div>
+      {/* Icon or words — whichever this board is set to in the admin */}
+      <TileFace task={task} display={display} size="sm" />
     </button>
   )
 }
@@ -488,6 +492,7 @@ function BoardScreen({
   settings,
   boardNote,
   boardNoteEvery,
+  tileDisplay,
   onLeave,
 }: {
   team: { id: string; name: string }
@@ -499,6 +504,7 @@ function BoardScreen({
   settings: BoardTimer | null
   boardNote: string
   boardNoteEvery: number
+  tileDisplay: TileDisplay
   onLeave: () => void
 }) {
   const navigate = useNavigate()
@@ -655,6 +661,7 @@ function BoardScreen({
                     task={task}
                     status={getStatus(task.id)}
                     isInBingoLine={bingoSlots.has(i)}
+                    display={tileDisplay}
                     onClick={() => navigate(`/bingo-dash/task/${task.id}`)}
                   />
                 ) : (
@@ -1101,8 +1108,12 @@ export function BingoDashJoin() {
           settings={section}
           boardNote={section.board_note ?? ''}
           boardNoteEvery={section.board_note_every ?? 0}
+          tileDisplay={normalizeTileDisplay(section.tile_display)}
           onLeave={leaveTeam}
         />
+        {/* Another team can challenge us at any moment — the banner has to reach
+            players wherever they are on the board, not only inside a card. */}
+        <IncomingDuelBanner team={team} sectionId={section.id} />
         {timeUpOverlay}
       </>
     )

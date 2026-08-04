@@ -12,9 +12,12 @@ import { PageNavigator } from '../components/PageNavigator'
 import { SwipeablePages } from '../components/SwipeablePages'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
+import { ContestCard } from '../components/ContestCard'
+import { AitbCardBrief } from '../components/AitbCardBrief'
+import { aitbActivityForTask } from '../lib/aitbCards'
 import { TOTAL_TILES, resolveJump } from '../lib/snakeLadder'
 import { normalizeUrl } from '../lib/normalizeUrl'
-import type { BingoTask, SnakeTeam } from '../types/database'
+import type { BingoScan, BingoTask, SnakeTeam } from '../types/database'
 
 async function compressToJpeg(file: File, maxDim = 1920, quality = 0.85): Promise<Blob> {
   let width = 0, height = 0
@@ -76,7 +79,7 @@ export function BingoDashParticipant() {
 
   const [task, setTask] = useState<BingoTask | null>(null)
   const [showSplash, setShowSplash] = useState(!isSnakeLadder)
-  const [scanRecord, setScanRecord] = useState<{ id: string; completed: boolean } | null>(null)
+  const [scanRecord, setScanRecord] = useState<{ id: string; completed: boolean; words: string[] } | null>(null)
   const [scanRecorded, setScanRecorded] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
   const [completing, setCompleting] = useState(false)
@@ -171,6 +174,42 @@ export function BingoDashParticipant() {
     return () => { supabase.removeChannel(channel) }
   }, [isSnakeLadder, sectionId])
 
+  // ── AI Team Building card ───────────────────────────────────────────────
+  // An imported AITB activity gets its own mission brief (hero, steps, props,
+  // interactive draw, tool buttons) instead of the generic instruction pages.
+  // Completion is unchanged: marshal password → toggleComplete → scoreboard.
+  const aitbActivity = aitbActivityForTask(task)
+
+  // The draw / typed words belong to the TEAM, not the phone that made them —
+  // a roulette spin on one handset has to reach the teammate holding the other.
+  // Writes BEFORE touching local state on purpose: the spin/deal modules call
+  // this from inside a setState updater, so a synchronous setScanRecord here
+  // would be a render-phase update of this page from inside the module.
+  const saveAitbWords = useCallback(async (words: string[]) => {
+    if (!scanRecord) return
+    const { error } = await supabase.from('bingo_scans').update({ words }).eq('id', scanRecord.id)
+    if (error) { console.warn('Could not save AITB result:', error.message); return }
+    setScanRecord(prev => (prev ? { ...prev, words } : prev))
+  }, [scanRecord])
+
+  // Pull a teammate's draw in live. Only mounted for AITB cards — every other
+  // card type has nothing on the row that can change from another phone.
+  useEffect(() => {
+    if (!aitbActivity || !scanRecord) return
+    const channel = supabase
+      .channel(`bingo-scan-words-${scanRecord.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'bingo_scans', filter: `id=eq.${scanRecord.id}` },
+        ({ new: updated }) => {
+          const row = updated as BingoScan
+          setScanRecord(prev => (prev ? { ...prev, completed: row.completed, words: row.words ?? [] } : prev))
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [aitbActivity, scanRecord?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Snake & Ladder mode: load teams + board config
   useEffect(() => {
     if (!isSnakeLadder) return
@@ -217,7 +256,7 @@ export function BingoDashParticipant() {
     if (team && taskId && !scanRecorded) {
       recordScan(team.id, taskId).then((scan) => {
         setScanRecorded(true)
-        if (scan) setScanRecord({ id: scan.id, completed: scan.completed })
+        if (scan) setScanRecord({ id: scan.id, completed: scan.completed, words: scan.words ?? [] })
       })
     }
   }, [isSnakeLadder, team, taskId, scanRecorded, recordScan])
@@ -343,14 +382,17 @@ export function BingoDashParticipant() {
         <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }} />
 
         <div className="relative z-10 text-center px-8 animate-bounce-in">
-          <div className="text-6xl mb-6">{isSnakeLadder ? '🐍🪜' : '🎯'}</div>
+          <div className="text-6xl mb-6">{isSnakeLadder ? '🐍🪜' : aitbActivity?.emoji ?? '🎯'}</div>
           <p className="text-sm font-bold opacity-70 uppercase tracking-[0.2em] mb-2">
-            {task.color} Challenge
+            {aitbActivity ? `Activity ${aitbActivity.act} · ${aitbActivity.mins} min` : `${task.color} Challenge`}
           </p>
           <h1 className="text-5xl font-black tracking-tight mb-4 leading-tight">
             {task.title}
           </h1>
           <div className="w-16 h-1 bg-white/40 rounded-full mx-auto mb-6" />
+          {aitbActivity && (
+            <p className="text-lg opacity-90 font-bold mb-3 leading-snug">{aitbActivity.tagline}</p>
+          )}
           {isSnakeLadder ? (
             snakeTile != null && (
               <p className="text-lg opacity-80 font-medium mb-2">Tile {snakeTile}</p>
@@ -496,8 +538,22 @@ export function BingoDashParticipant() {
           </div>
         )}
 
-        {/* Instruction pointers */}
-        {pages.length > 0 ? (
+        {/* AI Team Building brief — replaces the generic pages, which for these
+            cards only hold a copy of the same steps. */}
+        {aitbActivity && team && scanRecord ? (
+          <AitbCardBrief
+            activity={aitbActivity}
+            scanId={scanRecord.id}
+            teamId={team.id}
+            taskId={taskId!}
+            words={scanRecord.words}
+            onSaveWords={saveAitbWords}
+            locked={scanRecord.completed || isObserver}
+            points={task.points ?? 0}
+          />
+        ) : aitbActivity ? (
+          <div className="text-center py-12 text-white/50 font-bold animate-pulse">Loading mission…</div>
+        ) : pages.length > 0 ? (
           <SwipeablePages
             currentPage={currentPage}
             total={pages.length}
@@ -610,6 +666,25 @@ export function BingoDashParticipant() {
                 )}
               </div>
             )
+          ) : task.is_contest && team && sectionId ? (
+            /* ── Contest card: the whole duel flow replaces solo completion ──
+               ContestCard owns every state (challenge → live → result), and the
+               cross-off happens when the marshal declares a winner — never from
+               the normal Complete button. */
+            <>
+              <ContestCard
+                task={task}
+                team={team}
+                sectionId={sectionId}
+                marshalPassword={marshalPassword}
+              />
+              <button
+                onClick={() => navigate(backPath)}
+                className="mt-4 w-full py-3 rounded-2xl text-white/70 font-bold border border-white/15 hover:bg-white/5 transition-colors"
+              >
+                ← Back to Board
+              </button>
+            </>
           ) : scanRecord?.completed ? (
             <div className="text-center">
               <div

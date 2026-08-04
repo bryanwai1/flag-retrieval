@@ -348,8 +348,8 @@ function GalaxyView({ ranked, view, setView, reactions }: {
           <QRCodeSVG value={OBSERVER_URL} size={96} />
         </div>
         <div className="leading-tight">
-          <div className="font-black text-xl">📱 Watch &amp; cheer</div>
-          <div className="text-gray-400 font-bold text-sm">Scan to react to your team</div>
+          <div className="font-black text-xl">📱 Follow your team</div>
+          <div className="text-gray-400 font-bold text-sm">Scan for live mission progress</div>
         </div>
       </div>
     </div>

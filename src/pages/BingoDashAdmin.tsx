@@ -4,8 +4,12 @@ import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { supabase } from '../lib/supabase'
 import { useBingoAuth } from '../hooks/useBingoAuth'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard, BingoDuel } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
+import { TileFace } from '../components/BingoTileFace'
+import { CONTEST_GAMES, getContestGame } from '../lib/contestGames'
+import { duelBonusByTeam } from '../hooks/useBingoDuels'
+import { importAitbCards } from '../lib/importAitbCards'
 
 // Sanitize a string into a filesystem-safe filename component.
 function sanitizeForFilename(s: string): string {
@@ -477,6 +481,8 @@ export function BingoDashAdmin() {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [categories, setCategories] = useState<BingoCategory[]>([])
   const [challengeSections, setChallengeSections] = useState<BingoChallengeSection[]>([])
+  const [duels, setDuels] = useState<BingoDuel[]>([])
+  const [aitbImporting, setAitbImporting] = useState(false)
   // Remembered board is namespaced per signed-in account so switching accounts
   // on the same browser never inherits someone else's stale board id.
   const sectionStorageKey = `${ADMIN_SECTION_KEY}:${uid ?? 'anon'}`
@@ -615,6 +621,8 @@ export function BingoDashAdmin() {
       .filter((t): t is BingoTask => t !== null)
       .sort((a, b) => a.sort_order - b.sort_order)
   const gridTasks = currentSectionId ? boardTasksForSection(currentSectionId) : []
+  // Contest bonuses won in duels, folded into each team's earned points.
+  const duelBonuses = duelBonusByTeam(duels)
   const placedTaskIds = new Set(
     currentSectionId ? boardCards.filter(bc => bc.section_id === currentSectionId).map(bc => bc.task_id) : [],
   )
@@ -861,10 +869,11 @@ export function BingoDashAdmin() {
         : Promise.resolve([] as { id: string; email: string | null }[]),
     ])
     const myTeamIds = teamsData.map(t => t.id)
-    const [scansData, membersData, photoSubsData] = await Promise.all([
+    const [scansData, membersData, photoSubsData, duelsData] = await Promise.all([
       fetchInChunks<BingoScan>('bingo_scans', 'team_id', myTeamIds),
       fetchInChunks<BingoMember>('bingo_members', 'section_id', mySectionIds),
       fetchInChunks<BingoPhotoSubmission>('bingo_photo_submissions', 'team_id', myTeamIds),
+      fetchInChunks<BingoDuel>('bingo_duels', 'section_id', mySectionIds),
     ])
 
     setSections(allSections)
@@ -876,6 +885,7 @@ export function BingoDashAdmin() {
     setChallengeSections(challengeSectionsData.sort((a, b) => a.sort_order - b.sort_order))
     setMembers(membersData.sort((a, b) => a.created_at.localeCompare(b.created_at)))
     setPhotoSubmissions(photoSubsData.sort((a, b) => b.created_at.localeCompare(a.created_at)))
+    setDuels(duelsData.sort((a, b) => b.created_at.localeCompare(a.created_at)))
     if (isOwner) setAccountEmails(new Map(accountsData.map(a => [a.id, a.email ?? a.id])))
     // Keep the remembered board if it's still one of MINE; otherwise fall back
     // to my first board (never someone else's).
@@ -1019,6 +1029,28 @@ export function BingoDashAdmin() {
         .update({ category: '' })
         .eq('section_id', sectionId)
         .eq('category', cat.name)
+    }
+  }
+
+  // Pull the 10 AI Team Building activities into this board's library as a
+  // "Special" section. Idempotent — safe to press twice.
+  const runAitbImport = async () => {
+    if (!currentSectionId || aitbImporting) return
+    setAitbImporting(true)
+    try {
+      const res = await importAitbCards(currentSectionId, myOwnerValue)
+      await fetchAll()
+      alert(
+        res.createdCards === 0
+          ? `All ${res.skippedCards} AI Team Building cards were already in this library.`
+          : `Added ${res.createdCards} card${res.createdCards === 1 ? '' : 's'} under ${res.sectionName} → ${res.categoryName}.` +
+            (res.skippedCards ? ` ${res.skippedCards} already existed.` : '') +
+            '\n\nSpeed Edit Showdown arrived with Contending ON.',
+      )
+    } catch (e) {
+      alert(`Import failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setAitbImporting(false)
     }
   }
 
@@ -1290,6 +1322,10 @@ export function BingoDashAdmin() {
       answer_question: task.answer_question, answer_text: task.answer_text,
       completion_warning: task.completion_warning, require_marshal: task.require_marshal,
       maps_url: task.maps_url, maps_label: task.maps_label,
+      // Contending settings travel with the card — a copied contest card that
+      // silently reverted to a solo task would be a nasty surprise mid-event.
+      is_contest: task.is_contest, contest_game: task.contest_game,
+      contest_bonus: task.contest_bonus,
       sort_order: Math.max(25, tasks.filter(t => t.section_id === opts.sectionId).length + 25),
     }).select().single()
     if (error || !created) throw new Error(error?.message ?? 'Failed to copy card')
@@ -2359,6 +2395,66 @@ export function BingoDashAdmin() {
           })()}
         </section>
 
+        {/* ── Tile Display (icon vs words on the player board) ───────────────── */}
+        <section>
+          <h2 className="text-xl font-bold text-white mb-2">Tile Display</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            How the 25 tiles look on players' phones for this board. A tile is only about 70px wide,
+            so a full challenge title has to shrink to be unreadable — pick <b>Icons</b> for the cleanest
+            board, or <b>Words</b> to show the category with a shortened title. Players always see the
+            full title when they tap a tile.
+          </p>
+          {(() => {
+            const mode = currentBoard?.tile_display === 'words' ? 'words' : 'icon'
+            const sampleTasks = (gridTasks.length > 0 ? gridTasks : scopedTasks).slice(0, 3)
+            const options = [
+              { value: 'icon' as const, label: 'Icons', hint: 'One big category icon per tile' },
+              { value: 'words' as const, label: 'Words', hint: 'CATEGORY + shortened title' },
+            ]
+            return (
+              <div className="p-4 rounded-lg border border-white/10 bg-gray-900/50 flex flex-col sm:flex-row sm:items-center gap-5">
+                <div className="flex gap-2">
+                  {options.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { if (mode !== opt.value) updateBoardSettings({ tile_display: opt.value }) }}
+                      disabled={timerSaving}
+                      className={`px-4 py-3 rounded-lg text-left border transition-colors disabled:opacity-40 ${
+                        mode === opt.value
+                          ? 'bg-violet-500 border-violet-400 text-white'
+                          : 'bg-gray-950 border-white/15 text-gray-300 hover:border-violet-500'
+                      }`}
+                    >
+                      <p className="text-sm font-bold">{opt.label}</p>
+                      <p className={`text-[11px] mt-0.5 ${mode === opt.value ? 'text-white/75' : 'text-gray-500'}`}>
+                        {opt.hint}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Live preview — the same tile face players see */}
+                {sampleTasks.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Preview</span>
+                    <div className="flex gap-1.5">
+                      {sampleTasks.map(t => (
+                        <div
+                          key={t.id}
+                          className="relative w-[70px] h-[70px] rounded-xl overflow-hidden flex items-center justify-center"
+                          style={{ backgroundColor: t.hex_code, boxShadow: `0 3px 10px ${t.hex_code}55` }}
+                        >
+                          <TileFace task={t} display={mode} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </section>
+
         {/* ── Board Editor ──────────────────────────────────────────────────── */}
         <section>
           <div className="flex items-center justify-between mb-4">
@@ -2552,10 +2648,20 @@ export function BingoDashAdmin() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Card Library</h2>
-            <button onClick={() => setShowForm(!showForm)}
-              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium transition-colors">
-              + Add Challenge
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={runAitbImport}
+                disabled={aitbImporting || !currentSectionId}
+                title="Adds the 10 AI Team Building activities to this board's library under Special → AI Team Building. Safe to press twice."
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-violet-500/60 text-violet-300 hover:bg-violet-500/15 disabled:opacity-40"
+              >
+                {aitbImporting ? 'Importing…' : '✨ Import AI Team Building'}
+              </button>
+              <button onClick={() => setShowForm(!showForm)}
+                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium transition-colors">
+                + Add Challenge
+              </button>
+            </div>
           </div>
 
           {/* Compartment filter chips */}
@@ -2859,6 +2965,76 @@ export function BingoDashAdmin() {
                                     >
                                       {task.require_marshal ? '🔒 Marshal ON' : '🔓 Marshal OFF'}
                                     </button>
+                                  )}
+
+                                  {/* ── Contending mode ──────────────────────
+                                      Turns this card into a head-to-head duel:
+                                      the challenger scans another team's QR,
+                                      both phones unlock the same clue, and the
+                                      marshal declares the winner. */}
+                                  {!section.foreign && (
+                                    <div className="mt-1.5">
+                                      <button
+                                        onClick={async () => {
+                                          const newVal = !task.is_contest
+                                          setTasks(prev => prev.map(t => t.id === task.id ? { ...t, is_contest: newVal } : t))
+                                          await supabase.from('bingo_tasks').update({ is_contest: newVal }).eq('id', task.id)
+                                        }}
+                                        className={`text-xs font-bold px-2 py-0.5 rounded-full transition-colors ${
+                                          task.is_contest
+                                            ? 'bg-red-500/40 text-red-100 hover:bg-red-500/60'
+                                            : 'bg-white/10 text-white/30 hover:bg-white/20'
+                                        }`}
+                                      >
+                                        {task.is_contest ? '⚔️ Contending ON' : '⚔️ Contending OFF'}
+                                      </button>
+
+                                      {task.is_contest && (
+                                        <div className="mt-2 p-2 rounded-lg bg-black/30 space-y-2">
+                                          <div>
+                                            <label className="block text-white/40 text-[10px] font-black uppercase tracking-wider mb-1">Game</label>
+                                            <select
+                                              value={task.contest_game || 'speed-edit'}
+                                              onChange={async e => {
+                                                const v = e.target.value
+                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, contest_game: v } : t))
+                                                await supabase.from('bingo_tasks').update({ contest_game: v }).eq('id', task.id)
+                                              }}
+                                              className="w-full bg-black/40 text-white text-xs px-2 py-1 rounded border border-white/25 focus:outline-none focus:border-white/60"
+                                            >
+                                              {CONTEST_GAMES.map(g => (
+                                                <option key={g.key} value={g.key}>{g.emoji} {g.name}</option>
+                                              ))}
+                                            </select>
+                                            <p className="text-white/40 text-[10px] mt-1 leading-snug">
+                                              {getContestGame(task.contest_game).tagline}
+                                            </p>
+                                          </div>
+                                          <div>
+                                            <label className="block text-white/40 text-[10px] font-black uppercase tracking-wider mb-1">
+                                              Winner bonus
+                                            </label>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              defaultValue={task.contest_bonus ?? 0}
+                                              key={`${task.id}-cbonus-${task.contest_bonus ?? 0}`}
+                                              onBlur={async e => {
+                                                const v = Math.max(0, parseInt(e.target.value) || 0)
+                                                if (v === (task.contest_bonus ?? 0)) return
+                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, contest_bonus: v } : t))
+                                                await supabase.from('bingo_tasks').update({ contest_bonus: v }).eq('id', task.id)
+                                              }}
+                                              className="w-20 bg-black/40 text-white text-xs px-2 py-1 rounded border border-white/25 text-center font-bold focus:outline-none focus:border-white/60"
+                                            />
+                                            <p className="text-white/40 text-[10px] mt-1 leading-snug">
+                                              Extra points for the duel winner. The challenger still crosses this
+                                              tile off and banks its {task.points ?? 0} pts either way.
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                                 {section.foreign ? (
@@ -3324,9 +3500,12 @@ export function BingoDashAdmin() {
                         const gridTaskIds = new Set(sectionGridTasks.map(t => t.id))
                         const completedCount = teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
                         const completedIds = new Set(teamScans.filter(s => s.completed).map(s => s.task_id))
+                        // Tile points plus any contest bonuses this team won in
+                        // duels — the latter is a defender's only scoring record.
                         const pointsEarned = teamScans
                           .filter(s => s.completed && gridTaskIds.has(s.task_id))
                           .reduce((sum, s) => sum + (sectionGridTasks.find(t => t.id === s.task_id)?.points ?? 0), 0)
+                          + (duelBonuses.get(team.id) ?? 0)
                         const pct = sectionGridTasks.length > 0 ? Math.round((completedCount / sectionGridTasks.length) * 100) : 0
                         const teamSlots = buildBingoSlots(sectionGridTasks)
                         const teamBingoLines = completedBingoLines(teamSlots, completedIds).length

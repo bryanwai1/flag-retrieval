@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pick Your Mission — AI Team Building</title>
+  <meta name="hz:slide-selector" content=".slide" />
+  <meta name="hz:canvas-width" content="1920" />
+  <meta name="hz:canvas-height" content="1080" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; overflow: hidden; background: #05070f;
+      font-family: 'Baloo 2', 'Segoe UI', sans-serif;
+    }
+    .slide {
+      position: relative; width: 1920px; height: 1080px; overflow: hidden;
+      flex-shrink: 0; transform-origin: center center;
+      background: radial-gradient(1200px 700px at 50% -10%, #1b2350 0%, #0d1226 55%, #070a18 100%);
+      color: #fff;
+    }
+    .glow-l, .glow-r {
+      position: absolute; width: 560px; height: 560px; border-radius: 50%;
+      filter: blur(90px); opacity: .18; pointer-events: none;
+    }
+    .glow-l { left: -180px; bottom: -180px; background: #34d399; animation: drift 9s ease-in-out infinite alternate; }
+    .glow-r { right: -180px; bottom: -180px; background: #fb7185; animation: drift 9s ease-in-out infinite alternate-reverse; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(60px, -50px) scale(1.15); }
+    }
+    @keyframes pop {
+      0%   { opacity: 0; transform: translateY(60px) scale(.85); }
+      70%  { opacity: 1; transform: translateY(-8px) scale(1.03); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-9px); }
+    }
+    @keyframes titlePulse {
+      0%, 100% { text-shadow: 0 0 30px rgba(96,165,250,.55); }
+      50%      { text-shadow: 0 0 55px rgba(96,165,250,.95), 0 0 18px rgba(251,191,36,.45); }
+    }
+    @keyframes shimmer {
+      from { transform: translateX(-220px); }
+      to   { transform: translateX(2020px); }
+    }
+    @keyframes flicker {
+      0%, 100% { filter: brightness(1); transform: scale(1); }
+      45%      { filter: brightness(1.35); transform: scale(1.08); }
+      60%      { filter: brightness(.9); transform: scale(.97); }
+    }
+    @keyframes wiggle {
+      0%, 88%, 100% { transform: rotate(0); }
+      90% { transform: rotate(-9deg) scale(1.12); }
+      94% { transform: rotate(9deg) scale(1.12); }
+      98% { transform: rotate(-4deg); }
+    }
+    @keyframes footPulse {
+      0%, 100% { opacity: .85; }
+      50%      { opacity: 1; }
+    }
+
+    .head { position: absolute; top: 44px; left: 0; width: 100%; text-align: center; }
+    .title {
+      font-size: 78px; font-weight: 800; letter-spacing: 1px; line-height: 1;
+      text-shadow: 0 0 30px rgba(96,165,250,.55);
+      animation: titlePulse 2.8s ease-in-out infinite;
+    }
+    .title .accent { color: #fbbf24; }
+    .subtitle { margin-top: 14px; font-size: 30px; font-weight: 600; color: #aab4d8; }
+
+    .axis { position: absolute; top: 228px; left: 60px; width: 1800px; }
+    .axis-bar {
+      height: 18px; border-radius: 9px;
+      background: linear-gradient(90deg, #34d399 0%, #a3e635 25%, #fbbf24 50%, #fb923c 75%, #fb7185 100%);
+      box-shadow: 0 0 24px rgba(251,191,36,.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .axis-bar::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 180px; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent);
+      animation: shimmer 2.6s linear infinite;
+    }
+    .axis::after {
+      content: ''; position: absolute; right: -8px; top: 9px; transform: translateY(-50%);
+      border-left: 26px solid #fb7185; border-top: 20px solid transparent; border-bottom: 20px solid transparent;
+    }
+    .axis-labels { display: flex; justify-content: space-between; margin-top: 12px; font-weight: 800; font-size: 28px; }
+    .axis-labels .easy { color: #34d399; }
+    .axis-labels .mid  { color: #fbbf24; }
+    .axis-labels .hard { color: #fb7185; }
+
+    .cards {
+      position: absolute; top: 330px; left: 60px; width: 1800px; height: 640px;
+      display: flex; gap: 14px;
+    }
+    .card {
+      flex: 1; border-radius: 22px; background: rgba(21,27,48,.92);
+      border: 2px solid rgba(255,255,255,.07);
+      border-top: 7px solid var(--c);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 26px 10px 20px; text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,.45);
+      animation:
+        pop .6s cubic-bezier(.34,1.56,.64,1) backwards var(--d, 0s),
+        bob 4.6s ease-in-out infinite calc(var(--d, 0s) + 1.4s);
+    }
+    .card:nth-child(1)  { --d: .00s; }
+    .card:nth-child(2)  { --d: .09s; }
+    .card:nth-child(3)  { --d: .18s; }
+    .card:nth-child(4)  { --d: .27s; }
+    .card:nth-child(5)  { --d: .36s; }
+    .card:nth-child(6)  { --d: .45s; }
+    .card:nth-child(7)  { --d: .54s; }
+    .card:nth-child(8)  { --d: .63s; }
+    .card:nth-child(9)  { --d: .72s; }
+    .card:nth-child(10) { --d: .81s; }
+    .rank {
+      font-size: 22px; font-weight: 700; color: #6b7699; letter-spacing: 2px;
+    }
+    .emoji {
+      font-size: 62px; line-height: 1.2; margin-top: 6px;
+      animation: wiggle 5.5s ease-in-out infinite;
+      animation-delay: calc(var(--d, 0s) * 6);
+    }
+    .act-pill {
+      margin-top: 12px; padding: 4px 16px; border-radius: 999px;
+      background: var(--c); color: #0b1020; font-weight: 800; font-size: 24px; letter-spacing: 1px;
+    }
+    .name {
+      margin-top: 14px; font-size: 27px; font-weight: 700; line-height: 1.15;
+      min-height: 112px; display: flex; align-items: center; justify-content: center;
+    }
+    .out { font-size: 21px; font-weight: 600; color: #8fa0c9; margin-top: 2px; }
+    .card > * { flex-shrink: 0; }
+    .why {
+      margin-top: 12px; padding-top: 11px; width: 88%;
+      border-top: 2px solid rgba(255,255,255,.09);
+      font-size: 19px; font-weight: 600; line-height: 1.25;
+      color: var(--c); opacity: .9;
+      min-height: 59px;
+    }
+    .spacer { flex: 1; }
+    .flames {
+      font-size: 27px; letter-spacing: 2px; margin-top: 10px;
+      animation: flicker 2.2s ease-in-out infinite;
+      animation-delay: calc(var(--d, 0s) * 3);
+    }
+    .flames .off { opacity: .16; filter: grayscale(1); }
+    .mins {
+      margin-top: 12px; font-size: 23px; font-weight: 700; color: #cdd6f2;
+      background: rgba(255,255,255,.07); border-radius: 999px; padding: 4px 16px;
+    }
+    .foot {
+      position: absolute; bottom: 26px; left: 0; width: 100%; text-align: center;
+      font-size: 26px; font-weight: 600; color: #8fa0c9;
+    }
+    .foot b { color: #fbbf24; }
+    .foot { animation: footPulse 2.4s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="slide" data-canvas-width="1920" data-canvas-height="1080">
+    <div class="glow-l"></div><div class="glow-r"></div>
+
+    <header class="head">
+      <div class="title">🎯 PICK YOUR <span class="accent">MISSION!</span></div>
+      <div class="subtitle">Easiest on the left → toughest on the right. Choose your challenge!</div>
+    </header>
+
+    <div class="axis">
+      <div class="axis-bar"></div>
+      <div class="axis-labels">
+        <span class="easy">😌 EASY PEASY</span>
+        <span class="mid">🌶️ GETTING SPICY</span>
+        <span class="hard">🔥 BEAST MODE</span>
+      </div>
+    </div>
+
+    <main class="cards">
+      <div class="card" style="--c:#fb7185">
+        <div class="rank">#1</div>
+        <div class="emoji">🎯</div>
+        <div class="act-pill">ACT 01</div>
+        <div class="name">Nerf Prompt Cups</div>
+        <div class="out">AI Image</div>
+        <div class="why">3 words → 1 picture</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥<span class="off">🔥🔥🔥🔥</span></div>
+        <div class="mins">⏱ 10 min</div>
+      </div>
+
+      <div class="card" style="--c:#a78bfa">
+        <div class="rank">#2</div>
+        <div class="emoji">🏰</div>
+        <div class="act-pill">ACT 03</div>
+        <div class="name">Rubber Band Castle</div>
+        <div class="out">AI Castle Photo</div>
+        <div class="why">Teamwork, easy AI</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥<span class="off">🔥🔥🔥</span></div>
+        <div class="mins">⏱ 12 min</div>
+      </div>
+
+      <div class="card" style="--c:#c084fc">
+        <div class="rank">#3</div>
+        <div class="emoji">🧭</div>
+        <div class="act-pill">ACT 10</div>
+        <div class="name">Resort Character Journey</div>
+        <div class="out">10-Scene Story</div>
+        <div class="why">Easy, but lots of it</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥<span class="off">🔥🔥🔥</span></div>
+        <div class="mins">⏱ 20 min</div>
+      </div>
+
+      <div class="card" style="--c:#f59e0b">
+        <div class="rank">#4</div>
+        <div class="emoji">👁️</div>
+        <div class="act-pill">ACT 08</div>
+        <div class="name">Speed Edit Showdown</div>
+        <div class="out">Copy the Picture</div>
+        <div class="why">Keep trying prompts</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥<span class="off">🔥🔥🔥</span></div>
+        <div class="mins">⏱ 12 min</div>
+      </div>
+
+      <div class="card" style="--c:#f472b6">
+        <div class="rank">#5</div>
+        <div class="emoji">🎶</div>
+        <div class="act-pill">ACT 05</div>
+        <div class="name">Roulette Jingle &amp; Dance Off</div>
+        <div class="out">AI Song + Dance</div>
+        <div class="why">Perform it live!</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥<span class="off">🔥🔥</span></div>
+        <div class="mins">⏱ 15 min</div>
+      </div>
+
+      <div class="card" style="--c:#fbbf24">
+        <div class="rank">#6</div>
+        <div class="emoji">🎬</div>
+        <div class="act-pill">ACT 06</div>
+        <div class="name">Random Card Cinematic</div>
+        <div class="out">AI Movie Scene</div>
+        <div class="why">Video AI is fussy</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥<span class="off">🔥🔥</span></div>
+        <div class="mins">⏱ 15 min</div>
+      </div>
+
+      <div class="card" style="--c:#60a5fa">
+        <div class="rank">#7</div>
+        <div class="emoji">🏓</div>
+        <div class="act-pill">ACT 07</div>
+        <div class="name">Ping Pong Alphabet Pitch</div>
+        <div class="out">AI Ad + Pitch</div>
+        <div class="why">Tricky word puzzle</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥<span class="off">🔥🔥</span></div>
+        <div class="mins">⏱ 12 min</div>
+      </div>
+
+      <div class="card" style="--c:#2dd4bf">
+        <div class="rank">#8</div>
+        <div class="emoji">🐘</div>
+        <div class="act-pill">ACT 09</div>
+        <div class="name">Found Object Animals</div>
+        <div class="out">Animated Video</div>
+        <div class="why">Photo, then video</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥🔥<span class="off">🔥</span></div>
+        <div class="mins">⏱ 15 min</div>
+      </div>
+
+      <div class="card" style="--c:#34d399">
+        <div class="rank">#9</div>
+        <div class="emoji">🌳</div>
+        <div class="act-pill">ACT 04</div>
+        <div class="name">Resort Tree App Sprint</div>
+        <div class="out">Real Web App</div>
+        <div class="why">Must really work</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥🔥<span class="off">🔥</span></div>
+        <div class="mins">⏱ 20 min</div>
+      </div>
+
+      <div class="card" style="--c:#22d3ee">
+        <div class="rank">#10</div>
+        <div class="emoji">🕹️</div>
+        <div class="act-pill">ACT 02</div>
+        <div class="name">Retro Game Speed Build</div>
+        <div class="out">3 Browser Games</div>
+        <div class="why">3 games that must play!</div>
+        <div class="spacer"></div>
+        <div class="flames">🔥🔥🔥🔥🔥</div>
+        <div class="mins">⏱ 15 min</div>
+      </div>
+    </main>
+
+    <footer class="foot">Scan the QR at your station to check in — <b>finish faster = bigger bonus ⚡</b></footer>
+  </div>
+  <script>
+    // Scale the fixed 1920x1080 canvas to fit whatever screen it's projected on.
+    const fit = () => {
+      const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+      document.querySelector('.slide').style.transform = `scale(${s})`;
+    };
+    addEventListener('resize', fit); fit();
+  </script>
+</body>
+</html>

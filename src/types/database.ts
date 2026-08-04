@@ -95,6 +95,9 @@ export interface BingoSection extends BoardTimer {
   board_note_every: number
   marshal_password: string
   photo_submissions_enabled: boolean
+  // How the 5×5 tiles render for players: 'icon' (category icon) or 'words'
+  // (category + shortened title). See components/BingoTileFace.tsx.
+  tile_display: 'icon' | 'words'
   owner_id: string | null
   created_at: string
 }
@@ -131,6 +134,12 @@ export interface BingoTask {
   answer_text: string | null
   completion_warning: string | null
   require_marshal: boolean
+  // Contest ("contending") mode: played as a duel between two teams rather than
+  // solo. contest_game keys come from lib/contestGames.ts; contest_bonus is the
+  // extra the winner banks on top of the challenger's normal tile points.
+  is_contest: boolean
+  contest_game: string
+  contest_bonus: number
   maps_url: string | null
   maps_label: string | null
   owner_id: string | null
@@ -202,6 +211,32 @@ export interface BingoScan {
   scanned_at: string
   completed: boolean
   completed_at: string | null
+  // AI Team Building cards only: the result slots this team drew or typed
+  // (roulette genre/topic, dealt cards, animals, the 7 pitch words). Empty for
+  // every other card type. See lib/aitbCards.ts.
+  words: string[]
+}
+
+// A head-to-head duel on a contest card. The challenger scans the defender's QR
+// to create it; both phones then follow this row live.
+export interface BingoDuel {
+  id: string
+  section_id: string
+  task_id: string
+  challenger_team_id: string
+  defender_team_id: string
+  game_key: string
+  status: 'pending' | 'active' | 'done' | 'declined' | 'cancelled'
+  // Drawn once by the challenger so both phones show the identical setup.
+  payload: { imageUrl?: string; imageLabel?: string }
+  winner_team_id: string | null
+  // Bonus awarded to the winner only. The challenger's tile points are separate
+  // and come from the normal cross-off.
+  bonus_points: number
+  code: string
+  created_at: string
+  started_at: string | null
+  resolved_at: string | null
 }
 
 export interface BingoMember {

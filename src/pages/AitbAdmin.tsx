@@ -544,8 +544,8 @@ export function AitbAdmin() {
         return (
           <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6" onClick={() => setShowObserverQr(false)}>
             <div className="text-center" onClick={e => e.stopPropagation()}>
-              <div className="text-2xl font-black mb-1" style={{ color: '#c084fc' }}>🛰️ Watch &amp; Cheer</div>
-              <div className="text-gray-400 text-sm mb-4">Scan to watch the live race and react to your team</div>
+              <div className="text-2xl font-black mb-1" style={{ color: '#c084fc' }}>🛰️ Follow Your Team</div>
+              <div className="text-gray-400 text-sm mb-4">Scan to see your team&apos;s live mission progress — and cheer</div>
               <div className="bg-white p-6 rounded-3xl inline-block">
                 <QRCodeSVG value={url} size={min(560, window.innerWidth - 120, window.innerHeight - 260)} />
               </div>

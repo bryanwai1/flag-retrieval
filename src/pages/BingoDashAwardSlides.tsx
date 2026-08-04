@@ -9,7 +9,8 @@ import {
   normalizeSlideOrder,
   type AwardSlideDescriptor,
 } from '../lib/awardSlides'
-import type { BingoSection, BingoTeam, BingoScan, BingoTask, BingoAwardConfig } from '../types/database'
+import { duelBonusByTeam } from '../hooks/useBingoDuels'
+import type { BingoSection, BingoTeam, BingoScan, BingoTask, BingoAwardConfig, BingoDuel } from '../types/database'
 
 const BINGO_LINES: number[][] = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
@@ -132,6 +133,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
   const [scans, setScans] = useState<BingoScan[]>([])
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [config, setConfig] = useState<BingoAwardConfig | null>(null)
+  const [duels, setDuels] = useState<BingoDuel[]>([])
   const [loaded, setLoaded] = useState(false)
   const [slideIdx, setSlideIdx] = useState(0)
   const [showJudgePanel, setShowJudgePanel] = useState(false)
@@ -155,23 +157,26 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
       const { data: sec } = await supabase.from('bingo_sections').select('*').eq('slug', sectionSlug).maybeSingle()
       if (!sec || cancelled) { setLoaded(true); return }
       setSection(sec)
-      const [{ data: t }, { data: s }, gt, { data: cfg }] = await Promise.all([
+      const [{ data: t }, { data: s }, gt, { data: cfg }, { data: d }] = await Promise.all([
         supabase.from('bingo_teams').select('*').eq('section_id', sec.id).order('name'),
         supabase.from('bingo_scans').select('*'),
         fetchBoardTasks(sec.id),
         supabase.from('bingo_award_configs').select('*').eq('section_id', sec.id).maybeSingle(),
+        supabase.from('bingo_duels').select('*').eq('section_id', sec.id).eq('status', 'done'),
       ])
       if (cancelled) return
       setTeams(t ?? [])
       setScans(s ?? [])
       setGridTasks(gt)
       setConfig(cfg ?? null)
+      setDuels(d ?? [])
       setLoaded(true)
     })()
     return () => { cancelled = true }
   }, [sectionSlug])
 
   const ranked: RankedTeam[] = useMemo(() => {
+    const duelBonuses = duelBonusByTeam(duels)
     if (!teams.length || !gridTasks.length) {
       return teams
         .map<RankedTeam>(team => ({
@@ -191,7 +196,10 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
     const computed: RankedTeam[] = teams.map(team => {
       const teamScans = scans.filter(sc => sc.team_id === team.id && sc.completed && gridTaskIds.has(sc.task_id))
       const completedIds = new Set(teamScans.map(sc => sc.task_id))
+      // Contest bonuses count as earned play, alongside tile points — a winning
+      // defender has no tile, so this is the only record of their win.
       const basePoints = gridTasks.reduce((sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0)
+        + (duelBonuses.get(team.id) ?? 0)
       const bonusPoints = team.bonus_points ?? 0
       const bingos = BINGO_LINES.filter(line => line.every(i => {
         const t = slots[i]
@@ -213,7 +221,7 @@ function AwardShow({ sectionSlug }: { sectionSlug: string }) {
     })
     computed.sort(rankCompare)
     return computed
-  }, [teams, scans, gridTasks])
+  }, [teams, scans, gridTasks, duels])
 
   const slides: AwardSlideDescriptor[] = useMemo(() => {
     const counts = config ?? DEFAULT_COUNTS
