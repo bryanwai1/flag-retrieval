@@ -49,7 +49,34 @@ function SlideNav({ view, setView }: { view: View; setView: (v: View) => void })
           {t.label}
         </button>
       ))}
+      <FullscreenButton />
     </>
+  )
+}
+
+/* Puts the projector into browser fullscreen so the audience sees the deck
+   without the address bar / tabs / bookmarks. Sits in both nav rows. */
+function FullscreenButton() {
+  const [isFull, setIsFull] = useState(false)
+
+  useEffect(() => {
+    const sync = () => setIsFull(!!document.fullscreenElement)
+    sync()
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+
+  const toggle = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else document.documentElement.requestFullscreen().catch(() => {})
+  }
+
+  return (
+    <button onClick={toggle} title={isFull ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+      className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+      style={{ background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1.5px solid rgba(255,255,255,0.2)' }}>
+      {isFull ? '✕ Exit' : '⛶ Full'}
+    </button>
   )
 }
 
@@ -309,6 +336,7 @@ function GameNav({ view, setView }: { view: View; setView: (v: View) => void }) 
         style={{ background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1.5px solid rgba(255,255,255,0.2)' }}>
         ← Admin
       </a>
+      <FullscreenButton />
       {/* Same list the slide deck's own nav uses, so a tab added there can
           never go missing here (Opening and Closing did exactly that). */}
       {SLIDE_TABS.map(t => slideBtn(t.v, t.label, t.color))}
