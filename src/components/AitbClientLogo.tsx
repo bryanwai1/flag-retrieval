@@ -24,9 +24,18 @@ export const AITB_LOGO_KEY = 'aitb_client_logo'
 /** 'auto' = decide from the artwork; the rest force a backing. */
 export type AitbLogoPlate = 'auto' | 'light' | 'dark' | 'none'
 
-/** `src` may be empty when only the subline has been set — the slides then just
+/** `src` may be empty when only the text has been set — the slides then just
  *  render their headline with no logo above it. */
-export type AitbLogo = { src: string; plate: AitbLogoPlate; subline?: string }
+export type AitbLogo = {
+  src: string
+  plate: AitbLogoPlate
+  /** Big event title/header — drives the Opening, Closing and Title slides. */
+  subline?: string
+  /** Tagline under the Opening hero (default: "Prepare to be astounded"). */
+  openingTag?: string
+  /** Tagline under the Closing hero (default: "You just built the future"). */
+  closingTag?: string
+}
 
 /** What `auto` can resolve to — a white plate, or nothing behind the logo. */
 export type AitbResolvedPlate = 'light' | 'dark' | 'none'
@@ -43,10 +52,13 @@ export function readAitbLogo(): AitbLogo | null {
     const raw = localStorage.getItem(AITB_LOGO_KEY)
     if (!raw) return null
     const v = JSON.parse(raw)
-    const src = typeof v?.src === 'string' ? v.src : ''
-    const subline = typeof v?.subline === 'string' ? v.subline : ''
-    if (src || subline) {
-      return { src, plate: (v.plate as AitbLogoPlate) ?? 'auto', subline }
+    const str = (x: unknown) => (typeof x === 'string' ? x : '')
+    const src = str(v?.src)
+    const subline = str(v?.subline)
+    const openingTag = str(v?.openingTag)
+    const closingTag = str(v?.closingTag)
+    if (src || subline || openingTag || closingTag) {
+      return { src, plate: (v.plate as AitbLogoPlate) ?? 'auto', subline, openingTag, closingTag }
     }
   } catch { /* corrupt or unavailable — behave as if no logo is set */ }
   return null

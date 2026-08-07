@@ -18,6 +18,7 @@ import {
   writeAitbLogo,
   type AitbLogo, type AitbLogoPlate, type AitbResolvedPlate,
 } from './AitbClientLogo'
+import { AITB_DEFAULT_TITLE, AITB_OPENING_TAG, AITB_CLOSING_TAG } from './AitbSlides'
 
 const PLATE_TABS: { v: AitbLogoPlate; label: string; hint: string }[] = [
   { v: 'auto', label: '✨ Auto', hint: 'Reads the logo and picks for you' },
@@ -85,6 +86,18 @@ export function AitbLogoUpload() {
   }
 
   const plate = logo?.plate ?? 'auto'
+
+  // Update one text field while preserving the logo + the other text fields,
+  // so editing the header never wipes the subtitles (or vice versa).
+  const setText = (field: 'subline' | 'openingTag' | 'closingTag', value: string) =>
+    persist({
+      src: logo?.src ?? '',
+      plate,
+      subline: logo?.subline ?? '',
+      openingTag: logo?.openingTag ?? '',
+      closingTag: logo?.closingTag ?? '',
+      [field]: value,
+    })
 
   return (
     <div>
@@ -159,16 +172,43 @@ export function AitbLogoUpload() {
       )}
 
       <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
-        Line under the headline
+        Event title / header
       </div>
       <input
         value={logo?.subline ?? ''}
-        onChange={e => persist({ src: logo?.src ?? '', plate, subline: e.target.value })}
-        placeholder="AI Team Building"
+        onChange={e => setText('subline', e.target.value)}
+        placeholder={AITB_DEFAULT_TITLE}
         className="w-full bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none"
         style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
       <p className="text-gray-500 text-xs mt-2">
-        Appears under “Welcome” and “Thank you” — e.g. the client or event name.
+        The big headline on the ✨ Title, 👋 Opening and 🎬 Closing slides — your
+        client or event name, e.g. “X-Factor as a Team”.
+      </p>
+
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2 mt-5">
+        Opening subtitle
+      </div>
+      <input
+        value={logo?.openingTag ?? ''}
+        onChange={e => setText('openingTag', e.target.value)}
+        placeholder={AITB_OPENING_TAG}
+        className="w-full bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none"
+        style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
+      <p className="text-gray-500 text-xs mt-2">
+        The small line under the title on the 👋 Opening slide.
+      </p>
+
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2 mt-5">
+        Closing subtitle
+      </div>
+      <input
+        value={logo?.closingTag ?? ''}
+        onChange={e => setText('closingTag', e.target.value)}
+        placeholder={AITB_CLOSING_TAG}
+        className="w-full bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none"
+        style={{ border: '1.5px solid rgba(255,255,255,0.1)' }} />
+      <p className="text-gray-500 text-xs mt-2">
+        The small line under the title on the 🎬 Closing slide.
       </p>
     </div>
   )

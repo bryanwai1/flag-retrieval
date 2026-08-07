@@ -12,8 +12,11 @@ import { QRCodeSVG } from 'qrcode.react'
 import { AITB_POINTS } from '../lib/aitbActivities'
 import { AitbClientLogo, type AitbLogo } from './AitbClientLogo'
 
-/** Used when no event name has been set in Admin. */
-const DEFAULT_TITLE = 'AI TEAM BUILDING'
+/** Defaults for the editable slide text, used when Admin leaves a field blank.
+ *  Exported so the Admin inputs can show them as placeholders. */
+export const AITB_DEFAULT_TITLE = 'AI Team Building'
+export const AITB_OPENING_TAG = 'Prepare to be astounded'
+export const AITB_CLOSING_TAG = 'You just built the future'
 
 /* ── Opening title slide ───────────────────────────────────────────────────── */
 export function AitbTitleSlide({ eventName }: {
@@ -22,7 +25,7 @@ export function AitbTitleSlide({ eventName }: {
   eventName?: string
 }) {
   // Upper-cased because this hero is all-caps by design, whatever was typed.
-  const TITLE = (eventName?.trim() || DEFAULT_TITLE).toUpperCase()
+  const TITLE = (eventName?.trim() || AITB_DEFAULT_TITLE).toUpperCase()
 
   // Deterministic-ish decorative layers: stars, drifting orbs, orbiting emoji.
   const stars = Array.from({ length: 90 }, (_, i) => ({
@@ -206,7 +209,11 @@ export function AitbSpeechSlide({ kind, logo, subline }: {
 }) {
   const opening = kind === 'opening'
   const accent = opening ? '#38bdf8' : '#fbbf24'
-  const hero = subline?.trim() || 'AI Team Building'
+  const hero = subline?.trim() || AITB_DEFAULT_TITLE
+  // Tagline under the hero — editable per event in Admin, else the stock line.
+  const tag = opening
+    ? (logo?.openingTag?.trim() || AITB_OPENING_TAG)
+    : (logo?.closingTag?.trim() || AITB_CLOSING_TAG)
   const stars = Array.from({ length: 110 }, (_, i) => ({
     left: (i * 41.7) % 100,
     top: (i * 57.9) % 100,
@@ -262,9 +269,7 @@ export function AitbSpeechSlide({ kind, logo, subline }: {
           <span className="aitb-shine" />
         </h1>
 
-        <div className="aitb-speech-tag">
-          {opening ? 'Prepare to be astounded' : 'You just built the future'}
-        </div>
+        <div className="aitb-speech-tag">{tag}</div>
       </div>
     </div>
   )
