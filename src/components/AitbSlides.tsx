@@ -12,10 +12,18 @@ import { QRCodeSVG } from 'qrcode.react'
 import { AITB_POINTS } from '../lib/aitbActivities'
 import { AitbClientLogo, type AitbLogo } from './AitbClientLogo'
 
-const TITLE = 'AI TEAM BUILDING'
+/** Used when no event name has been set in Admin. */
+const DEFAULT_TITLE = 'AI TEAM BUILDING'
 
 /* ── Opening title slide ───────────────────────────────────────────────────── */
-export function AitbTitleSlide() {
+export function AitbTitleSlide({ eventName }: {
+  /** Event name from Admin (the same one the opening/closing heroes show), so a
+   *  deck can never announce two different names. Falls back to DEFAULT_TITLE. */
+  eventName?: string
+}) {
+  // Upper-cased because this hero is all-caps by design, whatever was typed.
+  const TITLE = (eventName?.trim() || DEFAULT_TITLE).toUpperCase()
+
   // Deterministic-ish decorative layers: stars, drifting orbs, orbiting emoji.
   const stars = Array.from({ length: 90 }, (_, i) => ({
     left: (i * 37.6) % 100,

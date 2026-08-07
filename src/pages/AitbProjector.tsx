@@ -146,7 +146,7 @@ export function AitbProjector() {
           <SlideNav view={view} setView={setView} />
         </div>
         {view === 'opening' && <AitbSpeechSlide kind="opening" logo={logo} subline={logo?.subline} />}
-        {view === 'title' && <AitbTitleSlide />}
+        {view === 'title' && <AitbTitleSlide eventName={logo?.subline} />}
         {view === 'join' && <AitbQrSlide kind="player" url={PLAYER_URL} />}
         {view === 'watch' && <AitbQrSlide kind="observer" url={OBSERVER_URL} />}
         {view === 'how' && <AitbHowItWorksSlide />}
