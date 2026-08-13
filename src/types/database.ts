@@ -182,7 +182,16 @@ export interface BingoTeam {
   password: string
   photo_url: string | null
   bonus_points: number
+  // Itemised breakdown of the bonus total: one entry per activity the marshal
+  // awarded points for. bonus_points stays the authoritative sum of these.
+  bonus_breakdown: BonusItem[]
   created_at: string
+}
+
+// One line in a team's bonus popup — an activity name and the points for it.
+export interface BonusItem {
+  label: string
+  points: number
 }
 
 export interface BingoAwardConfig {

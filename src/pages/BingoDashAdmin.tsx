@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { supabase } from '../lib/supabase'
 import { useBingoAuth } from '../hooks/useBingoAuth'
-import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard, BingoDuel } from '../types/database'
+import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoCategory, BingoChallengeSection, BingoMember, BingoPhotoSubmission, BingoBoardCard, BingoDuel, BonusItem } from '../types/database'
 import { BINGO_LINES, buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 import { TileFace } from '../components/BingoTileFace'
 import { CONTEST_GAMES, getContestGame } from '../lib/contestGames'
@@ -581,6 +581,10 @@ export function BingoDashAdmin() {
   // Per-team "live members link" share modal
   const [membersLinkTeam, setMembersLinkTeam] = useState<BingoTeam | null>(null)
   const [membersLinkCopied, setMembersLinkCopied] = useState(false)
+  // Per-team bonus-points breakdown popup: which team is open + its editable draft
+  const [bonusTeam, setBonusTeam] = useState<BingoTeam | null>(null)
+  const [bonusDraft, setBonusDraft] = useState<BonusItem[]>([])
+  const [bonusSaving, setBonusSaving] = useState(false)
   // Section-wide "live teams link" share modal
   const [showAllTeamsLink, setShowAllTeamsLink] = useState(false)
   const [allTeamsLinkCopied, setAllTeamsLinkCopied] = useState(false)
@@ -1558,12 +1562,12 @@ export function BingoDashAdmin() {
     // Optimistic UI
     setScans(prev => prev.filter(s => s.team_id !== id))
     setPhotoSubmissions(prev => prev.filter(s => s.team_id !== id))
-    setTeams(prev => prev.map(t => t.id === id ? { ...t, bonus_points: 0 } : t))
+    setTeams(prev => prev.map(t => t.id === id ? { ...t, bonus_points: 0, bonus_breakdown: [] } : t))
     // Persist
     await Promise.all([
       supabase.from('bingo_scans').delete().eq('team_id', id),
       subIds.length > 0 ? supabase.from('bingo_photo_submissions').delete().in('id', subIds) : Promise.resolve({ error: null } as any),
-      supabase.from('bingo_teams').update({ bonus_points: 0 }).eq('id', id),
+      supabase.from('bingo_teams').update({ bonus_points: 0, bonus_breakdown: [] }).eq('id', id),
     ])
     if (photoPaths.length > 0) await supabase.storage.from('media').remove(photoPaths)
     await fetchAll()
@@ -1813,6 +1817,34 @@ export function BingoDashAdmin() {
   const updateTeam = async (id: string, updates: Partial<BingoTeam>) => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
     await supabase.from('bingo_teams').update(updates).eq('id', id)
+  }
+
+  // Open the bonus-points breakdown popup for a team. Seed the draft from its
+  // saved breakdown; if the team has a legacy total with no breakdown, start it
+  // as a single "Bonus" row so the number isn't silently lost.
+  const openBonusModal = (team: BingoTeam) => {
+    const saved = team.bonus_breakdown ?? []
+    if (saved.length > 0) setBonusDraft(saved.map(i => ({ ...i })))
+    else if ((team.bonus_points ?? 0) !== 0) setBonusDraft([{ label: 'Bonus', points: team.bonus_points }])
+    else setBonusDraft([])
+    setBonusTeam(team)
+  }
+
+  // Persist the draft: bonus_points stays the authoritative total (sum of rows).
+  // Blank-label rows are dropped so leftover empties don't clutter the total.
+  const saveBonus = async () => {
+    if (!bonusTeam) return
+    const cleaned = bonusDraft
+      .map(i => ({ label: i.label.trim(), points: Number.isFinite(i.points) ? i.points : 0 }))
+      .filter(i => i.label !== '' || i.points !== 0)
+    const total = cleaned.reduce((sum, i) => sum + i.points, 0)
+    setBonusSaving(true)
+    try {
+      await updateTeam(bonusTeam.id, { bonus_breakdown: cleaned, bonus_points: total })
+      setBonusTeam(null)
+    } finally {
+      setBonusSaving(false)
+    }
   }
 
   const uploadTeamPhoto = async (teamId: string, file: File) => {
@@ -3654,22 +3686,28 @@ export function BingoDashAdmin() {
                             </td>
                             {/* Bonus */}
                             <td className="px-3 py-2.5">
-                              <input
-                                type="number"
-                                step="1"
-                                defaultValue={team.bonus_points ?? 0}
-                                placeholder="0"
-                                key={`${team.id}-bonus-${team.bonus_points ?? 0}`}
-                                onBlur={e => {
-                                  const n = parseInt(e.target.value, 10)
-                                  const v = Number.isFinite(n) ? n : 0
-                                  if (v !== (team.bonus_points ?? 0)) updateTeam(team.id, { bonus_points: v })
-                                  e.target.value = String(v)
-                                }}
-                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                className="w-14 px-2 py-1 rounded border border-transparent hover:border-white/20 focus:border-violet-500 focus:outline-none font-mono text-center text-gray-300 bg-transparent text-sm"
-                                title="Extra points from other games"
-                              />
+                              {(() => {
+                                const bonusTotal = team.bonus_points ?? 0
+                                const itemCount = (team.bonus_breakdown ?? []).length
+                                return (
+                                  <button
+                                    onClick={() => openBonusModal(team)}
+                                    title="Edit bonus points — add activities and points for each"
+                                    className={`min-w-[3.5rem] px-2.5 py-1 rounded-lg border font-mono text-center text-sm transition-colors ${
+                                      bonusTotal !== 0
+                                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                                        : 'border-white/15 bg-transparent text-gray-500 hover:border-white/30 hover:text-gray-300'
+                                    }`}
+                                  >
+                                    {bonusTotal !== 0 ? (bonusTotal > 0 ? `+${bonusTotal}` : bonusTotal) : 'Add'}
+                                    {itemCount > 0 && (
+                                      <span className="ml-1 text-[10px] text-gray-500 font-sans">
+                                        ({itemCount})
+                                      </span>
+                                    )}
+                                  </button>
+                                )
+                              })()}
                             </td>
                             {/* Actions */}
                             <td className="px-3 py-2.5 text-right">
@@ -4457,6 +4495,91 @@ export function BingoDashAdmin() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Per-team Bonus Points breakdown Modal ─────────────────────────── */}
+      {bonusTeam && (() => {
+        const total = bonusDraft.reduce((sum, i) => sum + (Number.isFinite(i.points) ? i.points : 0), 0)
+        const setRow = (idx: number, patch: Partial<BonusItem>) =>
+          setBonusDraft(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
+        const addRow = () => setBonusDraft(prev => [...prev, { label: '', points: 0 }])
+        const removeRow = (idx: number) => setBonusDraft(prev => prev.filter((_, i) => i !== idx))
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
+            onClick={() => { if (!bonusSaving) setBonusTeam(null) }}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-bounce-in flex flex-col max-h-[90vh]"
+              onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Bonus Points</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    For <span className="font-bold text-gray-700">{bonusTeam.name}</span> · one line per activity
+                  </p>
+                </div>
+                <button onClick={() => { if (!bonusSaving) setBonusTeam(null) }}
+                  className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+              </div>
+
+              <div className="px-6 py-4 overflow-y-auto">
+                {bonusDraft.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">
+                    No activities yet. Add one below to start giving points.
+                  </p>
+                )}
+                <div className="flex flex-col gap-2">
+                  {bonusDraft.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={item.label}
+                        autoFocus={idx === bonusDraft.length - 1 && item.label === ''}
+                        placeholder="Activity name (e.g. Tug of War)"
+                        onChange={e => setRow(idx, { label: e.target.value })}
+                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:border-violet-500 focus:outline-none text-sm text-gray-900 bg-white"
+                      />
+                      <input
+                        type="number"
+                        step="1"
+                        value={Number.isFinite(item.points) ? item.points : 0}
+                        onChange={e => {
+                          const n = parseInt(e.target.value, 10)
+                          setRow(idx, { points: Number.isFinite(n) ? n : 0 })
+                        }}
+                        onFocus={e => e.target.select()}
+                        className="w-20 px-2 py-2 rounded-lg border border-gray-200 focus:border-violet-500 focus:outline-none text-sm text-center font-mono text-gray-900 bg-white"
+                      />
+                      <button onClick={() => removeRow(idx)}
+                        title="Remove this activity"
+                        className="w-8 h-8 flex-shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors text-lg">
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={addRow}
+                  className="mt-3 w-full py-2.5 rounded-lg border border-dashed border-gray-300 text-gray-500 text-sm font-bold hover:border-violet-400 hover:text-violet-600 transition-colors">
+                  + Add activity
+                </button>
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+                <div className="text-sm text-gray-500">
+                  Total bonus <span className="ml-1 font-mono font-black text-lg text-amber-600">{total > 0 ? `+${total}` : total}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { if (!bonusSaving) setBonusTeam(null) }}
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={saveBonus} disabled={bonusSaving}
+                    className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                    {bonusSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )
