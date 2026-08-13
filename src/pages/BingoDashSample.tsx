@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import { fetchBoardTasks } from '../lib/boardCards'
-import { useSampleRemote, makeRemoteCode, type RemoteCommand, type RemoteState } from '../hooks/useSampleRemote'
+import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
+import { useSampleRemote, makeRemoteCode, type RemoteCommand, type RemoteState, type SampleView, type DetailStep } from '../hooks/useSampleRemote'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useTaskLinks } from '../hooks/useTaskLinks'
@@ -85,6 +86,9 @@ function DemoBar({
   showQuickWin,
   onRemote,
   remoteActive,
+  view,
+  onToggleView,
+  showViewToggle,
 }: {
   sections: BingoSection[]
   selectedId: string | null
@@ -95,6 +99,9 @@ function DemoBar({
   showQuickWin: boolean
   onRemote: () => void
   remoteActive: boolean
+  view: SampleView
+  onToggleView: () => void
+  showViewToggle: boolean
 }) {
   return (
     <div className="sticky top-0 z-40 w-full bg-gray-950/95 backdrop-blur border-b border-purple-500/30">
@@ -126,6 +133,15 @@ function DemoBar({
             👮 <span className="text-yellow-300">{marshalPassword}</span>
           </span>
           <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+            {showViewToggle && (
+              <button
+                onClick={onToggleView}
+                title={view === 'board' ? 'Show the scoreboard' : 'Show the bingo board'}
+                className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-violet-500/20 text-violet-200 border border-violet-400/40 text-xs font-black hover:bg-violet-500/30 transition-colors whitespace-nowrap"
+              >
+                {view === 'board' ? '📊' : '🎯'}<span className="hidden sm:inline"> {view === 'board' ? 'Scoreboard' : 'Board'}</span>
+              </button>
+            )}
             <button
               onClick={onRemote}
               title="Remote control — drive this screen from your phone"
@@ -652,9 +668,16 @@ function BoardScreen({
 
 // ── Task Detail (sandbox overlay) ─────────────────────────────────────────────
 
-function SampleTaskDetail({
-  task, teamName, marshalPassword, completed, onComplete, onUncomplete, onClose,
-}: {
+// Imperative handle so the phone remote can drive the open tile's flow.
+export type SampleTaskDetailHandle = {
+  start: () => void
+  nextPage: () => void
+  prevPage: () => void
+  fillMarshal: () => void
+  submitComplete: () => void
+}
+
+const SampleTaskDetail = forwardRef<SampleTaskDetailHandle, {
   task: BingoTask
   teamName: string
   marshalPassword: string
@@ -662,7 +685,10 @@ function SampleTaskDetail({
   onComplete: () => void
   onUncomplete: () => void
   onClose: () => void
-}) {
+  onStep?: (s: DetailStep) => void
+}>(function SampleTaskDetail({
+  task, teamName, marshalPassword, completed, onComplete, onUncomplete, onClose, onStep,
+}, ref) {
   const { pages } = useBingoTaskPages(task.id)
   const { photos } = useBingoTaskPhotos(task.id)
   const { links } = useTaskLinks(task.id, 'bingo_task_links')
@@ -708,6 +734,34 @@ function SampleTaskDetail({
     setPhotoPreview(url)
     setPhotoSubmitted(true)
   }
+
+  // Same rule as the on-screen "Complete Challenge" button, reused by the remote.
+  const isMarshalTask = task.task_type === 'standard' && !!task.require_marshal
+  const marshalFilled = marshalInput.trim() === marshalPassword
+  const doComplete = () => {
+    if (isMarshalTask && !marshalFilled) { setMarshalError('Wrong marshal password.'); return }
+    onComplete()
+  }
+
+  // Expose the flow to the phone remote (SampleProjector routes commands here).
+  useImperativeHandle(ref, () => ({
+    start: () => setShowSplash(false),
+    nextPage: () => setCurrentPage(p => Math.min(Math.max(0, pages.length - 1), p + 1)),
+    prevPage: () => setCurrentPage(p => Math.max(0, p - 1)),
+    fillMarshal: () => { setMarshalInput(marshalPassword); setMarshalError('') },
+    submitComplete: () => doComplete(),
+  }))
+
+  // Report the current step up so the controller renders the right buttons.
+  useEffect(() => {
+    onStep?.({
+      phase: showSplash ? 'splash' : 'main',
+      pageIndex: currentPage,
+      pageCount: pages.length,
+      isMarshalTask,
+      marshalFilled,
+    })
+  }, [onStep, showSplash, currentPage, pages.length, isMarshalTask, marshalFilled])
 
   // ── Splash ──
   if (showSplash) {
@@ -1074,7 +1128,7 @@ function SampleTaskDetail({
       </main>
     </div>
   )
-}
+})
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -1096,10 +1150,17 @@ function SampleProjector() {
   const [scanState, setScanState] = useState<ScanState>({})
   const [openTask, setOpenTask] = useState<BingoTask | null>(null)
 
+  // What the big screen is showing: the bingo board or the scoreboard.
+  const [view, setView] = useState<SampleView>('board')
+
   // Remote control: a code (generated on first "Remote" click) opens a broadcast
   // channel; a paired phone drives the state below via commands.
   const [remoteCode, setRemoteCode] = useState<string | null>(null)
   const [showPair, setShowPair] = useState(false)
+  // Live step of the open task detail, reported up so the phone shows the right
+  // buttons (Start Challenge → pages → marshal password → Complete).
+  const [detailStep, setDetailStep] = useState<DetailStep | null>(null)
+  const detailRef = useRef<SampleTaskDetailHandle | null>(null)
 
   const selectedSection = sections.find(s => s.id === selectedId) ?? null
   const marshalPassword = DEMO_MARSHAL_PASSWORD
@@ -1169,6 +1230,8 @@ function SampleProjector() {
     teamName,
     scanState,
     openTaskId: openTask?.id ?? null,
+    view,
+    detail: openTask ? detailStep : null,
   })
 
   const applyCommand = (c: RemoteCommand) => {
@@ -1186,6 +1249,12 @@ function SampleProjector() {
       case 'uncomplete': markUncomplete(c.taskId); break
       case 'quickWin': handleQuickWin(); break
       case 'reset': handleReset(); break
+      case 'setView': setView(c.view); break
+      case 'startChallenge': detailRef.current?.start(); break
+      case 'nextPage': detailRef.current?.nextPage(); break
+      case 'prevPage': detailRef.current?.prevPage(); break
+      case 'fillMarshal': detailRef.current?.fillMarshal(); break
+      case 'submitComplete': detailRef.current?.submitComplete(); break
       case 'requestState': sendState(snapshot()); break
     }
   }
@@ -1195,8 +1264,8 @@ function SampleProjector() {
   // Push a fresh snapshot to the paired phone on every meaningful change.
   useEffect(() => {
     if (!remoteCode) return
-    sendState({ selectedId, teamName, scanState, openTaskId: openTask?.id ?? null })
-  }, [remoteCode, selectedId, teamName, scanState, openTask, sendState])
+    sendState({ selectedId, teamName, scanState, openTaskId: openTask?.id ?? null, view, detail: openTask ? detailStep : null })
+  }, [remoteCode, selectedId, teamName, scanState, openTask, view, detailStep, sendState])
 
   const enableRemote = () => {
     setRemoteCode(prev => prev ?? makeRemoteCode())
@@ -1223,6 +1292,9 @@ function SampleProjector() {
         showQuickWin={!!teamName && gridTasks.length > 0}
         onRemote={enableRemote}
         remoteActive={!!remoteCode}
+        view={view}
+        onToggleView={() => setView(v => v === 'board' ? 'scoreboard' : 'board')}
+        showViewToggle={sections.length > 0}
       />
 
       {sections.length === 0 ? (
@@ -1231,6 +1303,13 @@ function SampleProjector() {
           <p className="text-white text-xl font-black mb-1">No boards found</p>
           <p className="text-gray-400 text-sm">Create a board in the Bingo admin first, then come back to the sample.</p>
         </div>
+      ) : view === 'scoreboard' ? (
+        <SampleScoreboard
+          gridTasks={gridTasks}
+          section={selectedSection}
+          playedTeamName={teamName}
+          scanState={scanState}
+        />
       ) : !teamName ? (
         <JoinScreen onJoin={name => setTeamName(name)} />
       ) : tasksLoading ? (
@@ -1249,9 +1328,10 @@ function SampleProjector() {
         />
       )}
 
-      {openTask && (
+      {openTask && view === 'board' && (
         <SampleTaskDetail
           key={openTask.id}
+          ref={detailRef}
           task={openTask}
           teamName={teamName ?? 'Sample Team'}
           marshalPassword={marshalPassword}
@@ -1259,6 +1339,7 @@ function SampleProjector() {
           onComplete={() => markComplete(openTask.id)}
           onUncomplete={() => markUncomplete(openTask.id)}
           onClose={() => setOpenTask(null)}
+          onStep={setDetailStep}
         />
       )}
 
@@ -1321,6 +1402,121 @@ function RemotePairModal({ code, onClose }: { code: string; onClose: () => void 
   )
 }
 
+// ── Sample scoreboard ─────────────────────────────────────────────────────────
+// A demo leaderboard for pitching. The 4 sample teams are ranked; the team you
+// play (via the phone remote) uses its REAL live progress, the others sit at
+// preset lively scores so the board looks full and competitive.
+
+// Preset completion levels (fraction of the board) for teams you aren't playing.
+const SCOREBOARD_PRESET: Record<string, number> = {
+  'Sample Team Alpha': 0.60,
+  'Sample Team Bravo': 0.44,
+  'Sample Team Charlie': 0.32,
+  'Sample Team Delta': 0.20,
+}
+
+function SampleScoreboard({
+  gridTasks, section, playedTeamName, scanState,
+}: {
+  gridTasks: BingoTask[]
+  section: BingoSection | null
+  playedTeamName: string | null
+  scanState: ScanState
+}) {
+  const slots = buildBingoSlots(gridTasks)
+  const orderedTasks = slots.filter((t): t is BingoTask => t !== null)
+  const total = gridTasks.length
+
+  const rows = DEMO_GROUPS.map((name, idx) => {
+    const isPlayed = name === playedTeamName
+    const completedIds = isPlayed
+      ? new Set(Object.entries(scanState).filter(([, v]) => v === 'completed').map(([k]) => k))
+      : new Set(orderedTasks.slice(0, Math.round((SCOREBOARD_PRESET[name] ?? 0.3) * total)).map(t => t.id))
+    const points = gridTasks.reduce((s, t) => completedIds.has(t.id) ? s + (t.points ?? 0) : s, 0)
+    const bingos = completedBingoLines(slots, completedIds).length
+    const tasksDone = completedIds.size
+    return { name, points, bingos, tasksDone, isPlayed, idx }
+  })
+
+  rows.sort((a, b) =>
+    b.points - a.points || b.bingos - a.bingos || b.tasksDone - a.tasksDone || a.idx - b.idx)
+
+  const rankColors = ['#fbbf24', '#cbd5e1', '#d97706']
+
+  return (
+    <div className="relative">
+      <ParticleBackground />
+      <header className="relative z-10 px-4 sm:px-8 pt-6 sm:pt-8 pb-3">
+        <div className="max-w-4xl mx-auto flex items-end justify-between gap-4">
+          <div>
+            <p className="text-purple-400 text-xs font-black uppercase tracking-[0.3em]">Bingo Dash</p>
+            <h1 className="text-white text-3xl sm:text-5xl font-black tracking-tight mt-1">Scoreboard</h1>
+            {section && <p className="text-gray-400 text-sm sm:text-lg font-bold mt-1">{section.name}</p>}
+          </div>
+          <p className="text-gray-500 text-xs sm:text-sm font-bold whitespace-nowrap">{DEMO_GROUPS.length} teams competing</p>
+        </div>
+      </header>
+
+      <main className="relative z-10 px-4 sm:px-8 pb-10">
+        <div className="max-w-4xl mx-auto flex flex-col gap-2.5">
+          <div className="grid grid-cols-[48px_1fr_84px_84px_84px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 px-3 sm:px-6 text-gray-500 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+            <div>Rank</div>
+            <div>Team</div>
+            <div className="text-center">Points</div>
+            <div className="text-center">Bingos</div>
+            <div className="text-center">Tasks</div>
+          </div>
+
+          {rows.map((row, i) => {
+            const rank = i + 1
+            const isTop3 = rank <= 3
+            const rankColor = isTop3 ? rankColors[rank - 1] : '#4b5563'
+            return (
+              <div
+                key={row.name}
+                className="grid grid-cols-[48px_1fr_84px_84px_84px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-3 sm:py-4 rounded-2xl transition-all duration-500"
+                style={{
+                  background: row.isPlayed
+                    ? 'linear-gradient(90deg, rgba(168,85,247,0.25) 0%, rgba(255,255,255,0.03) 100%)'
+                    : isTop3
+                      ? `linear-gradient(90deg, ${rankColor}22 0%, rgba(255,255,255,0.03) 100%)`
+                      : 'rgba(255,255,255,0.04)',
+                  border: row.isPlayed ? '1px solid rgba(168,85,247,0.6)' : isTop3 ? `1px solid ${rankColor}55` : '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
+                <div className="text-2xl sm:text-4xl font-black tabular-nums" style={{ color: rankColor }}>
+                  {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white text-lg sm:text-3xl font-black tracking-tight truncate">{row.name}</p>
+                  {row.isPlayed && (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full bg-purple-500 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-wider">You · live</span>
+                  )}
+                </div>
+                <div className="text-center">
+                  <p className="text-white text-xl sm:text-4xl font-black tabular-nums">{row.points}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-amber-400 text-xl sm:text-4xl font-black tabular-nums">
+                    {row.bingos}<span className="text-xs sm:text-xl text-gray-600">/12</span>
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-green-400 text-xl sm:text-4xl font-black tabular-nums">{row.tasksDone}</p>
+                </div>
+              </div>
+            )
+          })}
+
+          {total === 0 && (
+            <p className="text-gray-500 text-sm text-center py-10">Loading board…</p>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}
+
 // ── Phone controller ──────────────────────────────────────────────────────────
 // Loads at /bingo-dash/sample?remote=<code>. Mirrors the projector's live state
 // and drives it: switch board, join, tap tiles (open on screen), complete,
@@ -1371,6 +1567,8 @@ function SampleController({ code }: { code: string }) {
   const openTaskObj = gridTasks.find(t => t.id === openTaskId) ?? null
   const slots = buildSlots(gridTasks)
   const completedCount = Object.values(scanState).filter(s => s === 'completed').length
+  const view = state?.view ?? 'board'
+  const detail = state?.detail ?? null
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -1392,6 +1590,20 @@ function SampleController({ code }: { code: string }) {
         </div>
       ) : (
         <div className="flex-1 p-3 flex flex-col gap-3 max-w-md w-full mx-auto">
+          {/* Board / Scoreboard view toggle */}
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+            <button
+              onClick={() => sendCommand({ action: 'setView', view: 'board' })}
+              className={`py-2 rounded-lg text-sm font-black transition-colors ${view === 'board' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+              🎯 Board
+            </button>
+            <button
+              onClick={() => sendCommand({ action: 'setView', view: 'scoreboard' })}
+              className={`py-2 rounded-lg text-sm font-black transition-colors ${view === 'scoreboard' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+              📊 Scoreboard
+            </button>
+          </div>
+
           {/* Board picker */}
           <div>
             <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wide">Board</label>
@@ -1456,27 +1668,57 @@ function SampleController({ code }: { code: string }) {
             </div>
           )}
 
-          {/* Open-task controls */}
+          {/* Open-task controls — walk the tile's flow on the big screen */}
           {openTaskObj && (
             <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-xl p-3 flex flex-col gap-2">
               <p className="text-xs text-emerald-200 font-bold">On screen now: <span className="text-white">{openTaskObj.title}</span></p>
-              <div className="flex items-center gap-2">
-                {scanState[openTaskObj.id] === 'completed' ? (
-                  <button onClick={() => sendCommand({ action: 'uncomplete', taskId: openTaskObj.id })}
-                    className="flex-1 py-2.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
-                    ↺ Undo complete
-                  </button>
-                ) : (
-                  <button onClick={() => sendCommand({ action: 'complete', taskId: openTaskObj.id })}
-                    className="flex-1 py-2.5 rounded-lg bg-emerald-500 text-black text-sm font-black hover:bg-emerald-400 transition-colors">
-                    ✓ Mark complete
-                  </button>
-                )}
-                <button onClick={() => sendCommand({ action: 'closeTask' })}
-                  className="px-4 py-2.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
-                  Close
+
+              {scanState[openTaskObj.id] === 'completed' ? (
+                <button onClick={() => sendCommand({ action: 'uncomplete', taskId: openTaskObj.id })}
+                  className="w-full py-2.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
+                  ↺ Undo complete
                 </button>
-              </div>
+              ) : detail?.phase === 'splash' ? (
+                <button onClick={() => sendCommand({ action: 'startChallenge' })}
+                  className="w-full py-3 rounded-lg bg-emerald-500 text-black text-sm font-black hover:bg-emerald-400 transition-colors">
+                  ▶ Start Challenge
+                </button>
+              ) : (
+                <>
+                  {detail && detail.pageCount > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => sendCommand({ action: 'prevPage' })}
+                        disabled={detail.pageIndex <= 0}
+                        className="flex-1 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 disabled:opacity-30 transition-colors">
+                        ‹ Prev
+                      </button>
+                      <span className="text-[11px] text-gray-400 font-bold tabular-nums">{detail.pageIndex + 1}/{detail.pageCount}</span>
+                      <button onClick={() => sendCommand({ action: 'nextPage' })}
+                        disabled={detail.pageIndex >= detail.pageCount - 1}
+                        className="flex-1 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 disabled:opacity-30 transition-colors">
+                        Next ›
+                      </button>
+                    </div>
+                  )}
+                  {detail?.isMarshalTask && !detail.marshalFilled && (
+                    <button onClick={() => sendCommand({ action: 'fillMarshal' })}
+                      className="w-full py-2.5 rounded-lg bg-yellow-400/20 text-yellow-200 border border-yellow-400/40 text-sm font-black hover:bg-yellow-400/30 transition-colors">
+                      👮 Fill marshal password (4321)
+                    </button>
+                  )}
+                  <button
+                    onClick={() => sendCommand({ action: 'submitComplete' })}
+                    disabled={!!detail?.isMarshalTask && !detail.marshalFilled}
+                    className="w-full py-2.5 rounded-lg bg-emerald-500 text-black text-sm font-black hover:bg-emerald-400 disabled:opacity-40 transition-colors">
+                    ✓ Complete Challenge
+                  </button>
+                </>
+              )}
+
+              <button onClick={() => sendCommand({ action: 'closeTask' })}
+                className="w-full py-2 rounded-lg bg-white/5 text-gray-300 border border-white/10 text-xs font-bold hover:bg-white/10 transition-colors">
+                ← Back to board
+              </button>
             </div>
           )}
 

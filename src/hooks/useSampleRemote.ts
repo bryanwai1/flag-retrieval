@@ -23,13 +23,33 @@ export type RemoteCommand =
   | { action: 'uncomplete'; taskId: string }
   | { action: 'quickWin' }
   | { action: 'reset' }
+  | { action: 'setView'; view: SampleView }
+  // Task-detail flow (drive the open tile's screens from the phone)
+  | { action: 'startChallenge' }
+  | { action: 'nextPage' }
+  | { action: 'prevPage' }
+  | { action: 'fillMarshal' }
+  | { action: 'submitComplete' }
   | { action: 'requestState' } // controller → projector: "resend your state now"
+
+export type SampleView = 'board' | 'scoreboard'
+
+// Live step of the open task detail, so the controller shows the right buttons.
+export type DetailStep = {
+  phase: 'splash' | 'main'
+  pageIndex: number
+  pageCount: number
+  isMarshalTask: boolean
+  marshalFilled: boolean
+}
 
 export type RemoteState = {
   selectedId: string | null
   teamName: string | null
   scanState: Record<string, 'scanned' | 'completed'>
   openTaskId: string | null
+  view: SampleView
+  detail: DetailStep | null
 }
 
 /** Short, unambiguous pairing code (no 0/O/1/I to avoid QR-less typos). */
