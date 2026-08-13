@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import { fetchBoardTasks } from '../lib/boardCards'
+import { useSampleRemote, makeRemoteCode, type RemoteCommand, type RemoteState } from '../hooks/useSampleRemote'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useTaskLinks } from '../hooks/useTaskLinks'
@@ -81,6 +83,8 @@ function DemoBar({
   onReset,
   onQuickWin,
   showQuickWin,
+  onRemote,
+  remoteActive,
 }: {
   sections: BingoSection[]
   selectedId: string | null
@@ -89,6 +93,8 @@ function DemoBar({
   onReset: () => void
   onQuickWin: () => void
   showQuickWin: boolean
+  onRemote: () => void
+  remoteActive: boolean
 }) {
   return (
     <div className="sticky top-0 z-40 w-full bg-gray-950/95 backdrop-blur border-b border-purple-500/30">
@@ -120,6 +126,17 @@ function DemoBar({
             👮 <span className="text-yellow-300">{marshalPassword}</span>
           </span>
           <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+            <button
+              onClick={onRemote}
+              title="Remote control — drive this screen from your phone"
+              className={`flex-shrink-0 px-2.5 py-2 rounded-lg text-xs font-black border transition-colors whitespace-nowrap ${
+                remoteActive
+                  ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50 hover:bg-emerald-500/30'
+                  : 'bg-white/10 text-gray-200 border-white/15 hover:bg-white/20'
+              }`}
+            >
+              📡<span className="hidden sm:inline"> {remoteActive ? 'Paired' : 'Remote'}</span>
+            </button>
             {showQuickWin && (
               <button
                 onClick={onQuickWin}
@@ -1061,7 +1078,14 @@ function SampleTaskDetail({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+// Entry point: `?remote=<code>` opens the phone controller; otherwise the
+// normal sample view (which doubles as the "projector" when a phone is paired).
 export function BingoDashSample() {
+  const remoteCode = new URLSearchParams(window.location.search).get('remote')
+  return remoteCode ? <SampleController code={remoteCode} /> : <SampleProjector />
+}
+
+function SampleProjector() {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
@@ -1071,6 +1095,11 @@ export function BingoDashSample() {
   const [teamName, setTeamName] = useState<string | null>(null)
   const [scanState, setScanState] = useState<ScanState>({})
   const [openTask, setOpenTask] = useState<BingoTask | null>(null)
+
+  // Remote control: a code (generated on first "Remote" click) opens a broadcast
+  // channel; a paired phone drives the state below via commands.
+  const [remoteCode, setRemoteCode] = useState<string | null>(null)
+  const [showPair, setShowPair] = useState(false)
 
   const selectedSection = sections.find(s => s.id === selectedId) ?? null
   const marshalPassword = DEMO_MARSHAL_PASSWORD
@@ -1134,6 +1163,46 @@ export function BingoDashSample() {
     })
   }
 
+  // ── Remote control wiring ──────────────────────────────────────────────────
+  const snapshot = (): RemoteState => ({
+    selectedId,
+    teamName,
+    scanState,
+    openTaskId: openTask?.id ?? null,
+  })
+
+  const applyCommand = (c: RemoteCommand) => {
+    switch (c.action) {
+      case 'selectBoard': handleSelectBoard(c.id); break
+      case 'join': setTeamName(c.teamName); break
+      case 'leave': setTeamName(null); setOpenTask(null); break
+      case 'openTask': {
+        const t = gridTasks.find(x => x.id === c.taskId)
+        if (t) handleOpenTask(t)
+        break
+      }
+      case 'closeTask': setOpenTask(null); break
+      case 'complete': markComplete(c.taskId); break
+      case 'uncomplete': markUncomplete(c.taskId); break
+      case 'quickWin': handleQuickWin(); break
+      case 'reset': handleReset(); break
+      case 'requestState': sendState(snapshot()); break
+    }
+  }
+
+  const { sendState } = useSampleRemote(remoteCode, { onCommand: applyCommand })
+
+  // Push a fresh snapshot to the paired phone on every meaningful change.
+  useEffect(() => {
+    if (!remoteCode) return
+    sendState({ selectedId, teamName, scanState, openTaskId: openTask?.id ?? null })
+  }, [remoteCode, selectedId, teamName, scanState, openTask, sendState])
+
+  const enableRemote = () => {
+    setRemoteCode(prev => prev ?? makeRemoteCode())
+    setShowPair(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -1152,6 +1221,8 @@ export function BingoDashSample() {
         onReset={handleReset}
         onQuickWin={handleQuickWin}
         showQuickWin={!!teamName && gridTasks.length > 0}
+        onRemote={enableRemote}
+        remoteActive={!!remoteCode}
       />
 
       {sections.length === 0 ? (
@@ -1189,6 +1260,239 @@ export function BingoDashSample() {
           onUncomplete={() => markUncomplete(openTask.id)}
           onClose={() => setOpenTask(null)}
         />
+      )}
+
+      {showPair && remoteCode && (
+        <RemotePairModal code={remoteCode} onClose={() => setShowPair(false)} />
+      )}
+    </div>
+  )
+}
+
+// ── Remote pairing modal (projector side) ─────────────────────────────────────
+// Shows the QR + code a phone scans/enters to become the controller.
+
+function RemotePairModal({ code, onClose }: { code: string; onClose: () => void }) {
+  const url = `${window.location.origin}/bingo-dash/sample?remote=${code}`
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-bounce-in" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black text-gray-900">📡 Phone Remote</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Scan on a 2nd device to control this screen</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl font-light">&times;</button>
+        </div>
+        <div className="p-6 flex flex-col items-center gap-4">
+          <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+            <QRCodeSVG value={url} size={220} level="H" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-bold">Pairing code</span>
+            <span className="px-3 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-black tracking-[0.25em] text-lg">
+              {code}
+            </span>
+          </div>
+          <div className="w-full flex items-center gap-2">
+            <div className="flex-1 px-3 py-2.5 bg-gray-50 rounded-lg text-[11px] font-mono text-gray-600 break-all select-all border border-gray-200">
+              {url}
+            </div>
+            <button onClick={copy}
+              className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                copied ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400 text-center">
+            Keep this device on the projector. The phone becomes your remote — every tap here shows up on the big screen.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Phone controller ──────────────────────────────────────────────────────────
+// Loads at /bingo-dash/sample?remote=<code>. Mirrors the projector's live state
+// and drives it: switch board, join, tap tiles (open on screen), complete,
+// Quick Win, reset. Read-only fetches for board/task names; no DB writes.
+
+function SampleController({ code }: { code: string }) {
+  const [sections, setSections] = useState<BingoSection[]>([])
+  const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
+  const [state, setState] = useState<RemoteState | null>(null)
+  const stateRef = useRef<RemoteState | null>(null)
+  stateRef.current = state
+
+  const { sendCommand } = useSampleRemote(code, { onState: s => setState(s) })
+
+  // Load board names once (for the picker labels).
+  useEffect(() => {
+    supabase.from('bingo_sections').select('*').order('sort_order').then(({ data }) => {
+      setSections((data ?? []) as BingoSection[])
+    })
+  }, [])
+
+  // Ask the projector for its state until it answers, so a controller opened
+  // after the projector still syncs up.
+  useEffect(() => {
+    let tries = 0
+    sendCommand({ action: 'requestState' })
+    const iv = setInterval(() => {
+      if (stateRef.current || tries++ > 15) { clearInterval(iv); return }
+      sendCommand({ action: 'requestState' })
+    }, 1200)
+    return () => clearInterval(iv)
+  }, [sendCommand])
+
+  const selectedId = state?.selectedId ?? null
+
+  // Mirror the projector's board so tile taps map to the right tasks.
+  useEffect(() => {
+    if (!selectedId) { setGridTasks([]); return }
+    let cancelled = false
+    fetchBoardTasks(selectedId).then(tasks => { if (!cancelled) setGridTasks(tasks) })
+    return () => { cancelled = true }
+  }, [selectedId])
+
+  const connected = !!state
+  const teamName = state?.teamName ?? null
+  const scanState = state?.scanState ?? {}
+  const openTaskId = state?.openTaskId ?? null
+  const openTaskObj = gridTasks.find(t => t.id === openTaskId) ?? null
+  const slots = buildSlots(gridTasks)
+  const completedCount = Object.values(scanState).filter(s => s === 'completed').length
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-gray-950/95 backdrop-blur border-b border-emerald-500/30 px-3 py-2.5 flex items-center gap-2">
+        <span className="px-2 py-1 rounded-lg bg-emerald-500 text-black text-[11px] font-black tracking-wider">📡 REMOTE</span>
+        <span className="text-[11px] text-gray-400 font-bold tracking-[0.2em]">{code}</span>
+        <span className="ml-auto flex items-center gap-1.5 text-[11px] font-bold">
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+          {connected ? 'Connected' : 'Connecting…'}
+        </span>
+      </div>
+
+      {!connected ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-2">
+          <div className="text-4xl animate-pulse">📡</div>
+          <p className="text-gray-300 font-bold">Looking for the projector…</p>
+          <p className="text-gray-500 text-sm">Make sure the sample screen is open and shows <span className="text-emerald-300 font-bold">Paired</span>.</p>
+        </div>
+      ) : (
+        <div className="flex-1 p-3 flex flex-col gap-3 max-w-md w-full mx-auto">
+          {/* Board picker */}
+          <div>
+            <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wide">Board</label>
+            <select
+              value={selectedId ?? ''}
+              onChange={e => sendCommand({ action: 'selectBoard', id: e.target.value })}
+              className="w-full mt-1 bg-white/10 text-white text-sm font-bold rounded-lg px-3 py-2.5 border border-white/15 focus:outline-none focus:border-emerald-400"
+            >
+              {sections.length === 0 && <option value="">No boards</option>}
+              {sections.map(s => <option key={s.id} value={s.id} className="bg-gray-900">{s.name}</option>)}
+            </select>
+          </div>
+
+          {/* Join / team */}
+          {!teamName ? (
+            <div>
+              <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wide">Join as</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                {DEMO_GROUPS.map(g => (
+                  <button key={g}
+                    onClick={() => sendCommand({ action: 'join', teamName: g })}
+                    className="px-2 py-2.5 rounded-lg bg-purple-500/20 text-purple-100 border border-purple-400/40 text-xs font-bold hover:bg-purple-500/30 transition-colors">
+                    {g.replace('Sample Team ', '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+              <span className="text-sm font-bold text-white">👥 {teamName}</span>
+              <span className="text-[11px] text-gray-500">{completedCount} done</span>
+              <button onClick={() => sendCommand({ action: 'leave' })}
+                className="ml-auto text-[11px] font-bold text-gray-300 border border-white/15 rounded-lg px-2.5 py-1 hover:bg-white/10 transition-colors">
+                Leave
+              </button>
+            </div>
+          )}
+
+          {/* Tile grid — tap to open on the projector */}
+          {teamName && (
+            <div>
+              <label className="text-[11px] text-gray-500 font-bold uppercase tracking-wide">Tap a tile to show it on screen</label>
+              <div className="grid grid-cols-5 gap-1.5 mt-1">
+                {slots.map((task, i) => {
+                  if (!task) return <div key={i} className="rounded-lg aspect-square bg-white/5 border border-white/10" />
+                  const st = scanState[task.id]
+                  const isOpen = task.id === openTaskId
+                  return (
+                    <button key={i}
+                      onClick={() => sendCommand({ action: 'openTask', taskId: task.id })}
+                      title={task.title}
+                      className={`relative rounded-lg aspect-square flex items-center justify-center text-[9px] font-black leading-none p-0.5 text-center transition-all active:scale-95 ${isOpen ? 'ring-2 ring-emerald-400' : ''}`}
+                      style={{ backgroundColor: task.hex_code, opacity: st ? 1 : 0.8 }}>
+                      {st === 'completed' && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg text-white text-sm">✓</span>
+                      )}
+                      {st === 'scanned' && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full border border-white/80" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Open-task controls */}
+          {openTaskObj && (
+            <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-xl p-3 flex flex-col gap-2">
+              <p className="text-xs text-emerald-200 font-bold">On screen now: <span className="text-white">{openTaskObj.title}</span></p>
+              <div className="flex items-center gap-2">
+                {scanState[openTaskObj.id] === 'completed' ? (
+                  <button onClick={() => sendCommand({ action: 'uncomplete', taskId: openTaskObj.id })}
+                    className="flex-1 py-2.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
+                    ↺ Undo complete
+                  </button>
+                ) : (
+                  <button onClick={() => sendCommand({ action: 'complete', taskId: openTaskObj.id })}
+                    className="flex-1 py-2.5 rounded-lg bg-emerald-500 text-black text-sm font-black hover:bg-emerald-400 transition-colors">
+                    ✓ Mark complete
+                  </button>
+                )}
+                <button onClick={() => sendCommand({ action: 'closeTask' })}
+                  className="px-4 py-2.5 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom actions */}
+          <div className="mt-auto grid grid-cols-2 gap-2 pt-2">
+            <button onClick={() => sendCommand({ action: 'quickWin' })}
+              disabled={!teamName}
+              className="py-3 rounded-lg bg-yellow-400/20 text-yellow-200 border border-yellow-400/40 text-sm font-black hover:bg-yellow-400/30 disabled:opacity-40 transition-colors">
+              ⚡ Quick BINGO
+            </button>
+            <button onClick={() => sendCommand({ action: 'reset' })}
+              className="py-3 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors">
+              ↺ Reset demo
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
