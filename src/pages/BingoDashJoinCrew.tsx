@@ -65,6 +65,19 @@ function friendlyError(message: string): string {
   return message
 }
 
+/**
+ * Page chrome. Defined at module scope on purpose: a component declared inside
+ * BingoDashJoinCrew would be a brand-new function on every render, so React
+ * would remount this whole subtree on each keystroke and the name/PIN inputs
+ * would lose focus after every character typed.
+ */
+const Shell = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
+    <ParticleBackground />
+    <div className="relative z-10 w-full max-w-sm">{children}</div>
+  </div>
+)
+
 export function BingoDashJoinCrew() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
@@ -115,13 +128,6 @@ export function BingoDashJoinCrew() {
       setBusy(false)
     }
   }, [session, signInAnonymously, code, pin, name, refreshAccount, navigate])
-
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden px-4">
-      <ParticleBackground />
-      <div className="relative z-10 w-full max-w-sm">{children}</div>
-    </div>
-  )
 
   if (loading || authLoading) {
     return (
