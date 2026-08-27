@@ -9,14 +9,10 @@ import { AitbSubmissions } from '../components/AitbSubmissions'
 import { AitbLogoUpload } from '../components/AitbLogoUpload'
 import type { AitbTeam, AitbProgress, AitbSettings } from '../types/database'
 
-const UNLOCK_KEY = 'aitb_admin_unlocked'
 const TEAM_COLORS = ['#fb7185', '#22d3ee', '#fbbf24', '#34d399', '#a78bfa', '#f472b6', '#60a5fa', '#f59e0b']
 const ADMIN_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
 
 export function AitbAdmin() {
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(UNLOCK_KEY) === '1')
-  const [pwInput, setPwInput] = useState('')
-  const [pwError, setPwError] = useState('')
   const [settings, setSettings] = useState<AitbSettings | null>(null)
   const [teams, setTeams] = useState<AitbTeam[]>([])
   const [progress, setProgress] = useState<AitbProgress[]>([])
@@ -47,14 +43,6 @@ export function AitbAdmin() {
   useEffect(() => { load() }, [load])
 
   useAitbRealtime('aitb-admin', ADMIN_SUBS, load)
-
-  const tryUnlock = async () => {
-    const { data } = await supabase.from('aitb_settings').select('admin_password').eq('id', 1).maybeSingle()
-    if (data && pwInput === data.admin_password) {
-      sessionStorage.setItem(UNLOCK_KEY, '1')
-      setUnlocked(true)
-    } else setPwError('Wrong password')
-  }
 
   const addTeam = async () => {
     const name = newTeam.trim()
@@ -230,27 +218,6 @@ export function AitbAdmin() {
 
   if (!isSupabaseConfigured) {
     return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Supabase is not configured.</div>
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="text-6xl mb-3">🔒</div>
-          <h1 className="text-2xl font-black mb-4">AI Team Building — Admin</h1>
-          <input type="password" autoFocus value={pwInput}
-            onChange={e => { setPwInput(e.target.value); setPwError('') }}
-            onKeyDown={e => { if (e.key === 'Enter') tryUnlock() }}
-            placeholder="Admin password"
-            className="w-full bg-gray-800 rounded-xl px-4 py-3 font-bold text-center outline-none mb-2"
-            style={{ border: pwError ? '2px solid #f87171' : '2px solid rgba(255,255,255,0.15)' }} />
-          {pwError && <div className="text-red-400 text-sm font-bold mb-2">{pwError}</div>}
-          <button onClick={tryUnlock} className="w-full py-3 rounded-xl font-black" style={{ background: '#2dd4bf', color: '#000' }}>
-            Unlock
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (
