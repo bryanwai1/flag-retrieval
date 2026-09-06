@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
@@ -332,12 +332,17 @@ function BingoTile({
   display: TileDisplay
   onClick: () => void
 }) {
-  return (
+  // The three AI tiles are the only boxes you play a whole mission inside, so
+  // they get to look like it: a halo breathing behind the tile and beads of
+  // light running the rim. Keyframes live in index.css (`aitb-*`).
+  const isAi = !!aitbForTask(task)
+
+  const tile = (
     <button
       onClick={onClick}
       title={task.title}
       aria-label={task.title}
-      className="relative rounded-xl overflow-hidden flex items-center justify-center aspect-square transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
+      className="relative w-full rounded-xl overflow-hidden flex items-center justify-center aspect-square transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
       style={{
         backgroundColor: task.hex_code,
         boxShadow: status === 'completed'
@@ -348,6 +353,21 @@ function BingoTile({
         opacity: status === 'locked' ? 0.72 : 1,
       }}
     >
+      {isAi && (
+        <>
+          {/* A conic sweep spun behind the tile, then covered back up bar a 2px
+              rim — so the light reads as running around the edges of the box. */}
+          <span className="aitb-orbit" />
+          <span className="absolute inset-[3px] rounded-[9px] z-0 pointer-events-none" style={{ backgroundColor: task.hex_code }} />
+          {/* Glints on the rim, off-beat with each other and with the sweep. */}
+          <span className="aitb-twinkle absolute -top-px left-[40%] z-0 pointer-events-none text-white text-[11px] leading-none">✦</span>
+          <span className="aitb-twinkle absolute -bottom-px right-[20%] z-0 pointer-events-none text-white text-[11px] leading-none" style={{ animationDelay: '0.6s' }}>✦</span>
+          <span className="aitb-twinkle absolute -left-px top-[44%] z-0 pointer-events-none text-white text-[11px] leading-none" style={{ animationDelay: '1.2s' }}>✦</span>
+          <span className="aitb-twinkle absolute -right-px top-[18%] z-0 pointer-events-none text-white text-[9px] leading-none" style={{ animationDelay: '0.9s' }}>✦</span>
+          <span className="aitb-twinkle absolute -bottom-px left-[14%] z-0 pointer-events-none text-white text-[9px] leading-none" style={{ animationDelay: '1.5s' }}>✦</span>
+        </>
+      )}
+
       {isInBingoLine && status === 'completed' && (
         <div className="absolute inset-0 bg-yellow-300/10 z-0 pointer-events-none" />
       )}
@@ -377,6 +397,15 @@ function BingoTile({
         </div>
       )}
     </button>
+  )
+
+  if (!isAi) return tile
+
+  return (
+    <div className="relative" style={{ '--aitb-glow': task.hex_code } as CSSProperties}>
+      <div className="aitb-halo" />
+      {tile}
+    </div>
   )
 }
 

@@ -451,3 +451,90 @@ body {
   20%, 60%   { transform: translateX(-6px); }
   40%, 80%   { transform: translateX(6px); }
 }
+
+/* ── AI Bingo tiles ───────────────────────────────────────────────────────────
+   The three AITB missions on /bingo-dash/sample-ai are the only boxes you play a
+   whole game inside, so they are allowed to look like it: a halo breathing
+   behind the tile and beads of light running its rim. Everything reads its
+   colour from --aitb-glow (the mission's own hex), so the effect stays in the
+   tile's palette instead of hard-coding one.                                  */
+
+@keyframes aitb-halo {
+  0%, 100% { opacity: 0.60; transform: scale(0.94); }
+  50%      { opacity: 1;    transform: scale(1.10); }
+}
+
+/* The sweep is a full-disc conic gradient spun behind the tile; an inner panel
+   masks all but a 2px rim, so what you see is light travelling the edges. */
+@keyframes aitb-orbit {
+  from { transform: translate(-50%, -50%) rotate(0turn); }
+  to   { transform: translate(-50%, -50%) rotate(1turn); }
+}
+
+@keyframes aitb-twinkle {
+  0%, 100% { opacity: 0;    transform: scale(0.2) rotate(0deg); }
+  30%      { opacity: 1;    transform: scale(1.5) rotate(70deg); }
+  60%      { opacity: 0.35; transform: scale(0.9) rotate(130deg); }
+}
+
+.aitb-halo {
+  position: absolute;
+  inset: -8px;
+  border-radius: 1.15rem;
+  /* Two stops: a solid core that hugs the tile, then a wide falloff — a single
+     gradient either bleeds into the neighbouring tiles or barely shows. */
+  background:
+    radial-gradient(circle at 50% 50%, var(--aitb-glow, #a855f7) 0%, var(--aitb-glow, #a855f7) 38%, transparent 78%);
+  filter: blur(9px);
+  pointer-events: none;
+  animation: aitb-halo 2.4s ease-in-out infinite;
+}
+
+/* A second, tighter ring of the same colour — this is what makes the edge of an
+   AI box read as lit from behind rather than merely shadowed. */
+.aitb-halo::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 0.9rem;
+  box-shadow: 0 0 16px 5px var(--aitb-glow, #a855f7);
+}
+
+.aitb-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190%;
+  height: 190%;
+  pointer-events: none;
+  filter: brightness(1.35);
+  /* Three beads 120 deg apart on a faint constant ring, so the edge always
+     reads as lit and the sparkle is the part that travels. */
+  background: conic-gradient(
+    from 0deg,
+    rgba(255,255,255,0.38) 0deg,
+    rgba(255,255,255,1.00) 6deg,
+    rgba(255,255,255,1.00) 20deg,
+    rgba(255,255,255,0.38) 44deg,
+    rgba(255,255,255,0.38) 112deg,
+    rgba(255,255,255,1.00) 126deg,
+    rgba(255,255,255,1.00) 140deg,
+    rgba(255,255,255,0.38) 164deg,
+    rgba(255,255,255,0.38) 232deg,
+    rgba(255,255,255,1.00) 246deg,
+    rgba(255,255,255,1.00) 260deg,
+    rgba(255,255,255,0.38) 284deg,
+    rgba(255,255,255,0.38) 360deg
+  );
+  animation: aitb-orbit 2.6s linear infinite;
+}
+
+.aitb-twinkle {
+  animation: aitb-twinkle 1.8s ease-in-out infinite;
+  text-shadow: 0 0 6px rgba(255,255,255,0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aitb-halo, .aitb-orbit, .aitb-twinkle { animation: none; }
+  .aitb-twinkle { opacity: 0.7; }
+}
