@@ -1,10 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import { fetchBoardTasks } from '../lib/boardCards'
 import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
 import { useSampleRemote, makeRemoteCode, type RemoteCommand, type RemoteState, type SampleView, type DetailStep } from '../hooks/useSampleRemote'
+import { useSampleArena, makeArenaCode, type ArenaScore, type ArenaReport } from '../hooks/useSampleArena'
 import { useBingoTaskPages } from '../hooks/useBingoTaskPages'
 import { useBingoTaskPhotos } from '../hooks/useBingoTaskPhotos'
 import { useTaskLinks } from '../hooks/useTaskLinks'
@@ -88,6 +89,10 @@ function DemoBar({
   showQuickWin,
   onRemote,
   remoteActive,
+  onArena,
+  arenaActive,
+  arenaGuest,
+  boardName,
   view,
   onToggleView,
   showViewToggle,
@@ -101,6 +106,11 @@ function DemoBar({
   showQuickWin: boolean
   onRemote: () => void
   remoteActive: boolean
+  onArena: () => void
+  arenaActive: boolean
+  /** True on a phone that scanned in: it plays, it does not present. */
+  arenaGuest: boolean
+  boardName: string
   view: SampleView
   onToggleView: () => void
   showViewToggle: boolean
@@ -113,17 +123,23 @@ function DemoBar({
           <span className="flex-shrink-0 px-2 py-1 rounded-lg bg-purple-500 text-black text-[11px] font-black tracking-wider whitespace-nowrap">
             🎬 SAMPLE
           </span>
-          <select
-            value={selectedId ?? ''}
-            onChange={e => onSelect(e.target.value)}
-            aria-label="Choose board"
-            className="flex-1 min-w-0 sm:flex-none sm:max-w-[12rem] bg-white/10 text-white text-xs font-bold rounded-lg px-2.5 py-2 border border-white/15 focus:outline-none focus:border-purple-400"
-          >
-            {sections.length === 0 && <option value="">No boards found</option>}
-            {sections.map(s => (
-              <option key={s.id} value={s.id} className="bg-gray-900">{s.name}</option>
-            ))}
-          </select>
+          {arenaGuest ? (
+            <span className="flex-1 min-w-0 truncate bg-white/5 text-white text-xs font-bold rounded-lg px-2.5 py-2 border border-white/10">
+              {boardName || 'Loading board…'}
+            </span>
+          ) : (
+            <select
+              value={selectedId ?? ''}
+              onChange={e => onSelect(e.target.value)}
+              aria-label="Choose board"
+              className="flex-1 min-w-0 sm:flex-none sm:max-w-[12rem] bg-white/10 text-white text-xs font-bold rounded-lg px-2.5 py-2 border border-white/15 focus:outline-none focus:border-purple-400"
+            >
+              {sections.length === 0 && <option value="">No boards found</option>}
+              {sections.map(s => (
+                <option key={s.id} value={s.id} className="bg-gray-900">{s.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Row 2: password cheat-sheet pills + actions (icon-only on phones) */}
@@ -144,18 +160,33 @@ function DemoBar({
                 {view === 'board' ? '📊' : '🎯'}<span className="hidden sm:inline"> {view === 'board' ? 'Scoreboard' : 'Board'}</span>
               </button>
             )}
-            <button
-              onClick={onRemote}
-              title="Remote control — drive this screen from your phone"
-              className={`flex-shrink-0 px-2.5 py-2 rounded-lg text-xs font-black border transition-colors whitespace-nowrap ${
-                remoteActive
-                  ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50 hover:bg-emerald-500/30'
-                  : 'bg-white/10 text-gray-200 border-white/15 hover:bg-white/20'
-              }`}
-            >
-              📡<span className="hidden sm:inline"> {remoteActive ? 'Paired' : 'Remote'}</span>
-            </button>
-            {showQuickWin && (
+            {!arenaGuest && (
+              <button
+                onClick={onArena}
+                title="Scan to Play — put a QR on the screen and let the room join one live scoreboard"
+                className={`flex-shrink-0 px-2.5 py-2 rounded-lg text-xs font-black border transition-colors whitespace-nowrap ${
+                  arenaActive
+                    ? 'bg-pink-500/20 text-pink-200 border-pink-400/50 hover:bg-pink-500/30'
+                    : 'bg-white/10 text-gray-200 border-white/15 hover:bg-white/20'
+                }`}
+              >
+                📲<span className="hidden sm:inline"> {arenaActive ? 'Live' : 'Scan to Play'}</span>
+              </button>
+            )}
+            {!arenaGuest && (
+              <button
+                onClick={onRemote}
+                title="Remote control — drive this screen from your phone"
+                className={`flex-shrink-0 px-2.5 py-2 rounded-lg text-xs font-black border transition-colors whitespace-nowrap ${
+                  remoteActive
+                    ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50 hover:bg-emerald-500/30'
+                    : 'bg-white/10 text-gray-200 border-white/15 hover:bg-white/20'
+                }`}
+              >
+                📡<span className="hidden sm:inline"> {remoteActive ? 'Paired' : 'Remote'}</span>
+              </button>
+            )}
+            {showQuickWin && !arenaGuest && (
               <button
                 onClick={onQuickWin}
                 title="Quick BINGO — instantly complete one line"
@@ -164,13 +195,15 @@ function DemoBar({
                 ⚡<span className="hidden sm:inline"> BINGO</span>
               </button>
             )}
-            <button
-              onClick={onReset}
-              title="Reset demo"
-              className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors whitespace-nowrap"
-            >
-              ↺<span className="hidden sm:inline"> Reset</span>
-            </button>
+            {!arenaGuest && (
+              <button
+                onClick={onReset}
+                title="Reset demo"
+                className="flex-shrink-0 px-2.5 py-2 rounded-lg bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/20 transition-colors whitespace-nowrap"
+              >
+                ↺<span className="hidden sm:inline"> Reset</span>
+              </button>
+            )}
             <Link
               to="/"
               title="Back to Game Hub"
@@ -187,9 +220,18 @@ function DemoBar({
 
 // ── Join Screen (sandbox: demo groups + pre-filled sample password) ───────────
 
-function JoinScreen({ onJoin }: { onJoin: (groupName: string) => void }) {
+function JoinScreen({ onJoin, allowCustomName = false, taken = [] }: {
+  onJoin: (groupName: string) => void
+  /** Scanned in via the arena QR: this is a real person, not the presenter
+   *  clicking through four fake teams, so let them name their own team. */
+  allowCustomName?: boolean
+  /** Names already on the live scoreboard — two teams sharing one name would
+   *  share one row, so the second one is asked to pick again. */
+  taken?: string[]
+}) {
   const [step, setStep] = useState<1 | 2>(1)
   const [search, setSearch] = useState('')
+  const [custom, setCustom] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -228,7 +270,45 @@ function JoinScreen({ onJoin }: { onJoin: (groupName: string) => void }) {
           style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
         >
           <h2 className="text-2xl font-black text-gray-900 text-center mb-1">Join Game</h2>
-          <p className="text-gray-400 text-center text-sm mb-5">Search and select your group</p>
+          <p className="text-gray-400 text-center text-sm mb-5">
+            {allowCustomName ? 'Name your team to get on the scoreboard' : 'Search and select your group'}
+          </p>
+
+          {allowCustomName && (
+            <form
+              onSubmit={e => {
+                e.preventDefault()
+                const name = custom.trim()
+                if (!name) return
+                if (taken.some(t => t.toLowerCase() === name.toLowerCase())) {
+                  setError('That name is already on the board — pick another.')
+                  return
+                }
+                pick(name)
+              }}
+              className="mb-5"
+            >
+              <input
+                type="text"
+                value={custom}
+                onChange={e => { setCustom(e.target.value.slice(0, 24)); setError('') }}
+                placeholder="Your team name"
+                maxLength={24}
+                className="w-full px-4 py-3 rounded-2xl border-2 text-base font-bold focus:outline-none transition-colors text-center"
+                style={{ borderColor: custom ? '#a855f7' : '#e5e7eb' }}
+              />
+              {error && <p className="text-red-500 text-xs font-bold text-center mt-2">{error}</p>}
+              <button
+                type="submit"
+                disabled={custom.trim() === ''}
+                className="w-full mt-3 py-3.5 rounded-2xl text-white font-black text-lg transition-all duration-200 disabled:opacity-40 active:scale-95"
+                style={{ backgroundColor: '#a855f7' }}
+              >
+                Create Team →
+              </button>
+              <p className="text-center text-[11px] text-gray-400 mt-4">or join one of the sample teams</p>
+            </form>
+          )}
 
           <input
             type="text"
@@ -1176,6 +1256,12 @@ export function BingoDashSample({ aiMode = false }: { aiMode?: boolean } = {}) {
 }
 
 function SampleProjector({ aiMode }: { aiMode: boolean }) {
+  // A phone that scanned the host's QR arrives with the arena code AND the board
+  // it was opened on, so the whole room plays the same 25 tiles into one board.
+  const urlParams = new URLSearchParams(window.location.search)
+  const guestArena = urlParams.get('arena')
+  const guestBoard = urlParams.get('board')
+
   const [sections, setSections] = useState<BingoSection[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
@@ -1190,6 +1276,12 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
 
   // What the big screen is showing: the bingo board or the scoreboard.
   const [view, setView] = useState<SampleView>('board')
+
+  // Scan-to-Play: one code shared by QR puts every phone in the room on a single
+  // live scoreboard. The host generates it; a guest is handed it in the URL.
+  const [arenaCode, setArenaCode] = useState<string | null>(guestArena)
+  const [showArena, setShowArena] = useState(false)
+  const arenaGuest = !!guestArena
 
   // Remote control: a code (generated on first "Remote" click) opens a broadcast
   // channel; a paired phone drives the state below via commands.
@@ -1214,11 +1306,15 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
       const list = (secs ?? []) as BingoSection[]
       setSections(list)
       const active = settings?.active_section_id
-      const initial = list.find(s => s.id === active)?.id ?? list[0]?.id ?? null
+      // A guest plays the board named in its QR, whatever the admin has active.
+      const initial = list.find(s => s.id === guestBoard)?.id
+        ?? list.find(s => s.id === active)?.id
+        ?? list[0]?.id
+        ?? null
       setSelectedId(initial)
       setLoading(false)
     })()
-  }, [])
+  }, [guestBoard])
 
   // Load the grid whenever the selected board changes; reset the sandbox.
   useEffect(() => {
@@ -1235,6 +1331,29 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
     setAitbRuns({})
     return () => { cancelled = true }
   }, [selectedId, aiMode])
+
+  // ── Arena wiring ──────────────────────────────────────────────────────────
+  // One score object, recomputed only when something that scores changes, so a
+  // re-render doesn't put another presence update on the wire. Completing a
+  // tile — which for a marshal tile means entering 4321 — moves this, which is
+  // what the whole room sees.
+  const completedIds = useMemo(() => completedSet(scanState), [scanState])
+  const myScore = useMemo<ArenaReport | null>(() => {
+    if (!arenaCode || !teamName || gridTasks.length === 0) return null
+    return {
+      team: teamName,
+      points: scoreTeam(gridTasks, completedIds, aitbRuns),
+      tasksDone: completedIds.size,
+      bingos: completedBingoLines(buildBingoSlots(gridTasks), completedIds).length,
+      total: gridTasks.length,
+    }
+  }, [arenaCode, teamName, gridTasks, completedIds, aitbRuns])
+  const arenaTeams = useSampleArena(arenaCode, myScore)
+
+  const enableArena = () => {
+    setArenaCode(prev => prev ?? makeArenaCode())
+    setShowArena(true)
+  }
 
   const handleSelectBoard = (id: string) => { setSelectedId(id) }
 
@@ -1354,6 +1473,10 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
         showQuickWin={!!teamName && gridTasks.length > 0}
         onRemote={enableRemote}
         remoteActive={!!remoteCode}
+        onArena={enableArena}
+        arenaActive={!!arenaCode}
+        arenaGuest={arenaGuest}
+        boardName={selectedSection?.name ?? ''}
         view={view}
         onToggleView={() => setView(v => v === 'board' ? 'scoreboard' : 'board')}
         showViewToggle={sections.length > 0}
@@ -1372,9 +1495,15 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
           playedTeamName={teamName}
           scanState={scanState}
           aitbRuns={aitbRuns}
+          arenaCode={arenaCode}
+          arenaTeams={arenaTeams}
         />
       ) : !teamName ? (
-        <JoinScreen onJoin={name => setTeamName(name)} />
+        <JoinScreen
+          onJoin={name => setTeamName(name)}
+          allowCustomName={arenaGuest}
+          taken={arenaTeams.map(t => t.team)}
+        />
       ) : tasksLoading ? (
         <div className="min-h-[70vh] flex items-center justify-center">
           <div className="text-gray-400 text-xl font-bold animate-pulse">Loading board…</div>
@@ -1426,6 +1555,139 @@ function SampleProjector({ aiMode }: { aiMode: boolean }) {
       {showPair && remoteCode && (
         <RemotePairModal code={remoteCode} aiMode={aiMode} onClose={() => setShowPair(false)} />
       )}
+
+      {showArena && arenaCode && !arenaGuest && (
+        <ArenaScreen
+          code={arenaCode}
+          aiMode={aiMode}
+          boardId={selectedId}
+          boardName={selectedSection?.name ?? ''}
+          marshalPassword={marshalPassword}
+          teams={arenaTeams}
+          onClose={() => setShowArena(false)}
+          onShowScoreboard={() => { setShowArena(false); setView('scoreboard') }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Scan-to-Play screen (projector side) ──────────────────────────────────────
+// Put this on the big screen and the room joins by camera. Every phone that
+// scans lands on the SAME board carrying the SAME arena code, so from then on
+// each team's progress — every marshal approval included — lands on one live
+// scoreboard. Still no DB writes: the arena is an ephemeral realtime channel.
+
+function ArenaScreen({
+  code, aiMode, boardId, boardName, marshalPassword, teams, onClose, onShowScoreboard,
+}: {
+  code: string
+  aiMode: boolean
+  boardId: string | null
+  boardName: string
+  marshalPassword: string
+  teams: ArenaScore[]
+  onClose: () => void
+  onShowScoreboard: () => void
+}) {
+  const url = `${window.location.origin}/bingo-dash/sample${aiMode ? '-ai' : ''}?arena=${code}`
+    + (boardId ? `&board=${boardId}` : '')
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-gray-950 overflow-y-auto">
+      <ParticleBackground />
+
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-20 px-3 py-2 rounded-lg bg-white/10 text-gray-300 border border-white/15 text-sm font-bold hover:bg-white/20 transition-colors"
+      >
+        ✕ Close
+      </button>
+
+      <div className="relative z-10 min-h-full flex flex-col items-center justify-center px-5 py-10">
+        <p className="text-pink-400 text-xs sm:text-sm font-black uppercase tracking-[0.35em]">Bingo Dash · Live Demo</p>
+        <h1 className="text-white text-4xl sm:text-6xl font-black tracking-tight mt-2 text-center">Scan to Play</h1>
+        <p className="text-gray-400 text-sm sm:text-lg font-bold mt-2 text-center">
+          Point your camera here — you are on the scoreboard the moment you join
+        </p>
+
+        <div className="mt-8 flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-2xl flex-shrink-0">
+            <QRCodeSVG value={url} size={260} level="H" />
+          </div>
+
+          <div className="flex flex-col gap-4 w-full max-w-sm">
+            <div>
+              <p className="text-gray-500 text-[11px] font-black uppercase tracking-widest">Room code</p>
+              <p className="text-white text-5xl sm:text-6xl font-black tracking-[0.2em] leading-none mt-1">{code}</p>
+              {boardName && <p className="text-gray-400 text-sm font-bold mt-2">Board: {boardName}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-purple-500/10 border border-purple-400/30 px-4 py-3">
+                <p className="text-purple-300 text-[10px] font-black uppercase tracking-widest">🔑 Team password</p>
+                <p className="text-white text-3xl font-black tracking-[0.2em] mt-0.5">{SAMPLE_TEAM_PASSWORD}</p>
+              </div>
+              <div className="rounded-2xl bg-yellow-400/10 border border-yellow-400/30 px-4 py-3">
+                <p className="text-yellow-300 text-[10px] font-black uppercase tracking-widest">👮 Marshal</p>
+                <p className="text-white text-3xl font-black tracking-[0.2em] mt-0.5">{marshalPassword}</p>
+              </div>
+            </div>
+            <p className="text-gray-500 text-[11px] leading-relaxed">
+              A tile that needs a marshal only completes once {marshalPassword} is entered — and that
+              approval is what moves the team up the live scoreboard.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2.5 bg-white/5 rounded-lg text-[11px] font-mono text-gray-400 break-all select-all border border-white/10">
+                {url}
+              </div>
+              <button
+                onClick={copy}
+                className={`px-3 py-2.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                  copied ? 'bg-green-500/20 text-green-300 border border-green-400/40' : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Who is in so far — the host's proof the room is actually joining. */}
+        <div className="mt-9 w-full max-w-3xl">
+          <p className="text-center text-gray-500 text-xs font-black uppercase tracking-widest">
+            {teams.length === 0 ? 'Nobody has joined yet' : `${teams.length} ${teams.length === 1 ? 'team' : 'teams'} in`}
+          </p>
+          {teams.length > 0 && (
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {[...teams].sort((a, b) => b.points - a.points).map(t => (
+                <span
+                  key={t.team}
+                  className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white text-sm font-bold"
+                >
+                  {t.team} <span className="text-purple-300 tabular-nums">{t.points}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={onShowScoreboard}
+              className="px-6 py-3 rounded-2xl bg-violet-500/20 text-violet-100 border border-violet-400/40 font-black hover:bg-violet-500/30 transition-colors"
+            >
+              📊 Show the live scoreboard
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1497,42 +1759,77 @@ const SCOREBOARD_PRESET: Record<string, number> = {
   'Sample Team Delta': 0.20,
 }
 
+/**
+ * What a set of completed tiles is worth.
+ *
+ * Flat tiles pay their face value. AI tiles don't: pass `runs` (the device
+ * actually playing) and each one pays what its run has earned so far — check-in,
+ * steps, speed bonus, live even before the mission finishes. Pass null (the
+ * demo's filler teams) and a completed AI tile pays the par score instead: a
+ * mission finished, but not raced.
+ */
+function scoreTeam(
+  gridTasks: BingoTask[],
+  completedIds: Set<string>,
+  runs: Record<string, AitbTileRun> | null,
+): number {
+  return gridTasks.reduce((sum, t) => {
+    const activity = aitbForTask(t)
+    if (activity) {
+      if (runs) {
+        const run = runs[t.id]
+        return run ? sum + aitbTilePoints(run, activity) : sum
+      }
+      return completedIds.has(t.id) ? sum + aitbTileParPoints(activity) : sum
+    }
+    return completedIds.has(t.id) ? sum + (t.points ?? 0) : sum
+  }, 0)
+}
+
+/** The tiles this device has finished — the key to every score it reports. */
+function completedSet(scanState: ScanState): Set<string> {
+  return new Set(Object.entries(scanState).filter(([, v]) => v === 'completed').map(([k]) => k))
+}
+
 function SampleScoreboard({
-  gridTasks, section, playedTeamName, scanState, aitbRuns = {},
+  gridTasks, section, playedTeamName, scanState, aitbRuns = {}, arenaCode = null, arenaTeams = [],
 }: {
   gridTasks: BingoTask[]
   section: BingoSection | null
   playedTeamName: string | null
   scanState: ScanState
   aitbRuns?: Record<string, AitbTileRun>
+  /** Set when the room is playing off one QR — then the board is real people. */
+  arenaCode?: string | null
+  arenaTeams?: ArenaScore[]
 }) {
   const slots = buildBingoSlots(gridTasks)
   const orderedTasks = slots.filter((t): t is BingoTask => t !== null)
   const total = gridTasks.length
 
-  const rows = DEMO_GROUPS.map((name, idx) => {
-    const isPlayed = name === playedTeamName
-    const completedIds = isPlayed
-      ? new Set(Object.entries(scanState).filter(([, v]) => v === 'completed').map(([k]) => k))
-      : new Set(orderedTasks.slice(0, Math.round((SCOREBOARD_PRESET[name] ?? 0.3) * total)).map(t => t.id))
-    // AI tiles aren't flat-rate: the team you play banks what its run actually
-    // earned (check-in + steps + speed bonus, live even before it finishes),
-    // while the demo's other teams score a mission they finished without racing.
-    const points = gridTasks.reduce((s, t) => {
-      const activity = aitbForTask(t)
-      if (activity) {
-        if (isPlayed) {
-          const run = aitbRuns[t.id]
-          return run ? s + aitbTilePoints(run, activity) : s
+  const rows = arenaCode
+    ? arenaTeams.map((t, idx) => ({
+        name: t.team,
+        points: t.points,
+        bingos: t.bingos,
+        tasksDone: t.tasksDone,
+        isPlayed: t.team === playedTeamName,
+        idx,
+      }))
+    : DEMO_GROUPS.map((name, idx) => {
+        const isPlayed = name === playedTeamName
+        const completedIds = isPlayed
+          ? completedSet(scanState)
+          : new Set(orderedTasks.slice(0, Math.round((SCOREBOARD_PRESET[name] ?? 0.3) * total)).map(t => t.id))
+        return {
+          name,
+          points: scoreTeam(gridTasks, completedIds, isPlayed ? aitbRuns : null),
+          bingos: completedBingoLines(slots, completedIds).length,
+          tasksDone: completedIds.size,
+          isPlayed,
+          idx,
         }
-        return completedIds.has(t.id) ? s + aitbTileParPoints(activity) : s
-      }
-      return completedIds.has(t.id) ? s + (t.points ?? 0) : s
-    }, 0)
-    const bingos = completedBingoLines(slots, completedIds).length
-    const tasksDone = completedIds.size
-    return { name, points, bingos, tasksDone, isPlayed, idx }
-  })
+      })
 
   rows.sort((a, b) =>
     b.points - a.points || b.bingos - a.bingos || b.tasksDone - a.tasksDone || a.idx - b.idx)
@@ -1549,13 +1846,19 @@ function SampleScoreboard({
             <h1 className="text-white text-3xl sm:text-5xl font-black tracking-tight mt-1">Scoreboard</h1>
             {section && <p className="text-gray-400 text-sm sm:text-lg font-bold mt-1">{section.name}</p>}
           </div>
-          <p className="text-gray-500 text-xs sm:text-sm font-bold whitespace-nowrap">{DEMO_GROUPS.length} teams competing</p>
+          {arenaCode ? (
+            <p className="text-pink-400 text-xs sm:text-sm font-black whitespace-nowrap uppercase tracking-widest">
+              ● Live · {arenaCode} · {rows.length} {rows.length === 1 ? 'team' : 'teams'}
+            </p>
+          ) : (
+            <p className="text-gray-500 text-xs sm:text-sm font-bold whitespace-nowrap">{DEMO_GROUPS.length} teams competing</p>
+          )}
         </div>
       </header>
 
       <main className="relative z-10 px-4 sm:px-8 pb-10">
         <div className="max-w-4xl mx-auto flex flex-col gap-2.5">
-          <div className="grid grid-cols-[48px_1fr_84px_84px_84px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 px-3 sm:px-6 text-gray-500 text-[10px] sm:text-xs font-black uppercase tracking-widest">
+          <div className="grid grid-cols-[34px_1fr_62px_52px_44px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 px-3 sm:px-6 text-gray-500 text-[10px] sm:text-xs font-black uppercase tracking-widest">
             <div>Rank</div>
             <div>Team</div>
             <div className="text-center">Points</div>
@@ -1570,7 +1873,7 @@ function SampleScoreboard({
             return (
               <div
                 key={row.name}
-                className="grid grid-cols-[48px_1fr_84px_84px_84px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-3 sm:py-4 rounded-2xl transition-all duration-500"
+                className="grid grid-cols-[34px_1fr_62px_52px_44px] sm:grid-cols-[64px_1fr_140px_140px_140px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-3 sm:py-4 rounded-2xl transition-all duration-500"
                 style={{
                   background: row.isPlayed
                     ? 'linear-gradient(90deg, rgba(168,85,247,0.25) 0%, rgba(255,255,255,0.03) 100%)'
@@ -1603,6 +1906,12 @@ function SampleScoreboard({
               </div>
             )
           })}
+
+          {arenaCode && rows.length === 0 && total > 0 && (
+            <p className="text-gray-500 text-sm text-center py-10">
+              Waiting for the first team to scan in…
+            </p>
+          )}
 
           {total === 0 && (
             <p className="text-gray-500 text-sm text-center py-10">Loading board…</p>
