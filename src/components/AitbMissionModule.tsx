@@ -87,12 +87,11 @@ function CupsPicker({ color, slots, savedWords, disabled, onSave }: SubProps) {
 
   const choose = (i: number, val: string) => {
     if (disabled) return
-    setSel(prev => {
-      const next = [...prev]
-      next[i] = next[i] === val ? '' : val   // tap again to deselect
-      if (next.every(Boolean)) onSave(next)
-      return next
-    })
+    const next = [...sel]
+    next[i] = next[i] === val ? '' : val   // tap again to deselect
+    setSel(next)
+    // onSave outside the updater — see the note in SpinModule.
+    if (next.every(Boolean)) onSave(next)
   }
 
   const allPicked = sel.every(Boolean)
@@ -160,6 +159,8 @@ function SongPrompt({ genre, topic, color }: { genre: string; topic: string; col
 
 // ── Roulette: spin each wheel one at a time ──────────────────────────────────
 function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
+  // Latest vals, readable from the reel callbacks without a state updater.
+  const valsRef = useRef<string[]>([])
   const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
 
   // A wheel already spun elsewhere (teammate's phone) is locked here — this
@@ -181,6 +182,7 @@ function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: Su
   })
 
   const [vals, setVals] = useState<string[]>(() => slots.map((_, i) => savedWords[i] ?? ''))
+  valsRef.current = vals
   const [flash, setFlash] = useState<Record<number, string>>({})
   const [spinning, setSpinning] = useState<number | null>(null)
 
@@ -202,7 +204,13 @@ function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: Su
         // Charge the spin only once a result actually lands, so a reel that gets
         // interrupted (tab backgrounded to open Suno, phone locked) costs nothing.
         bumpSpin(i)
-        setVals(prev => { const next = [...prev]; next[i] = final; onSave(next); return next })
+        // onSave must run OUTSIDE the state updater: an updater is replayed
+        // during render, so a consumer that sets state synchronously (the AI
+        // bingo board does) would be updated mid-render.
+        const next = [...valsRef.current]
+        next[i] = final
+        setVals(next)
+        onSave(next)
         setSpinning(null)
       }
     }, 65)
@@ -384,6 +392,9 @@ function ImageDealModule({ color, slots, savedWords, disabled, onSave }: SubProp
 function ImageSpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
   const seed = () => slots.map((_, i) => savedWords[i] ?? '')
   const [vals, setVals] = useState<string[]>(seed)
+  // Latest vals, readable from the reel callback without a state updater.
+  const valsRef = useRef<string[]>(vals)
+  valsRef.current = vals
   const [finals, setFinals] = useState<string[]>(seed)
   const [spinning, setSpinning] = useState<number | null>(null)
   const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
@@ -422,7 +433,11 @@ function ImageSpinModule({ color, slots, savedWords, disabled, onSave, storeKey 
         writeSpins(storeKey, next)
         return next
       })
-      setVals(prev => { const n = [...prev]; n[i] = final; onSave(n); return n })
+      // Outside the updater — see the note in SpinModule.
+      const n = [...valsRef.current]
+      n[i] = final
+      setVals(n)
+      onSave(n)
       setSpinning(null)
     }, SPIN_BASE + 200)
   }
