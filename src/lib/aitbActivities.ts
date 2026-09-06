@@ -409,6 +409,15 @@ export function aitbMaxPoints(a: AitbActivity): number {
     + AITB_COMPLETE[a.difficulty] + Math.round((a.bonusTiers[0]?.pts ?? 0) * AITB_BONUS_MULT[a.difficulty])
 }
 
+/** Elapsed mission time as m:ss (h:mm:ss past an hour). */
+export function fmtElapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+}
+
 export function aitbSpeedBonus(elapsedMs: number, activity: Pick<AitbActivity, 'bonusTiers' | 'difficulty'>): number {
   const mins = elapsedMs / 60_000
   const mult = AITB_BONUS_MULT[activity.difficulty] ?? 1

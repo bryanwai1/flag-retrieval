@@ -89,6 +89,7 @@ export default function App() {
           <Route path="/bingo-dash/projector/:sectionSlug" element={<BingoDashProjector />} />
           <Route path="/bingo-dash/play/:sectionSlug" element={<BingoDashJoin />} />
           <Route path="/bingo-dash/sample" element={<BingoDashSample />} />
+          <Route path="/bingo-dash/sample-ai" element={<BingoDashSample aiMode />} />
           <Route path="/bingo-dash/colmar-intro" element={<BingoDashColmarIntro />} />
           <Route path="/bingo-dash/slides" element={<BingoDashSlidesHub />} />
           <Route path="/bingo-dash/slides/awards" element={<BingoDashAwardSlides />} />

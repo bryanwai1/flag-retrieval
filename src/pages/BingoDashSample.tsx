@@ -16,6 +16,8 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import { TileFace } from '../components/BingoTileFace'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import { normalizeUrl } from '../lib/normalizeUrl'
+import { SampleAitbMission } from '../components/SampleAitbMission'
+import { swapAitbTiles, aitbForTask, aitbTilePoints, aitbTileParPoints, newAitbRun, type AitbTileRun } from '../lib/bingoAitb'
 import type { BingoSection, BingoTask } from '../types/database'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1134,12 +1136,17 @@ const SampleTaskDetail = forwardRef<SampleTaskDetailHandle, {
 
 // Entry point: `?remote=<code>` opens the phone controller; otherwise the
 // normal sample view (which doubles as the "projector" when a phone is paired).
-export function BingoDashSample() {
+// `aiMode` is the AI-infused demo (/bingo-dash/sample-ai): the same board with
+// its three "Longest Breathe" tiles handed over to AI Team Building missions,
+// played inline. The swap is client-side only — see lib/bingoAitb.
+export function BingoDashSample({ aiMode = false }: { aiMode?: boolean } = {}) {
   const remoteCode = new URLSearchParams(window.location.search).get('remote')
-  return remoteCode ? <SampleController code={remoteCode} /> : <SampleProjector />
+  return remoteCode
+    ? <SampleController code={remoteCode} aiMode={aiMode} />
+    : <SampleProjector aiMode={aiMode} />
 }
 
-function SampleProjector() {
+function SampleProjector({ aiMode }: { aiMode: boolean }) {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
@@ -1149,6 +1156,8 @@ function SampleProjector() {
   const [teamName, setTeamName] = useState<string | null>(null)
   const [scanState, setScanState] = useState<ScanState>({})
   const [openTask, setOpenTask] = useState<BingoTask | null>(null)
+  // AI-mode only: one live run per AI tile (timer, steps, module result, bonus).
+  const [aitbRuns, setAitbRuns] = useState<Record<string, AitbTileRun>>({})
 
   // What the big screen is showing: the bingo board or the scoreboard.
   const [view, setView] = useState<SampleView>('board')
@@ -1164,6 +1173,7 @@ function SampleProjector() {
 
   const selectedSection = sections.find(s => s.id === selectedId) ?? null
   const marshalPassword = DEMO_MARSHAL_PASSWORD
+  const openAitbActivity = openTask ? aitbForTask(openTask) : null
 
   // Load all boards once. Prefer the admin's active board as the initial pick.
   useEffect(() => {
@@ -1188,13 +1198,14 @@ function SampleProjector() {
     setTasksLoading(true)
     fetchBoardTasks(selectedId).then(tasks => {
       if (cancelled) return
-      setGridTasks(tasks)
+      setGridTasks(aiMode ? swapAitbTiles(tasks) : tasks)
       setTasksLoading(false)
     })
     setScanState({})
     setOpenTask(null)
+    setAitbRuns({})
     return () => { cancelled = true }
-  }, [selectedId])
+  }, [selectedId, aiMode])
 
   const handleSelectBoard = (id: string) => { setSelectedId(id) }
 
@@ -1202,11 +1213,33 @@ function SampleProjector() {
     setScanState({})
     setOpenTask(null)
     setTeamName(null)
+    setAitbRuns({})
   }
 
   const handleOpenTask = (task: BingoTask) => {
     setScanState(prev => prev[task.id] ? prev : { ...prev, [task.id]: 'scanned' })
     setOpenTask(task)
+  }
+
+  // ── AI mission wiring (aiMode tiles) ───────────────────────────────────────
+  const patchRun = (taskId: string, patch: (run: AitbTileRun) => AitbTileRun) =>
+    setAitbRuns(prev => (prev[taskId] ? { ...prev, [taskId]: patch(prev[taskId]) } : prev))
+
+  const startAitbRun = (taskId: string) =>
+    setAitbRuns(prev => (prev[taskId] ? prev : { ...prev, [taskId]: newAitbRun() }))
+
+  const toggleAitbStep = (taskId: string, index: number) =>
+    patchRun(taskId, run => ({
+      ...run,
+      steps: run.steps.includes(index) ? run.steps.filter(i => i !== index) : [...run.steps, index],
+    }))
+
+  const saveAitbWords = (taskId: string, words: string[]) =>
+    patchRun(taskId, run => ({ ...run, words }))
+
+  const completeAitbRun = (taskId: string, bonus: number) => {
+    patchRun(taskId, run => ({ ...run, completedAt: Date.now(), bonus }))
+    markComplete(taskId)
   }
 
   const markComplete = (taskId: string) => setScanState(prev => ({ ...prev, [taskId]: 'completed' }))
@@ -1309,6 +1342,7 @@ function SampleProjector() {
           section={selectedSection}
           playedTeamName={teamName}
           scanState={scanState}
+          aitbRuns={aitbRuns}
         />
       ) : !teamName ? (
         <JoinScreen onJoin={name => setTeamName(name)} />
@@ -1329,22 +1363,39 @@ function SampleProjector() {
       )}
 
       {openTask && view === 'board' && (
-        <SampleTaskDetail
-          key={openTask.id}
-          ref={detailRef}
-          task={openTask}
-          teamName={teamName ?? 'Sample Team'}
-          marshalPassword={marshalPassword}
-          completed={scanState[openTask.id] === 'completed'}
-          onComplete={() => markComplete(openTask.id)}
-          onUncomplete={() => markUncomplete(openTask.id)}
-          onClose={() => setOpenTask(null)}
-          onStep={setDetailStep}
-        />
+        openAitbActivity ? (
+          <SampleAitbMission
+            key={openTask.id}
+            ref={detailRef}
+            activity={openAitbActivity}
+            teamName={teamName ?? 'Sample Team'}
+            marshalPassword={marshalPassword}
+            run={aitbRuns[openTask.id] ?? null}
+            onCheckIn={() => startAitbRun(openTask.id)}
+            onToggleStep={i => toggleAitbStep(openTask.id, i)}
+            onSaveWords={words => saveAitbWords(openTask.id, words)}
+            onComplete={bonus => completeAitbRun(openTask.id, bonus)}
+            onClose={() => setOpenTask(null)}
+            onStep={setDetailStep}
+          />
+        ) : (
+          <SampleTaskDetail
+            key={openTask.id}
+            ref={detailRef}
+            task={openTask}
+            teamName={teamName ?? 'Sample Team'}
+            marshalPassword={marshalPassword}
+            completed={scanState[openTask.id] === 'completed'}
+            onComplete={() => markComplete(openTask.id)}
+            onUncomplete={() => markUncomplete(openTask.id)}
+            onClose={() => setOpenTask(null)}
+            onStep={setDetailStep}
+          />
+        )
       )}
 
       {showPair && remoteCode && (
-        <RemotePairModal code={remoteCode} onClose={() => setShowPair(false)} />
+        <RemotePairModal code={remoteCode} aiMode={aiMode} onClose={() => setShowPair(false)} />
       )}
     </div>
   )
@@ -1353,8 +1404,10 @@ function SampleProjector() {
 // ── Remote pairing modal (projector side) ─────────────────────────────────────
 // Shows the QR + code a phone scans/enters to become the controller.
 
-function RemotePairModal({ code, onClose }: { code: string; onClose: () => void }) {
-  const url = `${window.location.origin}/bingo-dash/sample?remote=${code}`
+function RemotePairModal({ code, aiMode, onClose }: { code: string; aiMode: boolean; onClose: () => void }) {
+  // Pair the phone into the SAME demo the projector is running, so the board it
+  // mirrors has the same tiles.
+  const url = `${window.location.origin}/bingo-dash/sample${aiMode ? '-ai' : ''}?remote=${code}`
   const [copied, setCopied] = useState(false)
   const copy = () => {
     navigator.clipboard.writeText(url).then(() => {
@@ -1416,12 +1469,13 @@ const SCOREBOARD_PRESET: Record<string, number> = {
 }
 
 function SampleScoreboard({
-  gridTasks, section, playedTeamName, scanState,
+  gridTasks, section, playedTeamName, scanState, aitbRuns = {},
 }: {
   gridTasks: BingoTask[]
   section: BingoSection | null
   playedTeamName: string | null
   scanState: ScanState
+  aitbRuns?: Record<string, AitbTileRun>
 }) {
   const slots = buildBingoSlots(gridTasks)
   const orderedTasks = slots.filter((t): t is BingoTask => t !== null)
@@ -1432,7 +1486,20 @@ function SampleScoreboard({
     const completedIds = isPlayed
       ? new Set(Object.entries(scanState).filter(([, v]) => v === 'completed').map(([k]) => k))
       : new Set(orderedTasks.slice(0, Math.round((SCOREBOARD_PRESET[name] ?? 0.3) * total)).map(t => t.id))
-    const points = gridTasks.reduce((s, t) => completedIds.has(t.id) ? s + (t.points ?? 0) : s, 0)
+    // AI tiles aren't flat-rate: the team you play banks what its run actually
+    // earned (check-in + steps + speed bonus, live even before it finishes),
+    // while the demo's other teams score a mission they finished without racing.
+    const points = gridTasks.reduce((s, t) => {
+      const activity = aitbForTask(t)
+      if (activity) {
+        if (isPlayed) {
+          const run = aitbRuns[t.id]
+          return run ? s + aitbTilePoints(run, activity) : s
+        }
+        return completedIds.has(t.id) ? s + aitbTileParPoints(activity) : s
+      }
+      return completedIds.has(t.id) ? s + (t.points ?? 0) : s
+    }, 0)
     const bingos = completedBingoLines(slots, completedIds).length
     const tasksDone = completedIds.size
     return { name, points, bingos, tasksDone, isPlayed, idx }
@@ -1522,7 +1589,7 @@ function SampleScoreboard({
 // and drives it: switch board, join, tap tiles (open on screen), complete,
 // Quick Win, reset. Read-only fetches for board/task names; no DB writes.
 
-function SampleController({ code }: { code: string }) {
+function SampleController({ code, aiMode }: { code: string; aiMode: boolean }) {
   const [sections, setSections] = useState<BingoSection[]>([])
   const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
   const [state, setState] = useState<RemoteState | null>(null)
@@ -1556,9 +1623,11 @@ function SampleController({ code }: { code: string }) {
   useEffect(() => {
     if (!selectedId) { setGridTasks([]); return }
     let cancelled = false
-    fetchBoardTasks(selectedId).then(tasks => { if (!cancelled) setGridTasks(tasks) })
+    fetchBoardTasks(selectedId).then(tasks => {
+      if (!cancelled) setGridTasks(aiMode ? swapAitbTiles(tasks) : tasks)
+    })
     return () => { cancelled = true }
-  }, [selectedId])
+  }, [selectedId, aiMode])
 
   const connected = !!state
   const teamName = state?.teamName ?? null

@@ -43,6 +43,7 @@ export function GameSelector() {
           adminHref="/bingo-dash/admin"
           slidesHref="/bingo-dash/slides"
           sampleHref="/bingo-dash/sample"
+          aiSampleHref="/bingo-dash/sample-ai"
           icon="🎯"
           title="BINGO DASH"
           description="Scan challenges · Complete tasks · Track your team"
@@ -157,6 +158,7 @@ function GameCard({
   slidesHref,
   projectorHref,
   sampleHref,
+  aiSampleHref,
   icon,
   title,
   description,
@@ -170,6 +172,8 @@ function GameCard({
   slidesHref?: string
   projectorHref?: string
   sampleHref?: string
+  /** Sample board with its three swapped-in AI Team Building missions. */
+  aiSampleHref?: string
   icon: string
   title: string
   description: string
@@ -237,6 +241,15 @@ function GameCard({
             style={{ background: `${accent}22`, color: accent, border: `1.5px solid ${accent}` }}
           >
             🎬 SAMPLE BINGO
+          </a>
+        )}
+        {aiSampleHref && (
+          <a
+            href={aiSampleHref}
+            className="w-full py-2.5 rounded-xl font-black text-center text-sm transition-all hover:scale-105"
+            style={{ background: '#22d3ee22', color: '#22d3ee', border: '1.5px solid #22d3ee' }}
+          >
+            🤖 AI BINGO DEMO
           </a>
         )}
         {projectorHref && (

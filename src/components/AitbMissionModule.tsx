@@ -8,15 +8,17 @@
  *   · cards    (Random Cinematic) → deal 4 cards at once, no re-draws
  *   · animals  (Found Object)     → draw 2 surprise animals, no re-draws
  *
- * When every slot of a module has generated art (AITB_REEL_POOLS) the reveal
- * upgrades from a text flash to an image slot-machine that spins through the
- * pictures and lands on the chosen one; otherwise it falls back to text.
+ * The roulette spins real segmented wheels (as in the Game System player build)
+ * and reveals the artwork for what they landed on underneath. For the deal
+ * modules, a module whose every slot pool has generated art (AITB_REEL_POOLS)
+ * upgrades from a text flash to an image slot-machine; otherwise text.
  */
 import { useEffect, useRef, useState } from 'react'
 import {
-  AITB_POOLS, AITB_MODULE_SLOTS, AITB_MODULE_MODE, aitbReelImage, aitbModuleHasImages,
+  AITB_POOLS, AITB_MODULE_SLOTS, AITB_MODULE_MODE, AITB_REEL_POOLS, aitbReelImage, aitbModuleHasImages,
   type AitbActivity, type AitbModuleSlot, type AitbPoolKey,
 } from '../lib/aitbActivities'
+import { aitbWheelArt } from '../lib/aitbWheels'
 
 type ModuleProps = {
   activity: AitbActivity
@@ -72,7 +74,7 @@ export function AitbMissionModule({ activity, savedWords, disabled, onSave, prog
     storeKey: `aitb_spins_${activity.id}_${progressId}`,
   }
   if (mode === 'pick') return <CupsPicker {...sub} />
-  if (mode === 'spin') return aitbModuleHasImages(mod) ? <ImageSpinModule {...sub} /> : <SpinModule {...sub} />
+  if (mode === 'spin') return <WheelSpinModule {...sub} />
   return aitbModuleHasImages(mod) ? <ImageDealModule {...sub} /> : <TextDealModule {...sub} />
 }
 
@@ -90,7 +92,7 @@ function CupsPicker({ color, slots, savedWords, disabled, onSave }: SubProps) {
     const next = [...sel]
     next[i] = next[i] === val ? '' : val   // tap again to deselect
     setSel(next)
-    // onSave outside the updater — see the note in SpinModule.
+    // onSave outside the updater — see the note in WheelSpinModule.
     if (next.every(Boolean)) onSave(next)
   }
 
@@ -157,11 +159,79 @@ function SongPrompt({ genre, topic, color }: { genre: string; topic: string; col
   )
 }
 
-// ── Roulette: spin each wheel one at a time ──────────────────────────────────
-function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
-  // Latest vals, readable from the reel callbacks without a state updater.
-  const valsRef = useRef<string[]>([])
+// ── Roulette wheel ───────────────────────────────────────────────────────────
+// Painted artwork with the options printed on it, spun under a fixed pointer.
+// Where each slice sits is measured data (lib/aitbWheels), so the wheel always
+// stops with the pointer on the word the spin actually chose.
+
+const WHEEL_SPIN_MS = 4600
+
+function RouletteWheel({ pool, final, spinKey }: {
+  pool: AitbPoolKey
+  final: string | null
+  /** Bumped by the parent on every spin; 0 = never spun. */
+  spinKey: number
+}) {
+  const art = aitbWheelArt(pool)
+  const items: readonly string[] = AITB_POOLS[pool]
+  const [rot, setRot] = useState(0)
+  const rotRef = useRef(0)
+
+  useEffect(() => {
+    if (!spinKey || !final || !art) return
+    const idx = items.indexOf(final)
+    if (idx < 0) return
+    // Turn the slice's own centre angle up to the pointer, plus five whole
+    // turns. Measured from the CURRENT angle so a re-spin is as accurate as the
+    // first one.
+    const wanted = (360 - art.mids[idx]) % 360
+    const current = ((rotRef.current % 360) + 360) % 360
+    rotRef.current += 360 * 5 + (((wanted - current) % 360) + 360) % 360
+    setRot(rotRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinKey])
+
+  if (!art) return null
+
+  return (
+    <div className="relative w-full aspect-square">
+      {/* pointer — fixed at the top, the wheel turns beneath it */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 z-20"
+        style={{
+          top: '-2%',
+          borderLeft: '11px solid transparent',
+          borderRight: '11px solid transparent',
+          borderTop: '22px solid #f8fafc',
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
+        }}
+      />
+      <img
+        src={art.src}
+        alt=""
+        draggable={false}
+        className="w-full h-full select-none"
+        style={{
+          transform: `rotate(${rot}deg)`,
+          transition: `transform ${WHEEL_SPIN_MS}ms cubic-bezier(.12,.72,.05,1)`,
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Roulette: two real wheels, then the art + song brief underneath ──────────
+function WheelSpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
   const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
+  const [vals, setVals] = useState<string[]>(() => slots.map((_, i) => savedWords[i] ?? ''))
+  // Latest vals, readable from the spin callback without a state updater.
+  const valsRef = useRef<string[]>(vals)
+  valsRef.current = vals
+  // What each wheel is currently rotating towards, and a per-wheel spin counter
+  // the wheel watches to know a new spin started.
+  const [targets, setTargets] = useState<string[]>(() => slots.map((_, i) => savedWords[i] ?? ''))
+  const [spinKeys, setSpinKeys] = useState<number[]>(() => slots.map(() => 0))
+  const [spinning, setSpinning] = useState<number | null>(null)
 
   // A wheel already spun elsewhere (teammate's phone) is locked here — this
   // device can't know how many of the team's 2 spins are left, so it assumes none.
@@ -174,70 +244,64 @@ function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: Su
     })
   }, [savedWords, storeKey])
 
-  const bumpSpin = (i: number) => setSpins(prev => {
-    const next = [...prev]
-    next[i] = (next[i] || 0) + 1
-    writeSpins(storeKey, next)
-    return next
-  })
-
-  const [vals, setVals] = useState<string[]>(() => slots.map((_, i) => savedWords[i] ?? ''))
-  valsRef.current = vals
-  const [flash, setFlash] = useState<Record<number, string>>({})
-  const [spinning, setSpinning] = useState<number | null>(null)
-
+  // Re-seed from realtime unless this device has already spun.
   useEffect(() => {
     setVals(prev => (prev.some(Boolean) ? prev : slots.map((_, i) => savedWords[i] ?? '')))
+    setTargets(prev => (prev.some(Boolean) ? prev : slots.map((_, i) => savedWords[i] ?? '')))
   }, [savedWords, slots])
 
   const spin = (i: number) => {
     if (disabled || spinning !== null || (spins[i] || 0) >= MAX_SPINS) return
-    setSpinning(i)
     const pool = AITB_POOLS[slots[i].pool]
-    let ticks = 0
-    const iv = setInterval(() => {
-      setFlash(f => ({ ...f, [i]: pool[Math.floor(Math.random() * pool.length)] }))
-      if (++ticks > 18) {
-        clearInterval(iv)
-        const final = pool[Math.floor(Math.random() * pool.length)]
-        setFlash(f => { const n = { ...f }; delete n[i]; return n })
-        // Charge the spin only once a result actually lands, so a reel that gets
-        // interrupted (tab backgrounded to open Suno, phone locked) costs nothing.
-        bumpSpin(i)
-        // onSave must run OUTSIDE the state updater: an updater is replayed
-        // during render, so a consumer that sets state synchronously (the AI
-        // bingo board does) would be updated mid-render.
-        const next = [...valsRef.current]
-        next[i] = final
-        setVals(next)
-        onSave(next)
-        setSpinning(null)
-      }
-    }, 65)
+    const final = pool[Math.floor(Math.random() * pool.length)]
+    setSpinning(i)
+    setTargets(prev => { const n = [...prev]; n[i] = final; return n })
+    setSpinKeys(prev => { const n = [...prev]; n[i] = n[i] + 1; return n })
+    // Commit only once the wheel has actually stopped, so an interrupted spin
+    // (tab backgrounded to open Suno, phone locked) costs the team nothing.
+    setTimeout(() => {
+      setSpins(prev => {
+        const n = [...prev]
+        n[i] = (n[i] || 0) + 1
+        writeSpins(storeKey, n)
+        return n
+      })
+      // onSave must run OUTSIDE a state updater: an updater is replayed during
+      // render, so a consumer that sets state synchronously would be updated
+      // mid-render.
+      const next = [...valsRef.current]
+      next[i] = final
+      setVals(next)
+      onSave(next)
+      setSpinning(null)
+    }, WHEEL_SPIN_MS)
   }
+
+  const settled = vals.every(Boolean) && spinning === null
+  const hasArt = slots.every(s => AITB_REEL_POOLS.includes(s.pool))
 
   return (
     <div className="mb-6">
-      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-3">
         🎡 Spin both wheels — {MAX_SPINS} spins each, then it locks!
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         {slots.map((s, i) => {
-          const shown = flash[i] ?? vals[i]
-          const isSpin = spinning === i
           const left = MAX_SPINS - (spins[i] || 0)
+          const isSpin = spinning === i
           return (
-            <div key={i} className="rounded-2xl p-4 flex flex-col items-center text-center gap-2"
-              style={{ background: 'rgba(255,255,255,0.04)', border: `2px solid ${vals[i] ? color : 'rgba(255,255,255,0.1)'}` }}>
+            <div key={i} className="flex flex-col items-center gap-2">
               <div className="text-[11px] font-black uppercase tracking-widest" style={{ color }}>{s.emoji} {s.label}</div>
-              <div className="font-black text-lg min-h-[3.5rem] flex items-center justify-center leading-tight"
-                style={{ color: shown ? '#fff' : '#6b7280', filter: isSpin ? 'blur(0.5px)' : 'none' }}>
-                {shown || '—'}
+              <RouletteWheel pool={s.pool} final={targets[i] || null} spinKey={spinKeys[i]} />
+              <div className="font-black text-base text-center leading-tight min-h-[2.6em] flex items-center justify-center"
+                style={{ color: vals[i] ? '#fff' : '#6b7280' }}>
+                {isSpin ? '…' : vals[i] || '—'}
               </div>
               <button onClick={() => spin(i)} disabled={disabled || spinning !== null || left <= 0}
                 className="w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
                 style={{ background: color, color: '#000' }}>
-                {isSpin ? 'Spinning…' : left <= 0 ? '🔒 Locked' : vals[i] ? `🔄 Last spin (${left})` : `🎡 Spin ${i + 1}`}
+                {isSpin ? 'Spinning…' : left <= 0 ? '🔒 Locked' : vals[i] ? `🔄 Last spin (${left})` : `🎲 Spin ${s.label}`}
               </button>
               <div className="text-[10px] font-bold" style={{ color: left > 0 ? '#94a3b8' : '#f87171' }}>
                 {left > 0 ? `${left} spin${left > 1 ? 's' : ''} left` : 'No spins left'}
@@ -246,7 +310,25 @@ function SpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: Su
           )
         })}
       </div>
-      {vals.every(Boolean) && spinning === null && (
+
+      {/* What the wheels landed on, in pictures. */}
+      {settled && hasArt && (
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          {slots.map((s, i) => (
+            <div key={i} className="rounded-2xl overflow-hidden"
+              style={{ background: 'rgba(0,0,0,0.35)', border: `2px solid ${color}` }}>
+              <img src={aitbReelImage(s.pool, vals[i])} alt={vals[i]} draggable={false}
+                className="w-full block" style={{ aspectRatio: '1 / 1', objectFit: 'cover' }} />
+              <div className="text-[10px] font-black uppercase tracking-widest px-2 pt-1.5 text-center" style={{ color }}>
+                {s.emoji} {s.label}
+              </div>
+              <div className="text-white text-sm font-black px-2 pb-2 pt-0.5 text-center leading-tight">{vals[i]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {settled && (
         <>
           <SongPrompt genre={vals[0]} topic={vals[1]} color={color} />
           <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
@@ -384,94 +466,6 @@ function ImageDealModule({ color, slots, savedWords, disabled, onSave }: SubProp
         </button>
       )}
       {done && <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Locked in — your host can see it live!</div>}
-    </div>
-  )
-}
-
-// ── Roulette (image slot-machine): spin each wheel one at a time ─────────────
-function ImageSpinModule({ color, slots, savedWords, disabled, onSave, storeKey }: SubProps) {
-  const seed = () => slots.map((_, i) => savedWords[i] ?? '')
-  const [vals, setVals] = useState<string[]>(seed)
-  // Latest vals, readable from the reel callback without a state updater.
-  const valsRef = useRef<string[]>(vals)
-  valsRef.current = vals
-  const [finals, setFinals] = useState<string[]>(seed)
-  const [spinning, setSpinning] = useState<number | null>(null)
-  const [spins, setSpins] = useState<number[]>(() => readSpins(storeKey, slots.length))
-
-  // Re-seed from realtime unless we've already spun on this device.
-  useEffect(() => {
-    setVals(prev => (prev.some(Boolean) ? prev : seed()))
-    setFinals(prev => (prev.some(Boolean) ? prev : seed()))
-  }, [savedWords, slots])
-
-  // A wheel already spun elsewhere is locked here — see MAX_SPINS note.
-  useEffect(() => {
-    setSpins(prev => {
-      const next = prev.map((c, i) => (savedWords[i] && c === 0 ? MAX_SPINS : c))
-      if (next.every((c, i) => c === prev[i])) return prev
-      writeSpins(storeKey, next)
-      return next
-    })
-  }, [savedWords, storeKey])
-
-  useEffect(() => {
-    slots.forEach(s => AITB_POOLS[s.pool].forEach(item => { const im = new Image(); im.src = aitbReelImage(s.pool, item) }))
-  }, [slots])
-
-  const spin = (i: number) => {
-    if (disabled || spinning !== null || (spins[i] || 0) >= MAX_SPINS) return
-    const pool = AITB_POOLS[slots[i].pool]
-    const final = pool[Math.floor(Math.random() * pool.length)]
-    setFinals(prev => { const n = [...prev]; n[i] = final; return n })
-    setSpinning(i)
-    setTimeout(() => {
-      // Charge the spin only when the reel lands — an interrupted spin is free.
-      setSpins(prev => {
-        const next = [...prev]
-        next[i] = (next[i] || 0) + 1
-        writeSpins(storeKey, next)
-        return next
-      })
-      // Outside the updater — see the note in SpinModule.
-      const n = [...valsRef.current]
-      n[i] = final
-      setVals(n)
-      onSave(n)
-      setSpinning(null)
-    }, SPIN_BASE + 200)
-  }
-
-  return (
-    <div className="mb-6">
-      <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
-        🎰 Spin both wheels — {MAX_SPINS} spins each, then it locks!
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        {slots.map((s, i) => {
-          const left = MAX_SPINS - (spins[i] || 0)
-          return (
-            <div key={i} className="flex flex-col gap-2">
-              <ImageReel pool={s.pool} color={color} label={s.label} emoji={s.emoji}
-                final={finals[i] || null} spinning={spinning === i} durationMs={SPIN_BASE} />
-              <button onClick={() => spin(i)} disabled={disabled || spinning !== null || left <= 0}
-                className="w-full py-2.5 rounded-xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
-                style={{ background: color, color: '#000' }}>
-                {spinning === i ? 'Spinning…' : left <= 0 ? '🔒 Locked' : vals[i] ? `🔄 Last spin (${left})` : `🎡 Spin ${i + 1}`}
-              </button>
-              <div className="text-[10px] font-bold text-center" style={{ color: left > 0 ? '#94a3b8' : '#f87171' }}>
-                {left > 0 ? `${left} spin${left > 1 ? 's' : ''} left` : 'No spins left'}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      {vals.every(Boolean) && spinning === null && (
-        <>
-          <SongPrompt genre={vals[0]} topic={vals[1]} color={color} />
-          <div className="text-emerald-400 text-xs font-bold mt-2 text-center">✅ Genre + topic locked in — your host can see it live!</div>
-        </>
-      )}
     </div>
   )
 }
