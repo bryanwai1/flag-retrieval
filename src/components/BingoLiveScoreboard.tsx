@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { fetchBoardTasks } from '../lib/boardCards'
-import { computeBingoStandings, sortBingoStandings, type BingoStandingRow } from '../lib/bingoStandings'
-import type { BingoTask, BingoTeam, BingoScan, BingoDuel } from '../types/database'
+import { useEffect, useRef, useState } from 'react'
+import type { BingoStandings } from '../hooks/useBingoStandings'
+import { sortBingoStandings } from '../lib/bingoStandings'
 
 /**
  * The projector scoreboard, shrunk to a phone — so players and observers can
@@ -10,89 +8,50 @@ import type { BingoTask, BingoTeam, BingoScan, BingoDuel } from '../types/databa
  * shared with the projector (lib/bingoStandings) so the two always agree.
  */
 export function BingoLiveScoreboard({
-  sectionId,
+  standings: { rows: rawRows, loading },
   highlightTeamId,
 }: {
-  sectionId: string
+  /** Loaded once by the board (useBingoStandings) and shared with the strip. */
+  standings: BingoStandings
   /** The viewer's own group — outlined so it's findable at a glance. */
   highlightTeamId?: string
 }) {
-  const [teams, setTeams] = useState<BingoTeam[]>([])
-  const [gridTasks, setGridTasks] = useState<BingoTask[]>([])
-  const [scans, setScans] = useState<BingoScan[]>([])
-  const [duels, setDuels] = useState<BingoDuel[]>([])
   const [showBonus, setShowBonus] = useState(false)
-  const [loading, setLoading] = useState(true)
 
-  // Scans carry no section_id, so they're fetched by this section's team ids.
-  const loadScans = async (teamIds: string[]) => {
-    if (teamIds.length === 0) { setScans([]); return }
-    const { data } = await supabase.from('bingo_scans').select('*').in('team_id', teamIds)
-    if (data) setScans(data)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const [teamsRes, duelsRes, tasks] = await Promise.all([
-        supabase.from('bingo_teams').select('*').eq('section_id', sectionId).order('created_at'),
-        supabase.from('bingo_duels').select('*').eq('section_id', sectionId).eq('status', 'done'),
-        fetchBoardTasks(sectionId),
-      ])
-      if (cancelled) return
-      const loadedTeams = teamsRes.data ?? []
-      setTeams(loadedTeams)
-      setDuels(duelsRes.data ?? [])
-      setGridTasks(tasks)
-      await loadScans(loadedTeams.map(t => t.id))
-      if (!cancelled) setLoading(false)
-    }
-    load()
-    return () => { cancelled = true }
-  }, [sectionId])
-
-  // Live updates. bingo_scans can't be server-filtered by a list of teams, so
-  // any scan change triggers a refetch scoped to this section's teams.
-  const teamIdsKey = teams.map(t => t.id).join(',')
-  useEffect(() => {
-    const teamIds = teamIdsKey ? teamIdsKey.split(',') : []
-    if (teamIds.length === 0) return
-    const channel = supabase
-      .channel(`bingo-live-scoreboard-${sectionId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_scans' }, () => {
-        loadScans(teamIds)
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_teams', filter: `section_id=eq.${sectionId}` }, async () => {
-        const { data } = await supabase.from('bingo_teams').select('*').eq('section_id', sectionId).order('created_at')
-        if (data) setTeams(data)
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bingo_duels', filter: `section_id=eq.${sectionId}` }, async () => {
-        const { data } = await supabase.from('bingo_duels').select('*').eq('section_id', sectionId).eq('status', 'done')
-        if (data) setDuels(data)
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [sectionId, teamIdsKey])
-
-  // iOS Safari kills the socket when the phone locks, so poll as a fallback —
-  // the same self-healing the board itself relies on.
-  useEffect(() => {
-    const teamIds = teamIdsKey ? teamIdsKey.split(',') : []
-    if (teamIds.length === 0) return
-    const id = setInterval(() => {
-      if (document.visibilityState !== 'visible') return
-      loadScans(teamIds)
-    }, 8000)
-    return () => clearInterval(id)
-  }, [teamIdsKey])
-
-  const rows: BingoStandingRow[] = sortBingoStandings(
-    computeBingoStandings({ teams, gridTasks, scans, duels }),
-    showBonus,
-  )
+  const rows = sortBingoStandings([...rawRows], showBonus)
   // The manual award-ceremony bonus only exists once a marshal has given some,
   // so the toggle stays out of the way until it means something.
   const anyBonus = rows.some(r => r.bonus > 0)
+
+  // Overtaking is the part of a scoreboard people care about, and on a phone
+  // the reorder alone is easy to miss — a group that just moved carries a
+  // ▲/▼ chip for a few seconds so the change is legible.
+  const orderKey = rows.map(r => r.team.id).join(',')
+  const prevRanksRef = useRef<Map<string, number> | null>(null)
+  const lastBonusModeRef = useRef(showBonus)
+  const [deltas, setDeltas] = useState<Record<string, number>>({})
+  useEffect(() => {
+    const current = new Map(rows.map((r, i) => [r.team.id, i + 1]))
+    // Flipping the bonus view reshuffles everything without anyone scoring,
+    // so re-baseline instead of claiming a dozen overtakes.
+    const bonusModeChanged = lastBonusModeRef.current !== showBonus
+    lastBonusModeRef.current = showBonus
+    if (prevRanksRef.current === null || bonusModeChanged) {
+      prevRanksRef.current = current
+      return
+    }
+    const moved: Record<string, number> = {}
+    current.forEach((rank, id) => {
+      const before = prevRanksRef.current!.get(id)
+      if (before !== undefined && before !== rank) moved[id] = before - rank
+    })
+    prevRanksRef.current = current
+    if (Object.keys(moved).length === 0) return
+    setDeltas(prev => ({ ...prev, ...moved }))
+    const t = setTimeout(() => setDeltas({}), 6000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderKey, showBonus])
 
   if (loading) {
     return <div className="text-center py-16 text-gray-500 font-bold animate-pulse">Loading scoreboard...</div>
@@ -134,6 +93,7 @@ export function BingoLiveScoreboard({
         const isTop3 = rank <= 3
         const rankColor = isTop3 ? rankColors[rank - 1] : '#4b5563'
         const isMine = row.team.id === highlightTeamId
+        const delta = deltas[row.team.id] ?? 0
         return (
           <div
             key={row.team.id}
@@ -148,8 +108,17 @@ export function BingoLiveScoreboard({
               boxShadow: isMine ? '0 0 20px rgba(168,85,247,0.25)' : 'none',
             }}
           >
-            <div className="text-xl font-black tabular-nums text-center" style={{ color: rankColor }}>
-              {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}
+            <div className="text-center">
+              <div className="text-xl font-black tabular-nums" style={{ color: rankColor }}>
+                {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}
+              </div>
+              {delta !== 0 && (
+                <div className={`text-[10px] font-black tabular-nums leading-none mt-0.5 ${
+                  delta > 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {delta > 0 ? `▲${delta}` : `▼${-delta}`}
+                </div>
+              )}
             </div>
 
             <div className="min-w-0">
@@ -188,5 +157,54 @@ export function BingoLiveScoreboard({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * One line above the board: where this group stands and how far the next one
+ * is, so the standing is readable without leaving the tiles. Taps through to
+ * the full scoreboard for the detail.
+ */
+export function BingoRankStrip({
+  standings: { rows: rawRows, loading },
+  teamId,
+  onOpen,
+}: {
+  standings: BingoStandings
+  teamId: string
+  onOpen: () => void
+}) {
+  if (loading) return null
+
+  const rows = sortBingoStandings([...rawRows], false)
+  const index = rows.findIndex(r => r.team.id === teamId)
+  if (index === -1) return null
+
+  const me = rows[index]
+  const ahead = index > 0 ? rows[index - 1] : null
+  const behind = rows[index + 1] ?? null
+  const gapUp = ahead ? ahead.points - me.points : 0
+  const gapDown = behind ? me.points - behind.points : 0
+
+  return (
+    <button
+      onClick={onOpen}
+      className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-left active:bg-white/10 transition-colors"
+    >
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span className="text-white text-sm font-black tabular-nums flex-shrink-0">
+          {index === 0 ? '🥇 1st' : index === 1 ? '🥈 2nd' : index === 2 ? '🥉 3rd' : `#${index + 1}`}
+        </span>
+        <span className="text-purple-300 text-[11px] font-black tabular-nums flex-shrink-0">{me.points} pts</span>
+        <span className="text-gray-400 text-[11px] font-bold truncate">
+          {ahead
+            ? `${gapUp} behind ${ahead.team.name}`
+            : behind
+              ? `leading by ${gapDown}`
+              : ''}
+        </span>
+      </div>
+      <span className="text-gray-500 text-lg font-black leading-none flex-shrink-0">›</span>
+    </button>
   )
 }

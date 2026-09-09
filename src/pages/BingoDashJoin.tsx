@@ -6,7 +6,8 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import { TileFace } from '../components/BingoTileFace'
 import { IncomingDuelBanner } from '../components/ContestCard'
-import { BingoLiveScoreboard } from '../components/BingoLiveScoreboard'
+import { BingoLiveScoreboard, BingoRankStrip } from '../components/BingoLiveScoreboard'
+import { useBingoStandings } from '../hooks/useBingoStandings'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
 
@@ -604,6 +605,9 @@ function BoardScreen({
   // The facilitator can flip the scoreboard off mid-game, so fall back to the
   // board rather than leaving a player stranded on a tab that no longer exists.
   const activeView = showScoreboard ? view : 'board'
+  // Loaded once here so the rank strip and the scoreboard share one fetch and
+  // one subscription — switching tabs then costs nothing.
+  const standings = useBingoStandings(sectionId, showScoreboard)
 
   return (
     <div className="min-h-screen bg-gray-950 relative overflow-x-hidden">
@@ -673,10 +677,18 @@ function BoardScreen({
         )}
       </header>
 
+      {activeView === 'board' && showScoreboard && gridTasks.length > 0 && (
+        <div className="relative z-10 px-3 pb-3">
+          <div className="max-w-md mx-auto">
+            <BingoRankStrip standings={standings} teamId={team.id} onOpen={() => setView('scoreboard')} />
+          </div>
+        </div>
+      )}
+
       <main className="relative z-10 px-3 pb-8">
         <div className="max-w-md mx-auto">
           {activeView === 'scoreboard' ? (
-            <BingoLiveScoreboard sectionId={sectionId} highlightTeamId={team.id} />
+            <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
           ) : gridTasks.length === 0 ? (
             <div className="text-center py-20 text-gray-500">
               <div className="text-4xl mb-3">📋</div>

@@ -463,6 +463,35 @@ function boardWriteFailureMessage(dbMessage?: string): string {
   ].join('\n')
 }
 
+const WRITE_TIMEOUT_MS = 12_000
+
+/**
+ * A supabase call that never settles leaves the button looking dead: the
+ * failure paths below fire for rejections and zero-row writes, and a hung
+ * promise is neither. That has bitten this admin before (the auth-lock
+ * deadlock fixed in 3e11951) and it is exactly what gets reported as
+ * "Start Game does nothing". Racing a timeout turns a hang into the same
+ * shape as any other failed write, so the existing rollback and alert run
+ * instead of the facilitator staring at a dead button mid-event.
+ */
+function withWriteTimeout<T extends { data: unknown; error: { message: string } | null }>(
+  op: PromiseLike<T>,
+  label: string,
+): Promise<T | { data: null; error: { message: string } }> {
+  return Promise.race([
+    Promise.resolve(op),
+    new Promise<{ data: null; error: { message: string } }>(resolve =>
+      setTimeout(() => resolve({
+        data: null,
+        error: {
+          message: `${label} never came back (waited ${WRITE_TIMEOUT_MS / 1000}s). `
+            + "The tab's connection to Supabase is stuck — reload the page and try again.",
+        },
+      }), WRITE_TIMEOUT_MS),
+    ),
+  ])
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export function BingoDashAdmin() {
   const navigate = useNavigate()
@@ -1101,17 +1130,23 @@ export function BingoDashAdmin() {
   const setActiveSection = async (id: string) => {
     if (isOwner) setSettings(prev => prev ? { ...prev, active_section_id: id } : prev)
     setMyActiveBoard(id)
-    const { error } = await supabase.rpc('set_active_board', { p_section: id })
-    if (error) alert('Failed to set the live board — has the accounts migration been run in Supabase?')
+    const { error } = await withWriteTimeout(supabase.rpc('set_active_board', { p_section: id }), 'Setting the live board')
+    if (error) alert(`Failed to set the live board — has the accounts migration been run in Supabase?
+
+${error.message}`)
   }
 
   // Save the per-board note shown below the bingo board on the player page
   const saveBoardNote = async () => {
     const sec = sections.find(s => s.id === currentSectionId)
     if (!sec) return
-    const { error } = await supabase.from('bingo_sections')
-      .update({ board_note: sec.board_note ?? '', board_note_every: sec.board_note_every ?? 2 })
-      .eq('id', sec.id)
+    const { error } = await withWriteTimeout(
+      supabase.from('bingo_sections')
+        .update({ board_note: sec.board_note ?? '', board_note_every: sec.board_note_every ?? 2 })
+        .eq('id', sec.id)
+        .select('id'),
+      'Board note save',
+    )
     if (error) alert('Failed to save note — has the board_note migration been run in Supabase?')
   }
 
@@ -1138,11 +1173,11 @@ export function BingoDashAdmin() {
       setMyActiveBoard(sectionId)
       const otherIds = myBoards.filter(s => s.id !== sectionId && s.game_started).map(s => s.id)
       const [liveRes, othersRes, rpcRes] = await Promise.all([
-        supabase.from('bingo_sections').update(startPatch).eq('id', sectionId).select('id'),
+        withWriteTimeout(supabase.from('bingo_sections').update(startPatch).eq('id', sectionId).select('id'), 'Start Game'),
         otherIds.length > 0
-          ? supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds).select('id')
+          ? withWriteTimeout(supabase.from('bingo_sections').update({ game_started: false }).in('id', otherIds).select('id'), 'Locking the other boards')
           : Promise.resolve({ error: null, data: [] as { id: string }[] }),
-        supabase.rpc('set_active_board', { p_section: sectionId }),
+        withWriteTimeout(supabase.rpc('set_active_board', { p_section: sectionId }), 'Setting the live board'),
       ])
       // Zero rows updated means RLS refused it — that is the failure to report,
       // not just a thrown error.
@@ -1153,8 +1188,10 @@ export function BingoDashAdmin() {
       }
     } else {
       setSections(prev => prev.map(s => s.id === sectionId ? { ...s, game_started: false } : s))
-      const { data, error } = await supabase
-        .from('bingo_sections').update({ game_started: false }).eq('id', sectionId).select('id')
+      const { data, error } = await withWriteTimeout(
+        supabase.from('bingo_sections').update({ game_started: false }).eq('id', sectionId).select('id'),
+        'Lock Game',
+      )
       if (error || data?.length !== 1) {
         setSections(prevSections)
         alert(boardWriteFailureMessage(error?.message))
@@ -1234,7 +1271,10 @@ export function BingoDashAdmin() {
     if (!currentSectionId) return
     setTimerSaving(true)
     try {
-      const { data, error } = await supabase.from('bingo_sections').update(patch).eq('id', currentSectionId).select().single()
+      const { data, error } = await withWriteTimeout(
+        supabase.from('bingo_sections').update(patch).eq('id', currentSectionId).select().single(),
+        'Board settings save',
+      )
       if (data) { setSections(prev => prev.map(s => s.id === data.id ? data : s)); return }
       // A row-level-security rejection is not an error here — the UPDATE simply
       // matches zero rows, so .single() fails and the change vanishes silently.
