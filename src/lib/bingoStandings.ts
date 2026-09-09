@@ -2,6 +2,13 @@ import { buildBingoSlots, completedBingoLines } from './bingoLines'
 import { duelBonusByTeam } from '../hooks/useBingoDuels'
 import type { BingoTask, BingoTeam, BingoScan, BingoDuel } from '../types/database'
 
+/**
+ * The only scan columns a score depends on. Callers that fetch standings for
+ * many teams select just these — a full row carries `words` (the AITB draw
+ * results), which is dead weight on a phone refetching every team's scans.
+ */
+export type ScoringScan = Pick<BingoScan, 'team_id' | 'task_id' | 'completed' | 'completed_at'>
+
 export type BingoStandingRow = {
   team: BingoTeam
   /** Tile points + contest bonuses won in duels — everything earned in play. */
@@ -33,7 +40,7 @@ export function computeBingoStandings({
   teams: BingoTeam[]
   /** Cards actually placed on this board, in slot order. */
   gridTasks: BingoTask[]
-  scans: BingoScan[]
+  scans: ScoringScan[]
   /** Resolved duels (status 'done'). */
   duels: BingoDuel[]
 }): BingoStandingRow[] {
