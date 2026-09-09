@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ParticleBackground } from '../components/ParticleBackground'
-import { buildBingoSlots, completedBingoLines } from '../lib/bingoLines'
-import { duelBonusByTeam } from '../hooks/useBingoDuels'
+import { computeBingoStandings, sortBingoStandings, type BingoStandingRow } from '../lib/bingoStandings'
 import type { BingoTask, BingoTeam, BingoScan, BingoSettings, BingoSection, BingoBoardCard, BingoDuel } from '../types/database'
 
 function formatTime(totalSeconds: number): string {
@@ -11,24 +10,6 @@ function formatTime(totalSeconds: number): string {
   const m = Math.floor(s / 60)
   const sec = s % 60
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-}
-
-type Row = {
-  team: BingoTeam
-  /** Tile points + contest bonuses won in duels — everything earned in play. */
-  points: number
-  /** Contest bonus alone, so the board can show where a duel win landed. */
-  duelBonus: number
-  /** Manual bonus the admin adds during the award ceremony. */
-  bonus: number
-  bingos: number
-  tasksDone: number
-  /**
-   * When this team last scored — the moment they reached their current total.
-   * Ties are broken in favour of whoever got there first, so a team that
-   * matches the leader later does not leapfrog them. Infinity = never scored.
-   */
-  reachedAt: number
 }
 
 export function BingoDashProjector() {
@@ -135,55 +116,12 @@ export function BingoDashProjector() {
     })
     .filter((t): t is BingoTask => t !== null)
     .sort((a, b) => a.sort_order - b.sort_order)
-  const slots = buildBingoSlots(gridTasks)
 
-  // Contest bonuses won in duels. A winning DEFENDER has no tile to hang points
-  // on, so this is the only place their win shows up.
-  const duelBonuses = duelBonusByTeam(duels)
-
-  const rows: Row[] = sectionTeams.map(team => {
-    const teamScans = scans.filter(s => s.team_id === team.id)
-    const gridTaskIds = new Set(gridTasks.map(t => t.id))
-    const completedIds = new Set(teamScans.filter(s => s.completed && gridTaskIds.has(s.task_id)).map(s => s.task_id))
-    const tilePoints = gridTasks.reduce(
-      (sum, t) => completedIds.has(t.id) ? sum + (t.points ?? 0) : sum, 0,
-    )
-    const duelBonus = duelBonuses.get(team.id) ?? 0
-    const bingos = completedBingoLines(slots, completedIds).length
-    const tasksDone = completedIds.size
-    const bonus = team.bonus_points ?? 0
-    const lastScan = teamScans.reduce((latest, s) => {
-      if (!s.completed || !gridTaskIds.has(s.task_id) || !s.completed_at) return latest
-      return Math.max(latest, Date.parse(s.completed_at))
-    }, 0)
-    // A duel win is a scoring moment too, so it counts for tie-breaking.
-    const lastDuel = duels.reduce((latest, d) => {
-      if (d.winner_team_id !== team.id || !d.resolved_at) return latest
-      return Math.max(latest, Date.parse(d.resolved_at))
-    }, 0)
-    const reachedAt = Math.max(lastScan, lastDuel)
-    return {
-      team,
-      points: tilePoints + duelBonus,
-      duelBonus,
-      bonus,
-      bingos,
-      tasksDone,
-      reachedAt: reachedAt || Infinity,
-    }
-  })
-
-  // When the "Total after Bonus" view is on, rank by Bingo points + manual bonus points.
-  const scoreOf = (r: Row) => showBonus ? r.points + r.bonus : r.points
-  rows.sort((a, b) => {
-    if (scoreOf(b) !== scoreOf(a)) return scoreOf(b) - scoreOf(a)
-    if (b.bingos !== a.bingos) return b.bingos - a.bingos
-    if (b.tasksDone !== a.tasksDone) return b.tasksDone - a.tasksDone
-    // Dead heat on every score component: first to get there stays ahead.
-    // Without this the order fell back to the team list, so a team matching
-    // the leader later could appear above them.
-    return a.reachedAt - b.reachedAt
-  })
+  // Ranking is shared with the players' live scoreboard so the two can't drift.
+  const rows: BingoStandingRow[] = sortBingoStandings(
+    computeBingoStandings({ teams: sectionTeams, gridTasks, scans, duels }),
+    showBonus,
+  )
 
   const rankColors = ['#fbbf24', '#cbd5e1', '#d97706']
 

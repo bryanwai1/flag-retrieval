@@ -98,6 +98,9 @@ export interface BingoSection extends BoardTimer {
   // How the 5×5 tiles render for players: 'icon' (category icon) or 'words'
   // (category + shortened title). See components/BingoTileFace.tsx.
   tile_display: 'icon' | 'words'
+  // When false, players and observers lose the live scoreboard tab — the
+  // standings stay a projector-only reveal. See components/BingoLiveScoreboard.
+  show_scoreboard: boolean
   owner_id: string | null
   created_at: string
 }
