@@ -2419,30 +2419,6 @@ ${error.message}`)
             </button>
           </div>
 
-          {/* Live scoreboard on the player / observer page */}
-          <div className="mt-5 flex items-center justify-between gap-4 p-4 rounded-lg border border-white/10 bg-gray-900/50">
-            <div>
-              <p className="text-sm font-bold text-white">Live scoreboard for players</p>
-              <p className="text-xs text-gray-500 mt-0.5">When ON, players and observers get a 🏆 Scoreboard tab next to their board with the same standings as the projector. Turn OFF to keep the standings a surprise until you reveal them.</p>
-            </div>
-            <button
-              onClick={() => {
-                if (!currentBoard) return
-                updateBoardSettings({ show_scoreboard: !(currentBoard.show_scoreboard ?? true) })
-              }}
-              role="switch"
-              aria-checked={currentBoard?.show_scoreboard ?? true}
-              className={`relative shrink-0 w-14 h-8 rounded-full transition-colors ${
-                currentBoard?.show_scoreboard ?? true ? 'bg-violet-500' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${
-                  currentBoard?.show_scoreboard ?? true ? 'translate-x-6' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
         </section>
 
         {/* ── Board Note (shown below the bingo board on the player page) ──── */}
