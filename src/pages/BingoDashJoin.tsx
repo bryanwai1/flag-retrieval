@@ -6,7 +6,7 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import { TileFace } from '../components/BingoTileFace'
 import { IncomingDuelBanner } from '../components/ContestCard'
-import { BingoLiveScoreboard, BingoRankStrip } from '../components/BingoLiveScoreboard'
+import { BingoLiveScoreboard } from '../components/BingoLiveScoreboard'
 import { useBingoStandings } from '../hooks/useBingoStandings'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
@@ -496,7 +496,6 @@ function BoardScreen({
   boardNote,
   boardNoteEvery,
   tileDisplay,
-  showScoreboard,
   onLeave,
 }: {
   team: { id: string; name: string }
@@ -510,15 +509,13 @@ function BoardScreen({
   boardNote: string
   boardNoteEvery: number
   tileDisplay: TileDisplay
-  /** Facilitator switch — off keeps the standings a projector-only reveal. */
-  showScoreboard: boolean
   onLeave: () => void
 }) {
   const navigate = useNavigate()
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   // Board vs the live scoreboard — same page, so a player never loses their
   // place on the grid just to check where the group stands.
-  const [view, setView] = useState<'board' | 'scoreboard'>('board')
+  const [scoreboardOpen, setScoreboardOpen] = useState(false)
   const [popupLetters, setPopupLetters] = useState<string | null>(null)
   const [popupQueue, setPopupQueue] = useState<string[]>([])
   const celebratedLinesRef = useRef<Set<number> | null>(null)
@@ -602,12 +599,9 @@ function BoardScreen({
     return () => clearTimeout(t)
   }, [popupLetters])
 
-  // The facilitator can flip the scoreboard off mid-game, so fall back to the
-  // board rather than leaving a player stranded on a tab that no longer exists.
-  const activeView = showScoreboard ? view : 'board'
-  // Loaded once here so the rank strip and the scoreboard share one fetch and
-  // one subscription — switching tabs then costs nothing.
-  const standings = useBingoStandings(sectionId, showScoreboard)
+  // Keep standings live so the player can open the scoreboard without waiting
+  // for a second page or a separate projector view.
+  const standings = useBingoStandings(sectionId, true)
 
   return (
     <div className="min-h-screen bg-gray-950 relative overflow-x-hidden">
@@ -660,36 +654,11 @@ function BoardScreen({
           </div>
         </div>
 
-        {showScoreboard && (
-        <div className="max-w-md mx-auto mt-3 grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
-          {([['board', '🎯 My Board'], ['scoreboard', '🏆 Scoreboard']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setView(key)}
-              className={`py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                activeView === key ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40' : 'text-gray-400'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        )}
       </header>
-
-      {activeView === 'board' && showScoreboard && gridTasks.length > 0 && (
-        <div className="relative z-10 px-3 pb-3">
-          <div className="max-w-md mx-auto">
-            <BingoRankStrip standings={standings} teamId={team.id} onOpen={() => setView('scoreboard')} />
-          </div>
-        </div>
-      )}
 
       <main className="relative z-10 px-3 pb-8">
         <div className="max-w-md mx-auto">
-          {activeView === 'scoreboard' ? (
-            <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
-          ) : gridTasks.length === 0 ? (
+          {gridTasks.length === 0 ? (
             <div className="text-center py-20 text-gray-500">
               <div className="text-4xl mb-3">📋</div>
               <p className="font-bold">No grid set up yet</p>
@@ -714,15 +683,25 @@ function BoardScreen({
             </div>
           )}
 
-          {activeView === 'board' && showScoreboard && gridTasks.length > 0 && (
+          {gridTasks.length > 0 && (
             <div className="mt-8">
-              <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
+              <button
+                onClick={() => setScoreboardOpen(open => !open)}
+                className="w-full py-3 rounded-xl bg-purple-600 text-white text-sm font-black uppercase tracking-wider shadow-lg shadow-purple-900/30 transition-all active:scale-[0.98]"
+              >
+                {scoreboardOpen ? 'Hide scoreboard' : 'Scoreboard'}
+              </button>
+              {scoreboardOpen && (
+                <div className="mt-4">
+                  <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      {activeView === 'board' && gridTasks.length > 0 && (
+      {gridTasks.length > 0 && (
         <div className="relative z-10 pb-6 flex justify-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-600 opacity-50" />Not visited</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full border-2 border-gray-400" />In progress</span>
@@ -731,7 +710,7 @@ function BoardScreen({
       )}
 
       {/* Facilitator note below the board (e.g. Bonsai Project item collection) */}
-      {activeView === 'board' && boardNote.trim() !== '' && gridTasks.length > 0 && (
+      {boardNote.trim() !== '' && gridTasks.length > 0 && (
         <div className="relative z-10 px-4 pb-8">
           <div className="max-w-md mx-auto">
             <div className="rounded-2xl overflow-hidden border border-emerald-800/40 bg-emerald-950/30">
@@ -1159,7 +1138,6 @@ export function BingoDashJoin() {
           boardNote={section.board_note ?? ''}
           boardNoteEvery={section.board_note_every ?? 0}
           tileDisplay={normalizeTileDisplay(section.tile_display)}
-          showScoreboard={section.show_scoreboard ?? true}
           onLeave={leaveTeam}
         />
         {/* Another team can challenge us at any moment — the banner has to reach
