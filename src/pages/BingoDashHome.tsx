@@ -7,6 +7,8 @@ import { ParticleBackground } from '../components/ParticleBackground'
 import { TimeUpAlarm } from '../components/TimeUpAlarm'
 import { TileFace } from '../components/BingoTileFace'
 import { IncomingDuelBanner } from '../components/ContestCard'
+import { BingoLiveScoreboard } from '../components/BingoLiveScoreboard'
+import { useBingoStandings } from '../hooks/useBingoStandings'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BoardTimer } from '../types/database'
 
@@ -394,6 +396,7 @@ function TimerDisplay({ settings }: { settings: BoardTimer | null }) {
 
 function BoardScreen({
   team,
+  sectionId,
   gridTasks,
   scans,
   settings,
@@ -403,6 +406,7 @@ function BoardScreen({
   onLeave,
 }: {
   team: { id: string; name: string }
+  sectionId: string
   gridTasks: BingoTask[]
   scans: BingoScan[]
   settings: BoardTimer | null
@@ -413,12 +417,14 @@ function BoardScreen({
 }) {
   const navigate = useNavigate()
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [scoreboardOpen, setScoreboardOpen] = useState(false)
   const [popupLetters, setPopupLetters] = useState<string | null>(null)
   const [popupQueue, setPopupQueue] = useState<string[]>([])
   const celebratedLinesRef = useRef<Set<number> | null>(null)
 
   const gridTaskIds = new Set(gridTasks.map(t => t.id))
   const completedCount = scans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
+  const standings = useBingoStandings(sectionId, true)
 
   const getStatus = (taskId: string): TileStatus => {
     const scan = scans.find(s => s.task_id === taskId)
@@ -583,6 +589,25 @@ function BoardScreen({
                 ) : (
                   <EmptyTile key={`empty-${i}`} />
                 )
+              )}
+            </div>
+          )}
+
+          {gridTasks.length > 0 && (
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={() => setScoreboardOpen(open => !open)}
+                aria-expanded={scoreboardOpen}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600 text-white text-sm font-black uppercase tracking-wider shadow-lg shadow-purple-900/30 transition-all active:scale-[0.98]"
+              >
+                <span aria-hidden="true">🏆</span>
+                <span>{scoreboardOpen ? 'Hide scoreboard' : 'Scoreboard'}</span>
+              </button>
+              {scoreboardOpen && (
+                <div className="mt-4">
+                  <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
+                </div>
               )}
             </div>
           )}
@@ -803,6 +828,7 @@ export function BingoDashHome() {
     <>
       <BoardScreen
         team={team!}
+        sectionId={sectionId!}
         gridTasks={gridTasks}
         scans={scans}
         settings={section}
