@@ -10,6 +10,7 @@ import { BingoLiveScoreboard } from '../components/BingoLiveScoreboard'
 import { useBingoStandings } from '../hooks/useBingoStandings'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
+import type { truncate } from 'node:fs'
 
 /* ── helpers ─────────────────────────────────────────────────────────────────── */
 
@@ -515,7 +516,7 @@ function BoardScreen({
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   // Board vs the live scoreboard — same page, so a player never loses their
   // place on the grid just to check where the group stands.
-  const [scoreboardOpen, setScoreboardOpen] = useState(false)
+  const [scoreboardOpen, setScoreboardOpen] = useState(true)
   const [popupLetters, setPopupLetters] = useState<string | null>(null)
   const [popupQueue, setPopupQueue] = useState<string[]>([])
   const celebratedLinesRef = useRef<Set<number> | null>(null)
