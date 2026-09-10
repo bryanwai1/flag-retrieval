@@ -713,6 +713,12 @@ function BoardScreen({
               )}
             </div>
           )}
+
+          {activeView === 'board' && showScoreboard && gridTasks.length > 0 && (
+            <div className="mt-8">
+              <BingoLiveScoreboard standings={standings} highlightTeamId={team.id} />
+            </div>
+          )}
         </div>
       </main>
 
