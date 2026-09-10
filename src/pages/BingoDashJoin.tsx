@@ -10,7 +10,6 @@ import { BingoLiveScoreboard } from '../components/BingoLiveScoreboard'
 import { useBingoStandings } from '../hooks/useBingoStandings'
 import { normalizeTileDisplay, type TileDisplay } from '../lib/bingoTileDisplay'
 import type { BingoTask, BingoScan, BingoSection, BingoTeam, BingoMember, BoardTimer } from '../types/database'
-import type { truncate } from 'node:fs'
 
 /* ── helpers ─────────────────────────────────────────────────────────────────── */
 
@@ -687,10 +686,13 @@ function BoardScreen({
           {gridTasks.length > 0 && (
             <div className="mt-8">
               <button
+                type="button"
                 onClick={() => setScoreboardOpen(open => !open)}
-                className="w-full py-3 rounded-xl bg-purple-600 text-white text-sm font-black uppercase tracking-wider shadow-lg shadow-purple-900/30 transition-all active:scale-[0.98]"
+                aria-expanded={scoreboardOpen}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600 text-white text-sm font-black uppercase tracking-wider shadow-lg shadow-purple-900/30 transition-all active:scale-[0.98]"
               >
-                {scoreboardOpen ? 'Hide scoreboard' : 'Scoreboard'}
+                <span aria-hidden="true">🏆</span>
+                <span>{scoreboardOpen ? 'Hide scoreboard' : 'Scoreboard'}</span>
               </button>
               {scoreboardOpen && (
                 <div className="mt-4">
