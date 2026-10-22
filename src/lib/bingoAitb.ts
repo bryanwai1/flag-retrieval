@@ -11,7 +11,7 @@
  *     board (shared with real events and the plain sample) keeps its own cards.
  *  2. Points are scaled into Bingo's economy — see AITB_TILE_* below.
  */
-import { AITB_ACTIVITIES, AITB_BONUS_MULT, AITB_COMPLETE, aitbSpeedBonus, type AitbActivity } from './aitbActivities'
+import { AITB_DEFAULTS, AITB_BONUS_MULT, AITB_COMPLETE, aitbSpeedBonus, type AitbActivity } from './aitbActivities'
 import type { BingoTask } from '../types/database'
 
 /** Tiles carrying this title are the ones handed over to AITB, in board order. */
@@ -112,7 +112,7 @@ export type AitbBingoTask = BingoTask & { aitb_id?: number }
 export function aitbForTask(task: BingoTask): AitbActivity | null {
   const id = (task as AitbBingoTask).aitb_id
   if (!id) return null
-  return AITB_ACTIVITIES.find(a => a.id === id) ?? null
+  return AITB_DEFAULTS.find(a => a.id === id) ?? null
 }
 
 /**
@@ -125,7 +125,7 @@ export function swapAitbTiles(tasks: BingoTask[]): BingoTask[] {
   let next = 0
   return tasks.map(task => {
     if (task.title !== AITB_SWAP_TITLE || next >= AITB_SWAP_IDS.length) return task
-    const activity = AITB_ACTIVITIES.find(a => a.id === AITB_SWAP_IDS[next])
+    const activity = AITB_DEFAULTS.find(a => a.id === AITB_SWAP_IDS[next])
     next++
     if (!activity) return task
     const swapped: AitbBingoTask = {

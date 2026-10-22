@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { aitbActivity, AITB_POINTS, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbActivity, AITB_POINTS, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { AitbBonusBar } from '../components/AitbBonusBar'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
@@ -15,11 +15,30 @@ const TEAM_KEY = 'aitb_my_team'
 // stay locked to the single activity their QR opened (scan again = next game).
 const ADMIN_UNLOCK_KEY = 'aitb_admin_unlocked'
 
+// Admin preview (?preview=start|playing|done, framed on /aitb/admin): a fake team
+// and progress row, every write stays local, so no real team or score is touched.
+type PreviewState = 'start' | 'playing' | 'done'
+const PREVIEW_TEAM: AitbTeam = { id: 'preview', name: 'Preview Team', color: '#2dd4bf', sort_order: 0, adjust: 0, created_at: '' }
+function previewProgress(state: PreviewState, a: AitbActivity): AitbProgress | null {
+  if (state === 'start') return null
+  const done = state === 'done'
+  return {
+    id: 'preview', team_id: 'preview', activity_id: a.id, created_at: '', words: [],
+    scanned_at: new Date(Date.now() - 90_000).toISOString(),
+    steps_done: done ? a.steps.map((_, i) => i) : [],
+    completed_at: done ? new Date().toISOString() : null,
+    bonus: done ? aitbSpeedBonus(90_000, a) : 0,
+  }
+}
+
 export function AitbMission() {
   const { activityId } = useParams<{ activityId: string }>()
-  const activity = aitbActivity(Number(activityId))
+  const preview = useSearchParams()[0].get('preview') as PreviewState | null
+  // Players: ticked games only, so an unticked game stops opening from old QR
+  // codes. The admin preview may look at any game before ticking it.
+  const activity = preview ? aitbActivity(Number(activityId)) : AITB_ACTIVITIES.find(a => a.id === Number(activityId))
   const [teams, setTeams] = useState<AitbTeam[]>([])
-  const [teamId, setTeamId] = useState<string | null>(() => localStorage.getItem(TEAM_KEY))
+  const [teamId, setTeamId] = useState<string | null>(() => preview ? PREVIEW_TEAM.id : localStorage.getItem(TEAM_KEY))
   const [progress, setProgress] = useState<AitbProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(Date.now())
@@ -28,7 +47,8 @@ export function AitbMission() {
   const [pwError, setPwError] = useState('')
   const [celebrate, setCelebrate] = useState(false)
   const busyRef = useRef(false)
-  const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp } = useAitbGameTimer()
+  const { endsAt: gameEndsAt, remainingMs: gameRemainingMs, timeUp: gameOver } = useAitbGameTimer()
+  const timeUp = !preview && gameOver
   const [wordDrafts, setWordDrafts] = useState<string[]>([])
   const [wordsError, setWordsError] = useState('')
   const [wordsSaved, setWordsSaved] = useState(false)
@@ -52,6 +72,12 @@ export function AitbMission() {
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured || !activity) { setLoading(false); return }
+    if (preview) {
+      setTeams([PREVIEW_TEAM])
+      setProgress(previewProgress(preview, activity))
+      setLoading(false)
+      return
+    }
     const { data: teamRows } = await supabase.from('aitb_teams').select('*').order('sort_order').order('created_at')
     setTeams(teamRows ?? [])
     const tid = localStorage.getItem(TEAM_KEY)
@@ -62,7 +88,7 @@ export function AitbMission() {
       setProgress(prog ?? null)
     }
     setLoading(false)
-  }, [activity])
+  }, [activity, preview])
 
   useEffect(() => { load() }, [load])
 
@@ -76,8 +102,8 @@ export function AitbMission() {
   // Realtime: another phone in the team ticks a step → update here too. Filtered
   // to this team, and hardened against dropped sockets (reconnect + poll).
   const missionSubs = useMemo(
-    () => (teamId ? [{ table: 'aitb_progress', filter: `team_id=eq.${teamId}` }] : []),
-    [teamId],
+    () => (teamId && !preview ? [{ table: 'aitb_progress', filter: `team_id=eq.${teamId}` }] : []),
+    [teamId, preview],
   )
   useAitbRealtime(`aitb-mission-${teamId ?? 'none'}-${activity?.id ?? 0}`, missionSubs, load)
 
@@ -91,6 +117,7 @@ export function AitbMission() {
   // Check-in: creates the progress row, starts the timer, +100 pts
   const checkIn = async () => {
     if (!teamId || !activity || busyRef.current || timeUp) return
+    if (preview) { setProgress(previewProgress('playing', activity)); return }
     busyRef.current = true
     // Same 2-at-a-time cap the board enforces. Opening a mission page directly
     // (a station QR, a bookmark, the back button) used to skip the check, so a
@@ -122,6 +149,7 @@ export function AitbMission() {
     const done = progress.steps_done.includes(i)
       ? progress.steps_done.filter(x => x !== i)
       : [...progress.steps_done, i].sort((a, b) => a - b)
+    if (preview) { setProgress({ ...progress, steps_done: done }); return }
     const { data } = await supabase
       .from('aitb_progress').update({ steps_done: done })
       .eq('id', progress.id).select().maybeSingle()
@@ -136,6 +164,7 @@ export function AitbMission() {
       setWordsError(`Fill in all ${wordsCfg.count} words first!`)
       return
     }
+    if (preview) { setProgress({ ...progress, words: clean }); setWordsError(''); return }
     busyRef.current = true
     const { data } = await supabase
       .from('aitb_progress').update({ words: clean })
@@ -158,6 +187,7 @@ export function AitbMission() {
   const savingWordsRef = useRef(false)
   const saveWords = async (words: string[]) => {
     if (!progress || progress.completed_at || timeUp || savingWordsRef.current) return
+    if (preview) { setProgress({ ...progress, words }); return }
     savingWordsRef.current = true
     const { data } = await supabase
       .from('aitb_progress').update({ words })
@@ -169,6 +199,12 @@ export function AitbMission() {
   // Admin-password completion → +300 + speed bonus
   const tryComplete = async () => {
     if (!progress?.scanned_at || !activity || timeUp) return
+    if (preview) {
+      setProgress({ ...progress, completed_at: new Date().toISOString(), bonus: aitbSpeedBonus(90_000, activity) })
+      setPwOpen(false)
+      setCelebrate(true)
+      return
+    }
     const { data: settings } = await supabase.from('aitb_settings').select('admin_password').eq('id', 1).maybeSingle()
     if (!settings || pw !== settings.admin_password) {
       setPwError('Wrong password — ask the marshal!')
@@ -205,7 +241,7 @@ export function AitbMission() {
     return <div className="min-h-screen bg-gray-950 text-gray-400 flex items-center justify-center">Loading…</div>
   }
 
-  const isAdmin = sessionStorage.getItem(ADMIN_UNLOCK_KEY) === '1'
+  const isAdmin = !preview && sessionStorage.getItem(ADMIN_UNLOCK_KEY) === '1'
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-24">
@@ -217,7 +253,7 @@ export function AitbMission() {
           style={{ background: 'rgba(17,24,39,0.75)', color: '#2dd4bf', border: '1.5px solid #2dd4bf66' }}>
           ← Admin
         </a>
-      ) : team ? (
+      ) : team && !preview ? (
         <a href="/aitb/home"
           className="fixed top-3 left-3 z-[70] px-4 py-2 rounded-xl font-black text-sm backdrop-blur"
           style={{ background: 'rgba(17,24,39,0.8)', color: '#a78bfa', border: '1.5px solid #a78bfa66' }}>
@@ -275,8 +311,10 @@ export function AitbMission() {
             <div className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4"
               style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${team.color}44` }}>
               <span className="font-black" style={{ color: team.color }}>● {team.name}</span>
-              <button onClick={() => { localStorage.removeItem(TEAM_KEY); setTeamId(null); setProgress(null) }}
-                className="text-gray-500 text-xs underline">change</button>
+              {!preview && (
+                <button onClick={() => { localStorage.removeItem(TEAM_KEY); setTeamId(null); setProgress(null) }}
+                  className="text-gray-500 text-xs underline">change</button>
+              )}
               <div className="flex-1" />
               <span className="font-black text-xl" style={{ color: activity.color }}>{points} pts</span>
             </div>
@@ -353,7 +391,9 @@ export function AitbMission() {
             {/* Playable reference games (act 02) */}
             {activity.demos && (
               <>
-                <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🕹️ Play the 3 games first!</div>
+                <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+                  {activity.demos.length > 1 ? `🕹️ Play the ${activity.demos.length} games first!` : '🕹️ Try the example first!'}
+                </div>
                 <div className="flex flex-col gap-2 mb-5">
                   {activity.demos.map(d => (
                     <a key={d.label} href={d.url} target="_blank" rel="noopener noreferrer"
@@ -471,7 +511,7 @@ export function AitbMission() {
             ) : null}
 
             {/* Cheer bar — fire emoji that float off your rocket on the projector */}
-            <CheerBar teamId={team.id} teamName={team.name} teamColor={team.color} />
+            {!preview && <CheerBar teamId={team.id} teamName={team.name} teamColor={team.color} />}
 
             {/* Back to the team board: live score + draw the next mission */}
             <a href="/aitb/home"

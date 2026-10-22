@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FactoryFlow Planner · Example</title>
+<!-- AI Team Building, game "AI Factory Planner": an example of the website teams
+     are asked to build (new-game.md). One page, read top to bottom in the game's
+     own order: dashboard → plan orders → predictions → breakdown test → present.
+     Machines (edit), orders and breakdowns (create / read / update / delete) are
+     saved in this browser's localStorage. Self-contained, no libraries. -->
+<style>
+  :root {
+    --bg: #030712; --panel: rgba(255,255,255,0.04); --line: rgba(255,255,255,0.1);
+    --ink: #f3f4f6; --muted: #9ca3af; --accent: #34d399; --late: #fbbf24; --down: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 64px; }
+  h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+  h2 { font-size: 22px; margin: 6px 0 2px; letter-spacing: -0.01em; }
+  h3 { font-size: 15px; margin: 16px 0 8px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  .card { background: var(--panel); border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; }
+  .grid { display: grid; gap: 10px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+
+  /* Sticky step bar */
+  .bar { position: sticky; top: 0; z-index: 10; background: rgba(3,7,18,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar > div { max-width: 860px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  .dots { display: flex; gap: 6px; margin-left: auto; }
+  .dots a { display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--muted); font-size: 13px; font-weight: 800;
+    border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 4px; transition: background .2s, color .2s, border-color .2s; }
+  .dots a b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,0.08); }
+  .dots a.on { color: var(--ink); border-color: var(--accent); background: rgba(52,211,153,0.1); }
+  .dots a.on b { background: var(--accent); color: #032016; }
+
+  .intro { margin: 18px 0 8px; padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    color: var(--accent); background: rgba(52,211,153,0.08); border: 1.5px dashed rgba(52,211,153,0.4); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .intro button { margin-left: auto; }
+
+  /* The flow: numbered sections joined by a line */
+  .flow { display: grid; grid-template-columns: 40px 1fr; gap: 14px; position: relative; padding: 22px 0 10px; }
+  .flow::before { content: ""; position: absolute; left: 19px; top: 66px; bottom: -22px; width: 2px; background: var(--line); }
+  .flow:last-of-type::before { display: none; }
+  .num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 18px;
+    background: rgba(52,211,153,0.12); color: var(--accent); border: 2px solid rgba(52,211,153,0.5); position: relative; z-index: 1; }
+  .body { min-width: 0; }
+  .lead { color: #cbd5e1; margin: 0 0 14px; }
+  .next { margin-top: 14px; background: transparent; color: var(--accent); border: 1.5px solid rgba(52,211,153,0.45); }
+
+  input, select, button { font: inherit; color: inherit; }
+  input, select { background: rgba(31,41,55,0.8); border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; width: 100%; min-width: 0; }
+  input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); min-width: 0; }
+  button { cursor: pointer; border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 800; min-height: 44px; transition: transform .1s; white-space: nowrap; }
+  button:active { transform: scale(0.97); }
+  .primary { background: var(--accent); color: #032016; }
+  .danger { background: rgba(248,113,113,0.15); color: var(--down); border: 1.5px solid rgba(248,113,113,0.5); }
+  .ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--line); }
+  .mini { min-height: 34px; padding: 4px 10px; font-size: 13px; }
+  .acts { display: flex; gap: 6px; }
+
+  .machines { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .pill { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .p-ok { background: rgba(52,211,153,0.15); color: var(--accent); }
+  .p-late { background: rgba(251,191,36,0.15); color: var(--late); }
+  .p-down { background: rgba(248,113,113,0.18); color: var(--down); }
+  .big { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .ok { color: var(--accent); font-weight: 800; }
+  .lt { color: var(--late); font-weight: 800; }
+  .msg { margin-top: 10px; font-weight: 700; }
+  .msg:empty { display: none; }
+
+  /* One order (or breakdown) per line */
+  .list { display: grid; gap: 8px; }
+  .orow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px;
+    background: var(--panel); border: 1.5px solid var(--line); }
+  .orow.late { border-color: rgba(251,191,36,0.45); }
+  .orow .id { font-weight: 900; color: var(--muted); width: 32px; }
+  .orow .what { flex: 1 1 220px; min-width: 0; }
+  .orow.editing { border-color: var(--accent); }
+  .orow.editing .what { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+  .orow.editing input, .orow.editing select { min-height: 38px; padding: 6px 8px; }
+
+  /* Time-slot chart */
+  .tl-row { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 8px; height: 34px; }
+  .tl-track { position: relative; height: 26px; border-radius: 8px; background: rgba(255,255,255,0.04); }
+  .blk { position: absolute; top: 3px; bottom: 3px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #04140d;
+    display: flex; align-items: center; padding: 0 4px; overflow: hidden; white-space: nowrap; }
+  .blk.late { box-shadow: inset 0 0 0 2px var(--late); }
+  .blk.hl { outline: 2px solid #fff; outline-offset: 1px; }
+  .blk.dn { background: repeating-linear-gradient(45deg, #f87171 0 6px, #7f1d1d 6px 12px); color: #fff; }
+  .axis { display: grid; grid-template-columns: 76px 1fr; gap: 8px; font-size: 11px; color: var(--muted); }
+  .axis div:last-child { position: relative; height: 16px; }
+  .axis span { position: absolute; transform: translateX(-50%); }
+  .scroll { overflow-x: auto; }
+
+  @media (max-width: 640px) {
+    .dots a span { display: none; } .dots a { padding: 4px; }
+    .flow { grid-template-columns: 30px 1fr; gap: 10px; } .num { width: 30px; height: 30px; font-size: 15px; } .flow::before { left: 14px; top: 56px; }
+    .stats { grid-template-columns: 1fr 1fr 1fr; } .big { font-size: 22px; }
+    .orow.editing .what { grid-template-columns: 1fr 1fr; } .orow.editing .what label:first-child { grid-column: 1 / -1; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div>
+    <h1>⚙️ FactoryFlow</h1>
+    <nav class="dots" id="dots" aria-label="Steps"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    🏭 Example website for the AI Factory Planner game. Go through steps 1 to 5 from top to bottom. Changes are saved in this browser.
+    <button class="ghost mini" data-act="reset">↺ Reset demo</button>
+  </div>
+
+  <!-- 1. Dashboard -->
+  <section class="flow" id="s1" data-title="Dashboard">
+    <div class="num">1</div>
+    <div class="body">
+      <h2>Factory dashboard</h2>
+      <p class="lead">Your 5 machines. Each makes one item at its own speed. Tap ✏️ to change one.</p>
+      <div class="grid machines" id="machines"></div>
+      <div class="msg" id="machineMsg" role="status"></div>
+      <button class="next" data-jump="s2">Next: plan orders ↓</button>
+    </div>
+  </section>
+
+  <!-- 2. Plan orders -->
+  <section class="flow" id="s2" data-title="Plan">
+    <div class="num">2</div>
+    <div class="body">
+      <h2>Plan production orders</h2>
+      <p class="lead">Say what to make, how many, and when it's needed. The planner picks the machine, runs the most urgent orders first, and sets every start and finish time.</p>
+      <div class="card">
+        <div class="row">
+          <label style="flex:2 1 220px">What to make<select id="oItem"></select></label>
+          <label style="flex:1 1 90px">How many<input id="oQty" type="number" min="1" max="500" value="20" inputmode="numeric" /></label>
+          <label style="flex:1 1 110px">Needed by<input id="oDue" type="time" value="13:00" min="08:00" max="17:00" /></label>
+          <button class="primary" data-act="o-add" style="flex:1 1 130px">+ Add order</button>
+        </div>
+        <div class="msg" id="orderMsg" role="status"></div>
+      </div>
+      <h3>Today's orders</h3>
+      <div class="list" id="orderList"></div>
+      <button class="next" data-jump="s3">Next: see predictions ↓</button>
+    </div>
+  </section>
+
+  <!-- 3. Predictions -->
+  <section class="flow" id="s3" data-title="Predict">
+    <div class="num">3</div>
+    <div class="body">
+      <h2>Production predictions</h2>
+      <p class="lead">What today's plan will deliver, and when each machine is still free.</p>
+      <div class="grid stats">
+        <div class="card"><div class="muted small">Made by 17:00</div><div class="big" id="sUnits">0</div></div>
+        <div class="card"><div class="muted small">On time</div><div class="big ok" id="sOnTime">0</div></div>
+        <div class="card"><div class="muted small">Late</div><div class="big lt" id="sLate">0</div></div>
+      </div>
+      <div class="msg" id="lateMsg"></div>
+      <h3>Machine time slots</h3>
+      <div class="card">
+        <div class="scroll"><div style="min-width:560px"><div id="timeline"></div><div class="axis"><div></div><div id="axis"></div></div></div></div>
+        <p class="muted small" style="margin:8px 0 0">Blocks are orders (#number). Gold outline = late. Red stripes = breakdown.</p>
+      </div>
+      <h3>Free time to take more orders</h3>
+      <div class="list" id="free"></div>
+      <button class="next" data-jump="s4">Next: test a breakdown ↓</button>
+    </div>
+  </section>
+
+  <!-- 4. Breakdown -->
+  <section class="flow" id="s4" data-title="Breakdown">
+    <div class="num">4</div>
+    <div class="body">
+      <h2>Test a machine breakdown</h2>
+      <p class="lead">Break a machine for 45 minutes. If an order turns late, fix it with ✏️: make fewer now, or agree a later time.</p>
+      <div class="card">
+        <div class="row">
+          <label style="flex:2 1 200px">Machine<select id="bMachine"></select></label>
+          <label style="flex:1 1 110px">Breaks at<input id="bStart" type="time" value="09:30" min="08:00" max="16:15" /></label>
+          <button class="danger" data-act="b-add" style="flex:1 1 170px">💥 Break for 45 min</button>
+        </div>
+        <div class="msg" id="breakMsg" role="status"></div>
+      </div>
+      <div id="breakArea" hidden>
+        <h3>Breakdowns</h3>
+        <div class="list" id="breakList"></div>
+        <h3 id="fixTitle"></h3>
+        <div class="list" id="queue"></div>
+        <div class="msg" id="fixMsg" role="status"></div>
+      </div>
+      <button class="next" data-jump="s5">Next: present ↓</button>
+    </div>
+  </section>
+
+  <!-- 5. Present -->
+  <section class="flow" id="s5" data-title="Present">
+    <div class="num">5</div>
+    <div class="body">
+      <h2>Present your plan</h2>
+      <p class="lead">Show this to the facilitator and explain how the website helped you plan.</p>
+      <div class="card"><ul id="story" style="margin:0;padding-left:20px"></ul></div>
+      <button class="next" data-jump="s1">Back to the top ↑</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const SHIFT_START = 8 * 60, SHIFT_END = 17 * 60, BREAK_MINS = 45;
+const STORE = 'aitb-factory-planner-v1';
+const DEFAULT_MACHINES = [
+  { id: 'M1', name: 'CNC Cutter',        item: 'Metal brackets',  unit: 3,   color: '#34d399' },
+  { id: 'M2', name: 'Injection Moulder', item: 'Plastic casings', unit: 2,   color: '#22d3ee' },
+  { id: 'M3', name: 'Assembly Robot',    item: 'Control boards',  unit: 6,   color: '#a78bfa' },
+  { id: 'M4', name: 'Paint Booth',       item: 'Painted panels',  unit: 4,   color: '#f472b6' },
+  { id: 'M5', name: 'Packing Line',      item: 'Gift boxes',      unit: 1.5, color: '#fbbf24' },
+];
+const hm = t => t.split(':').reduce((h, m) => h * 60 + +m);
+const fmt = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+const pct = m => ((m - SHIFT_START) / (SHIFT_END - SHIFT_START)) * 100;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const $ = id => document.getElementById(id);
+
+let machines, nextId, nextBreak, orders, breaks, log, lastBooked, focusMachine;
+let editing = null; // { kind: 'machine' | 'order' | 'break', id }: one row open at a time
+let fixNote = '';   // result of the last order edit, shown above the step 4 status
+const machine = id => machines.find(m => m.id === id);
+
+// Seeded so everything starts on time, but the suggested test (Assembly Robot
+// breaks at 09:30) makes order #6 late by 27 min. Editing it fixes it: make 5
+// now instead of 10, or agree 11:00 instead of 10:30.
+function seed() {
+  machines = DEFAULT_MACHINES.map(m => ({ ...m }));
+  nextId = 1; nextBreak = 1;
+  const o = (m, qty, due) => ({ id: nextId++, m, qty, due: hm(due) });
+  orders = [
+    o('M1', 20, '10:00'), o('M1', 25, '12:00'),
+    o('M2', 40, '10:30'), o('M2', 50, '13:00'),
+    o('M3', 12, '09:30'), o('M3', 10, '10:30'), o('M3', 8, '14:00'),
+    o('M4', 18, '11:00'), o('M4', 20, '13:30'),
+    o('M5', 60, '10:00'), o('M5', 80, '13:00'),
+  ];
+  breaks = []; log = freshLog(); fixNote = ''; lastBooked = null; focusMachine = null; editing = null;
+}
+
+// Saved per browser. A missing, broken or blocked store just starts fresh.
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ machines, orders, breaks, log, nextId, nextBreak, focusMachine })); } catch { /* private mode: not saved */ }
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE));
+    if (s?.machines?.length === 5 && Array.isArray(s.orders) && Array.isArray(s.breaks)) {
+      ({ machines, orders, breaks, nextId, nextBreak } = s);
+      log = { ...freshLog(), ...s.log }; focusMachine = s.focusMachine || null;
+      return true;
+    }
+  } catch { /* fall through */ }
+  return false;
+}
+// What the step 5 summary counts: totals and machine ids, not a click history.
+const freshLog = () => ({ booked: 0, changed: 0, deleted: 0, edited: [] });
+const commit = (key, id) => {
+  if (typeof log[key] === 'number') log[key]++;
+  else if (key) log[key] = [...new Set([...log[key], id])];
+  editing = null; save(); render();
+};
+
+// Each machine runs its orders most urgent first (earliest needed-by time; ties
+// in booking order), back to back from 08:00. A breakdown pauses the order it
+// lands in (it finishes 45 min later); an order due to start inside a
+// breakdown waits for the repair.
+function plan() {
+  const out = {};
+  for (const m of machines) {
+    const downs = breaks.filter(d => d.m === m.id).sort((a, b) => a.start - b.start);
+    let t = SHIFT_START;
+    out[m.id] = orders.filter(o => o.m === m.id).sort((a, b) => a.due - b.due || a.id - b.id).map(o => {
+      let start = t;
+      for (const d of downs) if (start >= d.start && start < d.end) start = d.end;
+      let end = start + o.qty * m.unit;
+      for (const d of downs) if (d.start >= start && d.start < end) end += d.end - d.start;
+      t = end;
+      return { ...o, start, end, late: end > o.due };
+    });
+  }
+  return out;
+}
+const downIn = (m, a, b) => breaks.filter(d => d.m === m)
+  .reduce((s, d) => s + Math.max(0, Math.min(b, d.end) - Math.max(a, d.start)), 0);
+const unitsBy = (m, slots, at) => slots.reduce((sum, s) => at <= s.start ? sum
+  : sum + Math.min(s.qty, Math.floor((Math.min(at, s.end) - s.start - downIn(m.id, s.start, Math.min(at, s.end))) / m.unit + 1e-9)), 0);
+function freeSlots(m, slots) {
+  const busy = [...slots.map(s => [s.start, s.end]), ...breaks.filter(d => d.m === m.id).map(d => [d.start, d.end])].sort((a, b) => a[0] - b[0]);
+  const gaps = []; let t = SHIFT_START;
+  for (const [a, b] of busy) { if (a - t >= 15 && a <= SHIFT_END) gaps.push([t, a]); t = Math.max(t, b); }
+  if (SHIFT_END - t >= 15) gaps.push([t, SHIFT_END]);
+  return gaps;
+}
+const totals = p => {
+  let units = 0, onTime = 0, late = 0;
+  for (const m of machines) { units += unitsBy(m, p[m.id], SHIFT_END); for (const s of p[m.id]) s.late ? late++ : onTime++; }
+  return { units, onTime, late };
+};
+const findSlot = (p, id) => Object.values(p).flat().find(s => s.id === id);
+// Orders an urgent booking or edit pushed from on time to late (it jumped the queue).
+const pushedLate = (before, after, skip) => Object.values(after).flat()
+  .filter(s => s.late && s.id !== skip && findSlot(before, s.id)?.late === false);
+const bumpTxt = list => list.length
+  ? ` <span class="lt">⚠️ It goes first and makes order${list.length > 1 ? 's' : ''} ${list.map(s => '#' + s.id).join(', ')} late.</span>` : '';
+const status = s => s.late ? `<span class="pill p-late">Late ${Math.round(s.end - s.due)} min</span>` : '<span class="pill p-ok">On time</span>';
+const itemOptions = sel => machines.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.item)} (${esc(m.name)}, ${m.unit} min each)</option>`).join('');
+const machineOptions = sel => machines.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+const isEditing = (kind, id) => editing?.kind === kind && editing.id === id;
+const fields = el => Object.fromEntries([...el.closest('[data-form]').querySelectorAll('[data-f]')].map(f => [f.dataset.f, f.value.trim()]));
+const editBtns = (kind, id, label) => `<div class="acts">
+  <button class="ghost mini" data-act="${kind}-edit" data-id="${id}" aria-label="Edit ${label}">✏️</button>
+  <button class="danger mini" data-act="${kind}-del" data-id="${id}" aria-label="Delete ${label}">🗑️</button></div>`;
+const saveBtns = (kind, id) => `<div class="acts"><button class="ghost mini" data-act="cancel">Cancel</button>
+  <button class="primary mini" data-act="${kind}-save" data-id="${id}">Save</button></div>`;
+
+// One order per line, used in step 2 (all orders) and step 4 (the broken machine).
+const orderRows = list => list.map(s => {
+  const m = machine(s.m);
+  if (isEditing('order', s.id)) {
+    return `<div class="orow editing" data-form><span class="id">#${s.id}</span>
+      <div class="what">
+        <label>What<select data-f="m">${itemOptions(s.m)}</select></label>
+        <label>How many<input data-f="qty" type="number" min="1" max="500" value="${s.qty}" /></label>
+        <label>Needed by<input data-f="due" type="time" min="08:00" max="17:00" value="${fmt(s.due)}" /></label>
+      </div>${saveBtns('o', s.id)}</div>`;
+  }
+  return `<div class="orow${s.late ? ' late' : ''}"><span class="id">#${s.id}</span>
+    <div class="what"><b>${s.qty} ${esc(m.item.toLowerCase())}</b> <span class="muted small">· needed by ${fmt(s.due)}</span>
+      <div class="small muted">${esc(m.name)} · ${fmt(s.start)} to ${fmt(s.end)}</div></div>
+    ${status(s)}${editBtns('o', s.id, `order ${s.id}`)}</div>`;
+}).join('');
+
+function render() {
+  const p = plan(), t = totals(p);
+  $('oItem').innerHTML = itemOptions($('oItem').value || 'M1');
+  $('bMachine').innerHTML = machineOptions($('bMachine').value || 'M3');
+
+  // 1. Dashboard
+  $('machines').innerHTML = machines.map(m => {
+    const q = p[m.id], down = breaks.some(d => d.m === m.id), late = q.filter(s => s.late).length;
+    if (isEditing('machine', m.id)) {
+      return `<div class="card" data-form style="border-color:${m.color}"><div class="grid">
+        <label>Machine<input data-f="name" value="${esc(m.name)}" maxlength="30" /></label>
+        <label>Makes<input data-f="item" value="${esc(m.item)}" maxlength="30" /></label>
+        <label>Minutes per item<input data-f="unit" type="number" min="0.5" max="60" step="0.5" value="${m.unit}" /></label>
+        ${saveBtns('m', m.id)}</div></div>`;
+    }
+    const pill = down ? '<span class="pill p-down">Breakdown</span>' : late ? `<span class="pill p-late">${late} late</span>` : '<span class="pill p-ok">On track</span>';
+    return `<div class="card" style="border-top:4px solid ${m.color}">
+      <b>${esc(m.name)}</b>
+      <div class="small">${esc(m.item)} · ${m.unit} min each</div>
+      <div class="small muted" style="margin:6px 0 8px">${q.length} order${q.length === 1 ? '' : 's'} · busy until ${q.length ? fmt(q[q.length - 1].end) : '08:00'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">${pill}
+        <button class="ghost mini" data-act="m-edit" data-id="${m.id}" aria-label="Edit ${esc(m.name)}">✏️</button></div>
+    </div>`;
+  }).join('');
+
+  // 2. Orders
+  const rows = machines.flatMap(m => p[m.id]).sort((a, b) => a.id - b.id);
+  $('orderList').innerHTML = orderRows(rows) || '<p class="muted">No orders yet. Add one above.</p>';
+
+  // 3. Predictions
+  $('sUnits').textContent = t.units; $('sOnTime').textContent = t.onTime; $('sLate').textContent = t.late;
+  const lateRows = rows.filter(s => s.late);
+  $('lateMsg').innerHTML = lateRows.length
+    ? `<span class="lt">Late: ${lateRows.map(s => `#${s.id} (${Math.round(s.end - s.due)} min)`).join(', ')}.</span> Fix them in step 2 or 4.`
+    : '<span class="ok">Every order finishes on time ✅</span>';
+  $('timeline').innerHTML = machines.map(m => {
+    const blocks = p[m.id].map(s => `<div class="blk${s.late ? ' late' : ''}${s.id === lastBooked ? ' hl' : ''}" title="#${s.id}: ${s.qty} ${esc(m.item)}, ${fmt(s.start)} to ${fmt(s.end)}"
+      style="left:${pct(s.start)}%;width:${Math.max(0, Math.min(100, pct(s.end)) - pct(s.start))}%;background:${m.color}">#${s.id}</div>`).join('');
+    const downs = breaks.filter(d => d.m === m.id).map(d => `<div class="blk dn" style="left:${pct(d.start)}%;width:${pct(d.end) - pct(d.start)}%">down</div>`).join('');
+    return `<div class="tl-row"><b class="small">${esc(m.name.split(' ')[0])}</b><div class="tl-track">${blocks}${downs}</div></div>`;
+  }).join('');
+  $('axis').innerHTML = Array.from({ length: 10 }, (_, i) => `<span style="left:${(i / 9) * 100}%">${fmt(SHIFT_START + i * 60)}</span>`).join('');
+  $('free').innerHTML = machines.map(m => {
+    const gaps = freeSlots(m, p[m.id]);
+    return `<div class="orow"><div class="what"><b>${esc(m.name)}</b> <span class="muted small">· makes ${unitsBy(m, p[m.id], SHIFT_END)} ${esc(m.item.toLowerCase())} today</span></div>
+      <span class="small">${gaps.length ? `Free ${gaps.map(([a, b]) => `${fmt(a)}-${fmt(b)}`).join(', ')}` : '<span class="lt">Fully booked</span>'}</span></div>`;
+  }).join('');
+
+  // 4. Breakdowns, then the broken machine's orders to fix
+  $('breakArea').hidden = !breaks.length;
+  $('breakList').innerHTML = breaks.map(d => isEditing('break', d.id)
+    ? `<div class="orow editing" data-form><div class="what" style="grid-template-columns:2fr 1fr">
+        <label>Machine<select data-f="m">${machineOptions(d.m)}</select></label>
+        <label>Breaks at<input data-f="start" type="time" min="08:00" max="16:15" value="${fmt(d.start)}" /></label></div>${saveBtns('b', d.id)}</div>`
+    : `<div class="orow"><span class="pill p-down">Down</span><div class="what"><b>${esc(machine(d.m).name)}</b> <span class="muted small">· ${fmt(d.start)} to ${fmt(d.end)}</span></div>
+        ${editBtns('b', d.id, 'breakdown')}</div>`).join('');
+  if (focusMachine) {
+    const m = machine(focusMachine), q = p[m.id], lateN = q.filter(s => s.late).length;
+    $('fixTitle').textContent = `${m.name} orders, most urgent first`;
+    $('queue').innerHTML = orderRows(q) || '<p class="muted">No orders on this machine.</p>';
+    $('fixMsg').innerHTML = (fixNote ? `${fixNote}<br/>` : '') + (lateN
+      ? `<span class="lt">${lateN} order${lateN === 1 ? ' is' : 's are'} late.</span> Tap ✏️ to make fewer now or agree a later time.`
+      : '<span class="ok">✅ Plan fixed: every order on this machine is on time.</span>');
+  }
+
+  // 5. Summary: the end result, one line per step, however many clicks it took.
+  const names = ids => ids.map(id => esc(machine(id).name)).join(', ');
+  const changes = [log.booked && `${log.booked} added`, log.changed && `${log.changed} changed`, log.deleted && `${log.deleted} deleted`].filter(Boolean).join(', ');
+  const lateTxt = t.late ? `<span class="lt">${t.late} order${t.late === 1 ? '' : 's'} late</span>` : '<span class="ok">every order on time</span>';
+  $('story').innerHTML = [
+    `🏭 <b>Dashboard:</b> 5 machines${log.edited.length ? `, updated ${names(log.edited)}` : ''}.`,
+    `📅 <b>Orders:</b> ${orders.length} planned${changes ? ` (${changes})` : ''}.`,
+    `💥 <b>Breakdown test:</b> ${breaks.length ? breaks.map(d => `${esc(machine(d.m).name)} ${fmt(d.start)}-${fmt(d.end)}`).join(', ') : 'not done yet, try it in step 4'}.`,
+    `🔮 <b>Forecast:</b> ${t.units} items by 17:00, ${lateTxt}.`,
+  ].map(s => `<li style="margin-bottom:8px">${s}</li>`).join('');
+}
+
+// --- actions (one click handler for every button on the page) ---
+const ACTIONS = {
+  cancel() { editing = null; render(); },
+
+  'm-edit'(id) { editing = { kind: 'machine', id }; render(); },
+  'm-save'(id, btn) {
+    const f = fields(btn), unit = +f.unit;
+    if (!f.name || !f.item || !(unit >= 0.5)) { $('machineMsg').innerHTML = '<span class="lt">Fill in a name, an item, and at least 0.5 min per item.</span>'; return; }
+    Object.assign(machine(id), { name: f.name, item: f.item, unit });
+    $('machineMsg').innerHTML = `<span class="ok">Saved ${esc(f.name)} ✅</span> Its orders have been re-timed.`;
+    commit('edited', id);
+  },
+
+  'o-add'() {
+    const m = $('oItem').value, qty = Math.round(+$('oQty').value), due = $('oDue').value;
+    if (!(qty > 0) || !due) { $('orderMsg').innerHTML = '<span class="lt">Enter how many and when it is needed.</span>'; return; }
+    const before = plan(), o = { id: nextId++, m, qty, due: hm(due) };
+    orders.push(o);
+    lastBooked = o.id;
+    const after = plan(), s = findSlot(after, o.id), mc = machine(m);
+    $('orderMsg').innerHTML = `Order #${o.id}: ${qty} ${esc(mc.item.toLowerCase())} on the ${esc(mc.name)}, ${fmt(s.start)} to ${fmt(s.end)}. `
+      + (s.late ? `<span class="lt">That is ${Math.round(s.end - s.due)} min after it is needed. Try a later time or fewer items.</span>` : '<span class="ok">On time ✅</span>')
+      + bumpTxt(pushedLate(before, after, o.id));
+    commit('booked');
+  },
+  'o-edit'(id) { editing = { kind: 'order', id: +id }; render(); },
+  'o-save'(id, btn) {
+    const f = fields(btn), qty = Math.round(+f.qty), o = orders.find(x => x.id === +id);
+    if (!(qty > 0) || !f.due) { $('orderMsg').innerHTML = '<span class="lt">An order needs a quantity and a needed-by time.</span>'; return; }
+    const before = plan();
+    Object.assign(o, { m: f.m, qty, due: hm(f.due) });
+    lastBooked = o.id;
+    const after = plan(), s = findSlot(after, o.id);
+    // Shown in both step 2 and step 4, wherever it was edited from.
+    $('orderMsg').innerHTML = fixNote = `Order #${o.id} updated: ${fmt(s.start)} to ${fmt(s.end)}. `
+      + (s.late ? `<span class="lt">Still late by ${Math.round(s.end - s.due)} min.</span>` : '<span class="ok">On time ✅</span>')
+      + bumpTxt(pushedLate(before, after, o.id));
+    commit('changed');
+  },
+  'o-del'(id) {
+    if (!confirm(`Delete order #${id}?`)) return;
+    orders = orders.filter(o => o.id !== +id);
+    $('orderMsg').textContent = `Order #${id} deleted.`;
+    commit('deleted');
+  },
+
+  'b-add'() {
+    fixNote = '';
+    const m = $('bMachine').value, start = hm($('bStart').value || '09:30'), mc = machine(m);
+    const before = plan()[m];
+    breaks.push({ id: nextBreak++, m, start, end: start + BREAK_MINS });
+    focusMachine = m;
+    const after = plan()[m];
+    const moved = after.filter((s, i) => s.end !== before[i].end).length;
+    const newLate = after.filter((s, i) => s.late && !before[i].late).length;
+    $('breakMsg').innerHTML = `The ${esc(mc.name)} is down ${fmt(start)} to ${fmt(start + BREAK_MINS)}. ${moved} order${moved === 1 ? '' : 's'} pushed back`
+      + (newLate ? `, <span class="lt">${newLate} now late</span>. Fix it below 👇` : '. Everything is still on time ✅');
+    commit();
+  },
+  'b-edit'(id) { editing = { kind: 'break', id: +id }; render(); },
+  'b-save'(id, btn) {
+    fixNote = '';
+    const f = fields(btn), d = breaks.find(x => x.id === +id);
+    if (!f.start) return;
+    Object.assign(d, { m: f.m, start: hm(f.start), end: hm(f.start) + BREAK_MINS });
+    focusMachine = f.m;
+    $('breakMsg').textContent = `Breakdown moved to the ${machine(f.m).name}, ${fmt(d.start)} to ${fmt(d.end)}.`;
+    commit();
+  },
+  'b-del'(id) {
+    fixNote = '';
+    const d = breaks.find(x => x.id === +id);
+    breaks = breaks.filter(x => x.id !== +id);
+    if (!breaks.some(x => x.m === focusMachine)) focusMachine = breaks[0]?.m || null;
+    $('breakMsg').textContent = `${machine(d.m).name} repaired: breakdown removed.`;
+    commit();
+  },
+
+  reset() {
+    if (!confirm('Reset the demo? Your orders, machine edits and breakdowns will be cleared.')) return;
+    seed(); save();
+    for (const id of ['orderMsg', 'breakMsg', 'machineMsg']) $(id).textContent = '';
+    render();
+    $('s1').scrollIntoView();
+  },
+};
+
+document.addEventListener('click', e => {
+  const jump = e.target.closest('[data-jump]');
+  if (jump) return $(jump.dataset.jump).scrollIntoView();
+  const btn = e.target.closest('[data-act]');
+  if (btn && !btn.disabled) ACTIONS[btn.dataset.act]?.(btn.dataset.id, btn);
+});
+// Enter saves the row being edited.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !editing) return;
+  e.target.closest('[data-form]')?.querySelector('[data-act$="-save"]')?.click();
+});
+
+// Step bar: tap to jump, and highlight the step currently on screen.
+const sections = [...document.querySelectorAll('.flow')];
+$('dots').innerHTML = sections.map((s, i) => `<a href="#${s.id}" data-dot="${s.id}"><b>${i + 1}</b><span>${s.dataset.title}</span></a>`).join('');
+const io = new IntersectionObserver(entries => {
+  for (const en of entries) if (en.isIntersecting) {
+    document.querySelectorAll('[data-dot]').forEach(a => a.classList.toggle('on', a.dataset.dot === en.target.id));
+  }
+}, { rootMargin: '-35% 0px -60% 0px' });
+sections.forEach(s => io.observe(s));
+
+if (!load()) seed();
+render();
+</script>
+</body>
+</html>

@@ -39,11 +39,14 @@ const SnakeLadderAdmin      = lazy(() => import('./pages/SnakeLadderAdmin').then
 const VotingAdmin           = lazy(() => import('./pages/VotingAdmin').then(m => ({ default: m.VotingAdmin })))
 const VotingVote            = lazy(() => import('./pages/VotingVote').then(m => ({ default: m.VotingVote })))
 const VotingResults         = lazy(() => import('./pages/VotingResults').then(m => ({ default: m.VotingResults })))
-const AitbProjector         = lazy(() => import('./pages/AitbProjector').then(m => ({ default: m.AitbProjector })))
-const AitbAdmin             = lazy(() => import('./pages/AitbAdmin').then(m => ({ default: m.AitbAdmin })))
-const AitbMission           = lazy(() => import('./pages/AitbMission').then(m => ({ default: m.AitbMission })))
-const AitbHome              = lazy(() => import('./pages/AitbHome').then(m => ({ default: m.AitbHome })))
-const AitbObserver          = lazy(() => import('./pages/AitbObserver').then(m => ({ default: m.AitbObserver })))
+// AITB pages wait for the admin-edited game list before their modules evaluate.
+const aitbGames = () => import('./lib/aitbActivities').then(m => m.loadAitbGames())
+const AitbProjector         = lazy(() => aitbGames().then(() => import('./pages/AitbProjector')).then(m => ({ default: m.AitbProjector })))
+const AitbAdmin             = lazy(() => aitbGames().then(() => import('./pages/AitbAdmin')).then(m => ({ default: m.AitbAdmin })))
+const AitbGameEdit          = lazy(() => aitbGames().then(() => import('./pages/AitbAdmin')).then(m => ({ default: m.AitbGameEdit })))
+const AitbMission           = lazy(() => aitbGames().then(() => import('./pages/AitbMission')).then(m => ({ default: m.AitbMission })))
+const AitbHome              = lazy(() => aitbGames().then(() => import('./pages/AitbHome')).then(m => ({ default: m.AitbHome })))
+const AitbObserver          = lazy(() => aitbGames().then(() => import('./pages/AitbObserver')).then(m => ({ default: m.AitbObserver })))
 
 export default function App() {
   return (
@@ -109,6 +112,7 @@ export default function App() {
           <Route path="/aitb/home" element={<AitbHome />} />
           <Route path="/aitb/watch" element={<AitbObserver />} />
           <Route path="/aitb/admin" element={<AitbAdmin />} />
+          <Route path="/aitb/admin/game/:id" element={<AitbGameEdit />} />
           <Route path="/aitb/m/:activityId" element={<AitbMission />} />
 
         </Routes>

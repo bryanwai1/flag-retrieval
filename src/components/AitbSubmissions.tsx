@@ -14,10 +14,10 @@ import {
 } from '../lib/aitbActivities'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
-/** Games that record something a team can "obtain" or submit. */
-const RESULT_GAMES = AITB_ACTIVITIES.filter(a => a.module || a.wordsInput)
-
 export function AitbSubmissions({ teams, progress }: { teams: AitbTeam[]; progress: AitbProgress[] }) {
+  // Games that record something a team can "obtain" or submit. Read per render:
+  // the admin can edit or hide games without a reload.
+  const RESULT_GAMES = AITB_ACTIVITIES.filter(a => a.module || a.wordsInput)
   const [gameId, setGameId] = useState<number>(RESULT_GAMES[0]?.id ?? 0)
   const game = RESULT_GAMES.find(a => a.id === gameId) ?? RESULT_GAMES[0]
 

@@ -10,11 +10,11 @@
 // to something else falls back to the plain instruction pages, which is the
 // honest outcome — it is no longer that activity.
 
-import { AITB_ACTIVITIES, type AitbActivity } from './aitbActivities'
+import { AITB_DEFAULTS, type AitbActivity } from './aitbActivities'
 import { AITB_CATEGORY_NAME } from './importAitbCards'
 import type { BingoTask } from '../types/database'
 
-const byName = new Map(AITB_ACTIVITIES.map(a => [a.name.trim().toLowerCase(), a]))
+const byName = new Map(AITB_DEFAULTS.map(a => [a.name.trim().toLowerCase(), a]))
 
 /** The AITB activity a bingo card came from, or null if it isn't one. */
 export function aitbActivityForTask(

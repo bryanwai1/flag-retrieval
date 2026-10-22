@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { AITB_ACTIVITIES } from './aitbActivities'
+import { AITB_DEFAULTS } from './aitbActivities'
 import type { BingoTask } from '../types/database'
 
 // Import the AI Team Building activities into a board's Cards Library as a
@@ -89,7 +89,7 @@ export async function importAitbCards(
   let createdCards = 0
   let skippedCards = 0
 
-  for (const act of AITB_ACTIVITIES) {
+  for (const act of AITB_DEFAULTS) {
     if (existingTitles.has(act.name)) { skippedCards++; continue }
 
     const isSpeedEdit = act.id === SPEED_EDIT_ACTIVITY_ID

@@ -488,7 +488,6 @@ function BoardScreen({
   team,
   sectionId,
   sectionName,
-  sectionSlug: _sectionSlug,
   memberRole,
   gridTasks,
   scans,
@@ -501,7 +500,6 @@ function BoardScreen({
   team: { id: string; name: string }
   sectionId: string
   sectionName: string
-  sectionSlug: string
   memberRole: 'member' | 'observer'
   gridTasks: BingoTask[]
   scans: BingoScan[]
@@ -1133,7 +1131,6 @@ export function BingoDashJoin() {
           team={team}
           sectionId={section.id}
           sectionName={section.name}
-          sectionSlug={sectionSlug!}
           memberRole={memberRole}
           gridTasks={gridTasks}
           scans={scans}

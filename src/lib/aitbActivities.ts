@@ -3,6 +3,8 @@
 // Steps are written so "a 6-year-old understands" — keep them short and fun.
 // tagline = one punchy line; desc = full facilitator description; learning = outcome.
 
+import { supabase } from './supabase'
+
 // Interactive in-app systems on the mission page. Each stores its result into
 // aitb_progress.words (positions match AITB_MODULE_SLOTS) → live in the admin.
 export type AitbModule = 'cups' | 'roulette' | 'cards' | 'animals'
@@ -42,6 +44,9 @@ export type AitbActivity = {
   /** Interactive in-app system rendered on the mission page (Nerf cup picker,
    *  roulette spin, card / animal draw). Results save to aitb_progress.words. */
   module?: AitbModule
+  /** Hidden from players by the admin. Kept in the list so points already
+   *  earned on it still count. */
+  hidden?: boolean
 }
 
 /* ── AI tool registry ────────────────────────────────────────────────────────
@@ -94,7 +99,9 @@ export function aitbAppNotes(names: string[]): string[] {
   return [...seen]
 }
 
-export const AITB_ACTIVITIES: AitbActivity[] = [
+/** The built-in games, as shipped. Bingo reads these directly so admin edits
+ *  to AI Team Building never change a bingo board. */
+export const AITB_DEFAULTS: readonly AitbActivity[] = [
   {
     id: 1, act: '01', emoji: '🎯', color: '#fb7185', name: 'Nerf Prompt Cups',
     outType: 'AI Image',
@@ -300,8 +307,76 @@ export const AITB_ACTIVITIES: AitbActivity[] = [
   },
 ]
 
+/* ---------- Admin-editable game list ----------
+   aitb_settings.activities holds the admin's version of the list (null = the
+   built-ins). Only content fields are stored; scoring and the interactive
+   module stay in code. loadAitbGames() runs once per page load before any
+   AITB page renders (see App.tsx), so edits reach phones on their next load. */
+export const AITB_EDITABLE = [
+  'act', 'name', 'emoji', 'color', 'outType', 'tagline', 'desc', 'learning', 'steps', 'stepEmojis',
+  'props', 'apps', 'mins', 'difficulty', 'note', 'hero', 'demos',
+] as const
+export type AitbGameEdit = Pick<AitbActivity, 'id'> & Partial<Pick<AitbActivity, typeof AITB_EDITABLE[number] | 'hidden'>>
+
+// Same ladder shape as the built-ins: 1000…200 at ¼, ½, ¾, 1× and 1¼ of the minutes.
+const tiersFor = (mins: number) =>
+  [0.25, 0.5, 0.75, 1, 1.25].map((f, i) => ({ uptoMin: Math.round(mins * f), pts: 1000 - 200 * i }))
+
+export function aitbNewGame(id: number): AitbActivity {
+  return {
+    id, act: String(id).padStart(2, '0'), emoji: '✨', color: '#2dd4bf', name: 'New game',
+    outType: 'AI Image', tagline: '', desc: '', learning: '', steps: ['Step one'], stepEmojis: ['✅'],
+    apps: [], mins: 10, hero: '', difficulty: 'Normal', props: [], bonusTiers: tiersFor(10),
+  }
+}
+
+function mergeGame(s: AitbGameEdit): AitbActivity {
+  const base = AITB_DEFAULTS.find(d => d.id === s.id)
+  if (base) return { ...base, ...s }
+  const g = { ...aitbNewGame(s.id), ...s }
+  // No picture uploaded yet → a plain wash in the game's colour, so no screen shows a broken image.
+  const hero = g.hero || `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect width="16" height="9" fill="${g.color}" opacity=".35"/></svg>`)}`
+  return { ...g, hero, bonusTiers: tiersFor(g.mins) }
+}
+
+/** Every game, hidden ones included (admin + scoring). */
+let ALL: AitbActivity[] = [...AITB_DEFAULTS]
+/** Games players can see. Mutated in place so module-level readers stay valid. */
+export const AITB_ACTIVITIES: AitbActivity[] = [...AITB_DEFAULTS]
+
+export function aitbAllGames(): AitbActivity[] { return ALL }
+
+/** List order is the game number: ticked games are 01, 02… top to bottom, so
+ *  dragging a game in the admin renumbers it. Unticked games have no slot. */
+export function aitbNumbered<T extends { hidden?: boolean }>(list: T[]): (T & { act: string })[] {
+  let n = 0
+  return list.map(a => ({ ...a, act: a.hidden ? '--' : String(++n).padStart(2, '0') }))
+}
+
+export function setAitbGames(saved: AitbGameEdit[] | null) {
+  ALL = aitbNumbered(saved?.length ? saved.map(mergeGame) : [...AITB_DEFAULTS])
+  AITB_ACTIVITIES.splice(0, AITB_ACTIVITIES.length, ...ALL.filter(a => !a.hidden))
+}
+
+/** What gets written to aitb_settings.activities for one game. */
+export function aitbGameEdit(a: AitbActivity): AitbGameEdit {
+  const out: Record<string, unknown> = { id: a.id, hidden: !!a.hidden }
+  for (const k of AITB_EDITABLE) out[k] = a[k]
+  if (a.hero.startsWith('data:')) out.hero = '' // the colour-wash placeholder is never stored
+  return out as AitbGameEdit
+}
+
+let ready: Promise<void> | null = null
+export function loadAitbGames(): Promise<void> {
+  // Missing column (SQL not run yet) or offline → built-ins, never a crash.
+  ready ??= Promise.resolve(supabase.from('aitb_settings').select('activities').eq('id', 1).maybeSingle())
+    .then(({ data }) => setAitbGames((data?.activities as AitbGameEdit[] | null) ?? null), () => {})
+  return ready
+}
+
+/** Lookup across every game, hidden included, so earned points never vanish. */
 export function aitbActivity(id: number): AitbActivity | undefined {
-  return AITB_ACTIVITIES.find(a => a.id === id)
+  return ALL.find(a => a.id === id)
 }
 
 /** How many missions a team may have running at once. Enforced on the board and

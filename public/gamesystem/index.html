@@ -471,7 +471,26 @@ window.addEventListener("DOMContentLoaded",()=>{ syncTeams(); setInterval(syncTe
 
 /* ---------- Router ---------- */
 window.addEventListener("hashchange", render);
-window.addEventListener("DOMContentLoaded", render);
+/* Game list from the Game Hub (aitb_settings.activities), so edits made on
+   /aitb/admin show here too: built-in games keep their own demo screens with
+   the edited text, added games use the generic screen, deleted ones drop out.
+   Offline or never edited → the GAMES list above. First render waits for it so
+   a deep link to an added game (#/game/11) resolves. */
+async function syncGames(){
+  try{
+    const r=await fetch(HUB_URL+"/rest/v1/aitb_settings?select=activities&id=eq.1",
+      {headers:{apikey:HUB_KEY,Authorization:"Bearer "+HUB_KEY}});
+    if(!r.ok) return;
+    const list=(await r.json())[0]?.activities;
+    if(!Array.isArray(list)||!list.length) return;
+    const next=list.filter(s=>!s.hidden).map(s=>{
+      const base=GAMES.find(g=>g.id===s.id)||{module:null,act:String(s.id).padStart(2,"0")};
+      return {...base,...s,outCol:s.color||base.outCol};
+    });
+    GAMES.splice(0,GAMES.length,...next);
+  }catch(e){/* offline — keep the built-in list */}
+}
+window.addEventListener("DOMContentLoaded", ()=>{ syncGames().then(render); });
 // live-sync across tabs on the same device (e.g. projector tab + admin tab)
 window.addEventListener("storage", e=>{ if(e.key===LS_KEY){ state=load(); ensureCups(); render(); } });
 function go(h){ location.hash = h; }
@@ -677,7 +696,7 @@ function viewGame(g){
     <span class="pill">ACT ${g.act} of 10</span>
   </div>
   <div class="hero slim">
-    <img src="hero${g.id}.jpg" alt="" onerror="this.src='hero.png'">
+    <img src="${esc(g.hero||`/aitb/hero${g.id}.jpg`)}" alt="" onerror="this.src='hero.png'">
     <div class="ovs">
       <div class="ghead">
         <div class="em">${g.emoji}</div>
@@ -702,6 +721,8 @@ function viewGame(g){
       <p style="margin:0 0 14px;font-size:14px;color:#c9cdf0">${esc(g.learning)}</p>
       <p class="section-label">Suggested AI apps</p>
       <div class="row">${g.apps.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</div>
+      ${g.demos&&g.demos.length?`<hr/><p class="section-label">Try the example</p>
+      <div class="row">${g.demos.map(d=>`<a class="btn" href="${esc(d.url)}" target="_blank" rel="noopener">${d.emoji} ${esc(d.label)} ↗</a>`).join("")}</div>`:""}
     </div>
     <div>
       <div class="card pad" style="margin-bottom:16px">
@@ -2217,7 +2238,7 @@ function viewMission(g){
   if(!g) return `<div class="empty">Mission not found. <a href="#/">Home</a></div>`;
   return `<div class="mission" style="max-width:560px;margin:0 auto">
     <div class="hero slim">
-      <img src="hero${g.id}.jpg" alt="" onerror="this.src='hero.png'">
+      <img src="${esc(g.hero||`/aitb/hero${g.id}.jpg`)}" alt="" onerror="this.src='hero.png'">
       <div class="ovs">
         <div class="ghead">
           <div class="em">${g.emoji}</div>
@@ -2237,6 +2258,8 @@ function viewMission(g){
       <hr/>
       <p class="section-label">Suggested AI apps</p>
       <div class="row">${g.apps.map(a=>`<span class="tag">${esc(a)}</span>`).join("")}</div>
+      ${g.demos&&g.demos.length?`<hr/><p class="section-label">Try the example</p>
+      <div class="row">${g.demos.map(d=>`<a class="btn" href="${esc(d.url)}" target="_blank" rel="noopener">${d.emoji} ${esc(d.label)} ↗</a>`).join("")}</div>`:""}
     </div>
     ${g.id===3?`
     <div class="card pad" style="margin-top:14px">
