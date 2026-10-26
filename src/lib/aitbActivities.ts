@@ -79,6 +79,8 @@ export const AITB_APPS: Record<string, AitbApp> = {
   'Kling':      { url: 'https://app.klingai.com' },
   'Veo (Flow)': { url: 'https://labs.google/fx/tools/flow', note: 'Sign in with your Google account', sub: 'Google Flow' },
   'Higgsfield': { url: 'https://higgsfield.ai' },
+  'Adobe Firefly': { url: 'https://firefly.adobe.com', sub: 'Image to video' },
+  'Luma Labs':  { url: 'https://lumalabs.ai', sub: 'Dream Machine video' },
   // Web-app builders
   'Lovable':    { url: 'https://lovable.dev' },
   'Bolt':       { url: 'https://bolt.new' },

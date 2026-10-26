@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { ParticleBackground } from '../components/ParticleBackground'
 import { AitbRaceStage, type Ranked } from '../components/AitbRaceStage'
@@ -37,17 +37,33 @@ const SLIDE_TABS: { v: View; label: string; color: string }[] = [
   { v: 'closing', label: '🎬 Closing', color: '#fbbf24' },
 ]
 
+/* Opens the player demo (real player view, throwaway data) in a new tab. */
+function DemoLink() {
+  return (
+    <a href="/aitb/home?demo=1" target="_blank" rel="noopener noreferrer"
+      className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+      style={{ background: 'rgba(255,255,255,0.06)', color: '#22d3ee', border: '1.5px solid #22d3ee55' }}>
+      🎓 Demo
+    </a>
+  )
+}
+
 function SlideNav({ view, setView }: { view: View; setView: (v: View) => void }) {
   return (
     <>
       {SLIDE_TABS.map(t => (
-        <button key={String(t.v)} onClick={() => setView(t.v)}
-          className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
-          style={view === t.v
-            ? { background: t.color, color: '#000' }
-            : { background: 'rgba(255,255,255,0.06)', color: t.color, border: `1.5px solid ${t.color}55` }}>
-          {t.label}
-        </button>
+        <Fragment key={String(t.v)}>
+          <button onClick={() => setView(t.v)}
+            className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"
+            style={view === t.v
+              ? { background: t.color, color: '#000' }
+              : { background: 'rgba(255,255,255,0.06)', color: t.color, border: `1.5px solid ${t.color}55` }}>
+            {t.label}
+          </button>
+          {t.v === 'how' && (
+            <DemoLink />
+          )}
+        </Fragment>
       ))}
       <FullscreenButton />
     </>
@@ -339,7 +355,12 @@ function GameNav({ view, setView }: { view: View; setView: (v: View) => void }) 
       <FullscreenButton />
       {/* Same list the slide deck's own nav uses, so a tab added there can
           never go missing here (Opening and Closing did exactly that). */}
-      {SLIDE_TABS.map(t => slideBtn(t.v, t.label, t.color))}
+      {SLIDE_TABS.map(t => (
+        <Fragment key={String(t.v)}>
+          {slideBtn(t.v, t.label, t.color)}
+          {t.v === 'how' && <DemoLink />}
+        </Fragment>
+      ))}
       {AITB_ACTIVITIES.map(a => (
         <button key={a.id} onClick={() => setView(a.id)}
           className="px-4 py-2 rounded-xl font-black text-lg transition-all hover:scale-105"

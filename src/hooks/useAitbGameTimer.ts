@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/aitbDb'
 
 /** Whole-game countdown shared by admin, projector and mission pages.
  *  Follows aitb_settings.game_ends_at over realtime; null = no timer set. */

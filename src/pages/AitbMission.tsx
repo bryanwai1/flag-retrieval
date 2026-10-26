@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, AITB_TEAM_KEY, AITB_PW_PREFILL } from '../lib/aitbDb'
 import { AITB_ACTIVITIES, aitbActivity, AITB_POINTS, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
 import { AitbBonusBar } from '../components/AitbBonusBar'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
@@ -10,7 +10,7 @@ import { AitbAppLinks } from '../components/AitbAppLinks'
 import { useAitbReactions, AITB_REACTIONS } from '../hooks/useAitbReactions'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
-const TEAM_KEY = 'aitb_my_team'
+const TEAM_KEY = AITB_TEAM_KEY
 // Same key the admin page sets on unlock — players never have it, so they
 // stay locked to the single activity their QR opened (scan again = next game).
 const ADMIN_UNLOCK_KEY = 'aitb_admin_unlocked'
@@ -244,7 +244,7 @@ export function AitbMission() {
   const isAdmin = !preview && sessionStorage.getItem(ADMIN_UNLOCK_KEY) === '1'
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-24">
+    <div className="min-h-screen bg-gray-950 text-white pb-24 lg:pb-6 lg:flex lg:flex-col mission-fit">
       {/* Back button. Admins go to the admin panel; a player who has already
           picked their team goes to their board (score + draw new missions). */}
       {isAdmin ? (
@@ -272,19 +272,22 @@ export function AitbMission() {
         </div>
       )}
       {/* Hero */}
-      <div className="relative">
-        <img src={activity.hero} alt="" className="w-full aspect-video object-cover" />
+      {/* Laptop / projector (lg+): two columns so the whole mission fits one screen. Phones stay single-column. */}
+      <div className="lg:max-w-6xl lg:mx-auto lg:pt-12 lg:px-4 lg:w-full lg:flex-1 lg:flex lg:flex-col">
+      <div className="relative max-w-lg mx-auto lg:max-w-none lg:w-full lg:rounded-3xl lg:overflow-hidden lg:border lg:border-white/10 lg:flex-1 lg:min-h-[104px] lg:max-h-[45svh]">
+        <img src={activity.hero} alt="" className="w-full aspect-video max-h-[40svh] object-cover lg:absolute lg:inset-0 lg:h-full lg:max-h-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent" />
-        <div className="absolute bottom-3 left-4 right-4">
+        <div className="absolute bottom-3 left-4 right-4 lg:left-6">
           <div className="text-xs font-black tracking-widest uppercase" style={{ color: activity.color }}>
             Activity {activity.act} · {activity.mins} min · {activity.outType}
           </div>
-          <h1 className="text-3xl font-black leading-tight">{activity.emoji} {activity.name}</h1>
+          <h1 className="text-3xl lg:text-2xl font-black leading-tight">{activity.emoji} {activity.name}</h1>
+          <p className="hidden lg:block text-gray-300 text-sm">{activity.tagline}</p>
         </div>
       </div>
 
-      <div className="px-4 pt-4 max-w-lg mx-auto">
-        <p className="text-gray-300 text-base mb-4">{activity.tagline}</p>
+      <div className="px-4 pt-4 max-w-lg mx-auto lg:max-w-none">
+        <p className="text-gray-300 text-base mb-4 lg:hidden">{activity.tagline}</p>
 
         {/* Team picker */}
         {!team && (
@@ -307,8 +310,10 @@ export function AitbMission() {
 
         {team && (
           <>
+            <div className="lg:mb-3">
+            <div className="lg:h-full">
             {/* Team + points bar */}
-            <div className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4"
+            <div className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4 lg:mb-0 lg:h-full"
               style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${team.color}44` }}>
               <span className="font-black" style={{ color: team.color }}>● {team.name}</span>
               {!preview && (
@@ -319,6 +324,12 @@ export function AitbMission() {
               <span className="font-black text-xl" style={{ color: activity.color }}>{points} pts</span>
             </div>
 
+            </div>
+
+            </div>
+
+            <div className="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
+            <div>
             {/* Check-in / timer */}
             {!progress?.scanned_at ? (
               <div className="mb-4">
@@ -339,24 +350,23 @@ export function AitbMission() {
               <AitbBonusBar elapsedMs={elapsedMs} activity={activity}
                 completed={!!progress.completed_at} bankedBonus={progress.bonus} />
             )}
-
             {/* Steps — fun point form */}
-            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
+            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2 break-after-avoid">
               ✅ Tick as you go — +{AITB_POINTS.step} each!
             </div>
-            <div className="flex flex-col gap-2 mb-5">
+            <div className="flex flex-col gap-2 mb-5 lg:mb-3 lg:gap-1.5">
               {activity.steps.map((s, i) => {
                 const done = progress?.steps_done.includes(i) ?? false
                 const locked = !progress?.scanned_at || !!progress?.completed_at
                 return (
                   <button key={i} onClick={() => toggleStep(i)} disabled={locked}
-                    className="flex items-center gap-3 text-left rounded-2xl px-4 py-3 transition-all active:scale-[0.98]"
+                    className="flex items-center gap-3 text-left rounded-2xl px-4 py-3 lg:py-2 transition-all active:scale-[0.98]"
                     style={{
                       background: done ? `${activity.color}1e` : 'rgba(255,255,255,0.05)',
                       border: `2px solid ${done ? activity.color : 'rgba(255,255,255,0.1)'}`,
                       opacity: locked && !done ? 0.6 : 1,
                     }}>
-                    <span className="text-3xl">{activity.stepEmojis[i]}</span>
+                    <span className="text-3xl lg:text-2xl">{activity.stepEmojis[i]}</span>
                     <span className={`flex-1 font-bold ${done ? 'line-through opacity-70' : ''}`}>{s}</span>
                     <span className="text-2xl">{done ? '✅' : '⬜'}</span>
                   </button>
@@ -364,6 +374,8 @@ export function AitbMission() {
               })}
             </div>
 
+            </div>
+            <div>
             {/* Optional reassuring disclaimer (e.g. act 04 tree photos) */}
             {activity.note && (
               <div className="rounded-2xl px-4 py-3 mb-5 flex items-start gap-2"
@@ -415,21 +427,21 @@ export function AitbMission() {
             {activity.gallery && (
               <>
                 <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🖼️ The 10 target pictures</div>
-                <div className="rounded-2xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${activity.color}44` }}>
-                  <p className="text-sm font-bold mb-3" style={{ color: activity.color }}>
+                <div className="rounded-2xl p-4 mb-5 lg:p-3 lg:mb-3" style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${activity.color}44` }}>
+                  <p className="text-sm font-bold mb-3 lg:text-xs lg:mb-2" style={{ color: activity.color }}>
                     ⚠️ You must REGENERATE the picture with AI — then show the marshal your picture AND the prompt you used. No prompt = no points!
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
                     {activity.gallery.map((s, i) => (
                       <button key={s.img} onClick={() => setZoomImg(i)} className="text-left">
                         <img src={s.img} alt={s.label} loading="lazy"
                           className="rounded-xl w-full aspect-square object-cover"
                           style={{ border: `2px solid ${activity.color}44` }} />
-                        <div className="text-xs font-bold text-gray-300 mt-1">#{i + 1} · {s.label}</div>
+                        <div className="text-xs font-bold text-gray-300 mt-1 lg:hidden">#{i + 1} · {s.label}</div>
                       </button>
                     ))}
                   </div>
-                  <p className="text-gray-500 text-xs mt-2">Tap a picture to see it big.</p>
+                  <p className="text-gray-500 text-xs mt-2 lg:hidden">Tap a picture to see it big.</p>
                 </div>
               </>
             )}
@@ -479,13 +491,13 @@ export function AitbMission() {
             )}
 
             {/* Apps — tap to open the tool in your browser */}
-            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">🤖 Your AI tools — tap to open</div>
-            <div className="mb-5">
+            <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2 break-after-avoid">🤖 Your AI tools — tap to open</div>
+            <div className="mb-5 lg:mb-3">
               <AitbAppLinks apps={activity.apps} color={activity.color} />
             </div>
 
             {/* Full details — tucked away so the page stays fun */}
-            <details className="rounded-2xl mb-6 overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.08)' }}>
+            <details className="rounded-2xl mb-6 lg:mb-3 overflow-hidden" style={{ border: '2px solid rgba(255,255,255,0.08)' }}>
               <summary className="px-4 py-3 cursor-pointer list-none font-black text-sm" style={{ background: 'rgba(255,255,255,0.04)', color: activity.color }}>
                 📖 More info
               </summary>
@@ -503,8 +515,8 @@ export function AitbMission() {
                 <div className="text-gray-300 font-bold mt-1">{points} points earned{progress.bonus ? ` — incl. +${progress.bonus} speed bonus!` : ''}</div>
               </div>
             ) : progress?.scanned_at ? (
-              <button onClick={() => { setPwOpen(true); setPwError('') }}
-                className="w-full py-4 rounded-2xl font-black text-lg transition-all active:scale-95"
+              <button onClick={() => { setPwOpen(true); setPw(AITB_PW_PREFILL); setPwError('') }}
+                className="w-full py-4 lg:py-3 rounded-2xl font-black text-lg transition-all active:scale-95"
                 style={{ background: 'rgba(52,211,153,0.15)', border: '2px solid #34d399', color: '#34d399' }}>
                 🏁 DONE? CALL THE MARSHAL!
               </button>
@@ -515,12 +527,15 @@ export function AitbMission() {
 
             {/* Back to the team board: live score + draw the next mission */}
             <a href="/aitb/home"
-              className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-black text-base mt-3 transition-all active:scale-95"
+              className="flex lg:hidden items-center justify-center gap-2 w-full py-4 rounded-2xl font-black text-base mt-3 transition-all active:scale-95"
               style={{ background: 'rgba(167,139,250,0.14)', border: '2px solid #a78bfa66', color: '#a78bfa' }}>
               🚀 Back to my board — score &amp; new missions
             </a>
+            </div>
+            </div>
           </>
         )}
+      </div>
       </div>
 
       {/* Password modal */}
@@ -603,14 +618,14 @@ function CheerBar({ teamId, teamName, teamColor }: { teamId: string; teamName: s
   }
 
   return (
-    <div className="rounded-2xl px-4 py-3 mt-5" style={{ background: 'rgba(255,255,255,0.04)', border: `2px solid ${teamColor}44` }}>
+    <div className="rounded-2xl px-4 py-3 mt-5 lg:mt-3 lg:py-2" style={{ background: 'rgba(255,255,255,0.04)', border: `2px solid ${teamColor}44` }}>
       <div className="text-xs font-black tracking-widest uppercase text-gray-400 mb-2">
         📣 Cheer <span style={{ color: teamColor }}>{teamName}</span> on the big screen
       </div>
       <div className="flex justify-between gap-2">
         {AITB_REACTIONS.map(e => (
           <button key={e} onClick={() => fire(e)} aria-label={`Send ${e}`}
-            className="flex-1 text-3xl h-14 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+            className="flex-1 text-3xl h-14 lg:h-10 lg:text-2xl rounded-2xl flex items-center justify-center transition-all active:scale-90"
             style={{
               background: sent === e ? `${teamColor}33` : 'rgba(255,255,255,0.07)',
               border: `1.5px solid ${sent === e ? teamColor : 'rgba(255,255,255,0.14)'}`,
@@ -619,7 +634,7 @@ function CheerBar({ teamId, teamName, teamColor }: { teamId: string; teamName: s
           </button>
         ))}
       </div>
-      <div className="text-gray-500 text-xs font-bold mt-2 text-center">
+      <div className="text-gray-500 text-xs font-bold mt-2 text-center lg:hidden">
         {sent ? `${sent} sent to the projector!` : 'Tap an emoji — it pops on the projector 🎉'}
       </div>
     </div>

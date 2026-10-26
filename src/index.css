@@ -538,3 +538,10 @@ body {
   .aitb-halo, .aitb-orbit, .aitb-twinkle { animation: none; }
   .aitb-twinkle { opacity: 0.7; }
 }
+
+/* AITB mission page on short laptop screens: scale the whole page down so it fits one screen without scrolling. */
+@media (min-width: 1024px) and (max-height: 940px) { .mission-fit { zoom: .9; min-height: calc(100svh / .9) !important; } }
+@media (min-width: 1024px) and (max-height: 860px) { .mission-fit { zoom: .85; min-height: calc(100svh / .85) !important; } }
+@media (min-width: 1024px) and (max-height: 800px) { .mission-fit { zoom: .8; min-height: calc(100svh / .8) !important; } }
+@media (min-width: 1024px) and (max-height: 740px) { .mission-fit { zoom: .75; min-height: calc(100svh / .75) !important; } }
+@media (min-width: 1024px) and (max-height: 680px) { .mission-fit { zoom: .7; min-height: calc(100svh / .7) !important; } }

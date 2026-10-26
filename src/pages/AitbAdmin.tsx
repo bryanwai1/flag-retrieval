@@ -428,6 +428,9 @@ export function AitbAdmin() {
           <a href="/aitb" aria-label="Projector" className="px-3 py-2 rounded-xl font-bold text-sm" style={{ background: '#2dd4bf22', color: '#2dd4bf', border: '1.5px solid #2dd4bf55' }}>
             📺<span className="hidden sm:inline"> Projector</span>
           </a>
+          <a href="/aitb/home?demo=1" target="_blank" rel="noopener noreferrer" aria-label="Player demo" className="px-3 py-2 rounded-xl font-bold text-sm" style={{ background: '#22d3ee22', color: '#22d3ee', border: '1.5px solid #22d3ee55' }}>
+            🎓<span className="hidden sm:inline"> Demo</span>
+          </a>
           <button onClick={exportResults} aria-label="Export results" className="px-3 py-2 rounded-xl font-bold text-sm" style={{ background: '#a3e63522', color: '#a3e635', border: '1.5px solid #a3e63555' }}>
             ⬇️<span className="hidden sm:inline"> Export</span>
           </button>

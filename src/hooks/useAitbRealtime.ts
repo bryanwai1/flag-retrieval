@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/aitbDb'
 
 type Sub = { table: string; filter?: string }
 

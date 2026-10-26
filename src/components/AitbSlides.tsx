@@ -9,7 +9,7 @@
  * the app, and everything is sized for the back of a function room.
  */
 import { QRCodeSVG } from 'qrcode.react'
-import { AITB_POINTS } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, AITB_POINTS } from '../lib/aitbActivities'
 import { AitbClientLogo, type AitbLogo } from './AitbClientLogo'
 
 /** Defaults for the editable slide text, used when Admin leaves a field blank.
@@ -70,7 +70,7 @@ export function AitbTitleSlide({ eventName }: {
         </h1>
 
         <div className="aitb-sub">
-          <span>10 missions</span><i>·</i><span>2 at a time</span><i>·</i><span>fastest team wins</span>
+          <span>{AITB_ACTIVITIES.length} missions</span><i>·</i><span>2 at a time</span><i>·</i><span>fastest team wins</span>
         </div>
 
         {/* orbiting tool emoji */}

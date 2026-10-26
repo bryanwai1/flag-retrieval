@@ -49,7 +49,7 @@ export function AitbBonusBar({ elapsedMs, activity, completed, bankedBonus, scal
     return ((tiers[i].uptoMin - from) / endMin) * 100
   }
   return (
-    <div className="rounded-2xl px-4 py-3 mb-4" style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)' }}>
+    <div className="rounded-2xl px-4 py-3 mb-4 lg:mb-0" style={{ background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(255,255,255,0.1)' }}>
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-gray-400 text-xs font-bold uppercase tracking-wider">{completed ? 'Finished in' : '⏱ Your team timer'}</div>
@@ -93,7 +93,7 @@ export function AitbBonusBar({ elapsedMs, activity, completed, bankedBonus, scal
         <span style={{ color: !completed && shown === 0 ? '#f87171' : undefined }}>0</span>
       </div>
       {!completed && (
-        <div className="text-gray-500 text-xs font-bold mt-1">
+        <div className="text-gray-500 text-xs font-bold mt-1 lg:hidden">
           ⚡ Every milestone you pass, the bonus drops — finish before the bar hits the end!
         </div>
       )}

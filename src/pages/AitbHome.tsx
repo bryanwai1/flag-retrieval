@@ -18,14 +18,14 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, AITB_TEAM_KEY, AITB_PW_PREFILL, IS_DEMO, resetDemo } from '../lib/aitbDb'
 import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, AITB_MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress } from '../types/database'
 
 const MAX_ACTIVE = AITB_MAX_ACTIVE
-const TEAM_KEY = 'aitb_my_team'
+const TEAM_KEY = AITB_TEAM_KEY
 const TOTAL = AITB_ACTIVITIES.length
 // Watch every team's progress so the live rank chip updates when rivals score.
 const HOME_SUBS = [{ table: 'aitb_progress' }, { table: 'aitb_teams' }]
@@ -335,7 +335,7 @@ export function AitbHome() {
           {menuOpen && (
             <div className="rd-menu">
               <button onClick={() => { localStorage.removeItem(TEAM_KEY); setTeamId(null); setMenuOpen(false) }}>Switch team</button>
-              <button onClick={() => setMenuOpen(false)}>Close</button>
+              {IS_DEMO && <button onClick={() => { resetDemo(); localStorage.removeItem(TEAM_KEY); setTeamId(null); setRows([]); setAllRows([]); setDraw(null); setMenuOpen(false) }}>Reset demo</button>}
             </div>
           )}
         </header>
@@ -465,7 +465,7 @@ export function AitbHome() {
                   <div className="rd-slot-meta">⏱ {fmtElapsed(now - new Date(row.scanned_at!).getTime())} · {nowPts} pts{liveBonus ? ` · ⚡${liveBonus}` : ''}</div>
                   <div className="rd-slot-actions">
                     <a className="rd-btn rd-btn-open" href={`/aitb/m/${act.id}`}>Steps →</a>
-                    <button className="rd-btn rd-btn-done" onClick={() => { setCompleting(act.id); setPwd(''); setPwdErr('') }} disabled={busy}>Complete</button>
+                    <button className="rd-btn rd-btn-done" onClick={() => { setCompleting(act.id); setPwd(AITB_PW_PREFILL); setPwdErr('') }} disabled={busy}>Complete</button>
                   </div>
                 </div>
               )
