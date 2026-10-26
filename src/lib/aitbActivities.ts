@@ -44,6 +44,8 @@ export type AitbActivity = {
   /** Interactive in-app system rendered on the mission page (Nerf cup picker,
    *  roulette spin, card / animal draw). Results save to aitb_progress.words. */
   module?: AitbModule
+  /** Id of a game this one unlocks after: a team can't start it until that game is completed. */
+  requires?: number
   /** Hidden from players by the admin. Kept in the list so points already
    *  earned on it still count. */
   hidden?: boolean
@@ -316,7 +318,7 @@ export const AITB_DEFAULTS: readonly AitbActivity[] = [
    AITB page renders (see App.tsx), so edits reach phones on their next load. */
 export const AITB_EDITABLE = [
   'act', 'name', 'emoji', 'color', 'outType', 'tagline', 'desc', 'learning', 'steps', 'stepEmojis',
-  'props', 'apps', 'mins', 'difficulty', 'note', 'hero', 'demos',
+  'props', 'apps', 'mins', 'difficulty', 'note', 'hero', 'demos', 'requires',
 ] as const
 export type AitbGameEdit = Pick<AitbActivity, 'id'> & Partial<Pick<AitbActivity, typeof AITB_EDITABLE[number] | 'hidden'>>
 
@@ -374,6 +376,14 @@ export function loadAitbGames(): Promise<void> {
   ready ??= Promise.resolve(supabase.from('aitb_settings').select('activities').eq('id', 1).maybeSingle())
     .then(({ data }) => setAitbGames((data?.activities as AitbGameEdit[] | null) ?? null), () => {})
   return ready
+}
+
+/** The game a team must finish before it can start `a`, or null when `a` is unlocked.
+ *  `rows` are the team's progress rows. A missing or hidden prerequisite never blocks. */
+export function aitbLock(a: AitbActivity, rows: { activity_id: number; completed_at: string | null }[]): AitbActivity | null {
+  const pre = a.requires != null ? ALL.find(g => g.id === a.requires && !g.hidden) : undefined
+  if (!pre) return null
+  return rows.some(r => r.activity_id === pre.id && r.completed_at) ? null : pre
 }
 
 /** Lookup across every game, hidden included, so earned points never vanish. */

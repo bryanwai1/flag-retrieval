@@ -959,6 +959,12 @@ function GameForm({ draft, setDraft, say, onSave, onCancel, onReset }: {
       <Field label="Tagline (one line under the title)"><input value={draft.tagline} onChange={e => set('tagline', e.target.value)} className={FIELD} style={FIELD_STYLE} /></Field>
       <Field label="Description"><textarea rows={3} value={draft.desc} onChange={e => set('desc', e.target.value)} className={`${FIELD} resize-y`} style={FIELD_STYLE} /></Field>
       <Field label="What teams learn"><input value={draft.learning} onChange={e => set('learning', e.target.value)} className={FIELD} style={FIELD_STYLE} /></Field>
+      <Field label="Unlocks after (teams can't start this game until they finish that one)">
+        <select value={draft.requires ?? ''} onChange={e => set('requires', e.target.value ? Number(e.target.value) : undefined)} className={FIELD} style={FIELD_STYLE}>
+          <option value="">Always open</option>
+          {aitbAllGames().filter(g => g.id !== draft.id).map(g => <option key={g.id} value={g.id}>{g.emoji} {g.name}</option>)}
+        </select>
+      </Field>
 
       <Field group label="Steps (emoji + instruction)">
         <div className="flex flex-col gap-2">

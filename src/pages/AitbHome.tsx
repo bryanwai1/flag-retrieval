@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured, AITB_TEAM_KEY, AITB_PW_PREFILL, IS_DEMO, resetDemo } from '../lib/aitbDb'
-import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, AITB_MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, type AitbActivity } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbActivity, AITB_COMPLETE, AITB_MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, aitbMaxPoints, aitbLock, type AitbActivity } from '../lib/aitbActivities'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
 import type { AitbTeam, AitbProgress } from '../types/database'
@@ -229,14 +229,16 @@ export function AitbHome() {
 
   const startMission = useCallback(async (aid: number) => {
     if (!teamId || busyRef.current || activeRows.length >= MAX_ACTIVE || timeUp) return
+    const wanted = aitbActivity(aid)
+    if (wanted && aitbLock(wanted, rows)) return
     busyRef.current = true; setBusy(true)
     // Re-check the slot cap against fresh DB state — another phone on this team
     // may have started a mission since our last sync (the 2-slot cap is otherwise
     // only enforced in local React state, so two phones could both slip past it).
     const { data: fresh } = await supabase.from('aitb_progress')
-      .select('scanned_at,completed_at').eq('team_id', teamId)
+      .select('activity_id,scanned_at,completed_at').eq('team_id', teamId)
     const activeNow = (fresh ?? []).filter(r => r.scanned_at && !r.completed_at).length
-    if (activeNow >= MAX_ACTIVE) {
+    if (activeNow >= MAX_ACTIVE || (wanted && aitbLock(wanted, fresh ?? []))) {
       busyRef.current = false; setBusy(false)
       setDraw(null)
       await load()
@@ -493,15 +495,16 @@ export function AitbHome() {
                   {draw.map((aid, i) => {
                     const act = aitbActivity(aid)!
                     const diff = difficultyOf(act)
+                    const lockedBy = aitbLock(act, rows)
                     return (
-                      <div key={aid} className="rd-card" style={{ animationDelay: `${i * 0.09}s` }}>
-                        <div className="rd-card-hero" style={{ backgroundImage: `url(${act.hero})` }}>
+                      <div key={aid} className="rd-card" style={{ animationDelay: `${i * 0.09}s`, ...(lockedBy ? { opacity: 0.7 } : {}) }}>
+                        <div className="rd-card-hero" style={{ backgroundImage: `url(${act.hero})`, ...(lockedBy ? { filter: 'grayscale(1) brightness(0.7)' } : {}) }}>
                           <span className="rd-card-diff" style={{ background: diff.color }}>{diff.label}</span>
                         </div>
                         <div className="rd-card-title">{act.emoji} {act.name}</div>
                         <div className="rd-card-pts">⏱ {act.mins}m · up to {aitbMaxPoints(act).toLocaleString()} pts</div>
-                        <button className="rd-card-start" style={{ background: act.color }} onClick={() => startMission(aid)} disabled={busy || activeRows.length >= MAX_ACTIVE}>
-                          Start Mission
+                        <button className="rd-card-start" style={{ background: lockedBy ? '#475569' : act.color }} onClick={() => startMission(aid)} disabled={busy || activeRows.length >= MAX_ACTIVE || !!lockedBy}>
+                          {lockedBy ? `🔒 Finish ${lockedBy.name} first` : 'Start Mission'}
                         </button>
                       </div>
                     )

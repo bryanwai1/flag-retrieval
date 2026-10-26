@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase, isSupabaseConfigured, AITB_TEAM_KEY, AITB_PW_PREFILL } from '../lib/aitbDb'
-import { AITB_ACTIVITIES, aitbActivity, AITB_POINTS, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, type AitbActivity } from '../lib/aitbActivities'
+import { AITB_ACTIVITIES, aitbActivity, AITB_POINTS, AITB_MAX_ACTIVE as MAX_ACTIVE, aitbSpeedBonus, aitbProgressPoints, aitbLock, type AitbActivity } from '../lib/aitbActivities'
 import { AitbBonusBar } from '../components/AitbBonusBar'
 import { useAitbGameTimer, fmtCountdown } from '../hooks/useAitbGameTimer'
 import { useAitbRealtime } from '../hooks/useAitbRealtime'
@@ -54,6 +54,7 @@ export function AitbMission() {
   const [wordsSaved, setWordsSaved] = useState(false)
   const [zoomImg, setZoomImg] = useState<number | null>(null)
   const [capError, setCapError] = useState('')
+  const [lockedBy, setLockedBy] = useState<AitbActivity | null>(null)
 
   const wordsCfg = activity?.wordsInput
 
@@ -86,6 +87,8 @@ export function AitbMission() {
         .from('aitb_progress').select('*')
         .eq('team_id', tid).eq('activity_id', activity.id).maybeSingle()
       setProgress(prog ?? null)
+      const { data: mine } = await supabase.from('aitb_progress').select('activity_id,completed_at').eq('team_id', tid)
+      setLockedBy(aitbLock(activity, mine ?? []))
     }
     setLoading(false)
   }, [activity, preview])
@@ -124,6 +127,12 @@ export function AitbMission() {
     // team could run three missions at once and out-earn everyone else.
     const { data: fresh } = await supabase.from('aitb_progress')
       .select('activity_id,scanned_at,completed_at').eq('team_id', teamId)
+    const stillLocked = aitbLock(activity, fresh ?? [])
+    if (stillLocked) {
+      busyRef.current = false
+      setLockedBy(stillLocked)
+      return
+    }
     const activeNow = (fresh ?? []).filter(r =>
       r.scanned_at && !r.completed_at && r.activity_id !== activity.id).length
     if (activeNow >= MAX_ACTIVE) {
@@ -333,11 +342,19 @@ export function AitbMission() {
             {/* Check-in / timer */}
             {!progress?.scanned_at ? (
               <div className="mb-4">
+                {lockedBy ? (
+                  <div className="rounded-2xl px-4 py-4 text-center font-bold"
+                    style={{ background: 'rgba(148,163,184,0.12)', border: '2px solid rgba(148,163,184,0.35)', color: '#cbd5e1' }}>
+                    🔒 Finish <span style={{ color: lockedBy.color }}>{lockedBy.emoji} {lockedBy.name}</span> first to unlock this mission.
+                    <a href="/aitb/home" className="block mt-2 underline text-sm">🚀 Go to my board</a>
+                  </div>
+                ) : (
                 <button onClick={checkIn}
                   className="w-full py-5 rounded-2xl font-black text-xl transition-all active:scale-95 animate-pulse"
                   style={{ background: activity.color, color: '#000' }}>
                   🚀 START MISSION (+{AITB_POINTS.scan} pts)
                 </button>
+                )}
                 {capError && (
                   <div className="mt-3 rounded-2xl px-4 py-3 text-sm font-bold text-amber-300"
                     style={{ background: 'rgba(251,191,36,0.12)', border: '1.5px solid rgba(251,191,36,0.4)' }}>
