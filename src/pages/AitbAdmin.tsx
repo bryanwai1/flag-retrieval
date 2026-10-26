@@ -225,7 +225,10 @@ export function AitbAdmin() {
   }
 
   // Split on newlines OR commas so a pasted list or a single line both work.
-  const parseBulk = (raw: string) => raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+  // A lone number (e.g. "8") means "make Team 1 … Team 8".
+  const parseBulk = (raw: string) => /^\s*\d+\s*$/.test(raw)
+    ? Array.from({ length: Math.min(Number(raw), 100) }, (_, i) => `Team ${i + 1}`)
+    : raw.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
 
   const bulkAddTeams = async () => {
     const requested = parseBulk(bulkText)
@@ -473,9 +476,9 @@ export function AitbAdmin() {
                   ⚡ Bulk add teams
                 </summary>
                 <div className="px-3 pb-3">
-                  <p className="text-gray-500 text-xs mb-2">One team per line (or comma-separated). Existing names &amp; duplicates are skipped.</p>
+                  <p className="text-gray-500 text-xs mb-2">Type a number (e.g. <b>8</b>) to get Team 1 … Team 8, or list names one per line / comma-separated. Existing names &amp; duplicates are skipped.</p>
                   <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={5} aria-label="Team names"
-                    placeholder={'Team Alpha\nTeam Bravo\nTeam Charlie'}
+                    placeholder={'8   (→ Team 1 … Team 8)\n\nor names:\nTeam Alpha\nTeam Bravo'}
                     className="w-full bg-gray-800/60 rounded-lg px-3 py-2 font-bold outline-none resize-y" style={FIELD_STYLE} />
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={bulkAddTeams} className="px-4 py-2 rounded-lg font-black" style={{ background: '#2dd4bf', color: '#000' }}>
