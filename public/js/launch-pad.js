@@ -13,7 +13,7 @@
  *         3 Cosmic Vote (vote + submit QR, live ranked scoreboard)
  *         4 Spotlight (poster carousel, auto-swipe or paused by the admin)
  */
-import { makeStore, drawQr, startStarfield, esc, slideChannel, spotPosition } from './li-store.js?v=20261108c';
+import { makeStore, drawQr, startStarfield, esc, slideChannel, spotPosition } from './li-store.js?v=20261108d';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -158,7 +158,7 @@ function applyTally(t) {
   state.voters = t.voters || 0;
   state.votingOpen = !!t.voting_open;
   state.remote = t.slide != null;
-  if (t.now) state.skew = Date.parse(t.now) - Date.now();
+  if (t.now) state.skew = Date.parse(t.now) - (t._recv || Date.now());
   if (Date.now() < state.guardUntil) return;
   if (t.spot && t.spot.at) state.spot = t.spot;
   if (state.remote) goTo(t.slide);
@@ -173,17 +173,44 @@ async function pollSlide() {
   } catch { /* pollGames reports errors */ }
 }
 
+const loadingImg = new Set();
+async function loadImagesInBackground(ids) {
+  ids.forEach(id => loadingImg.add(id));
+  // Posters closest to the one in the Spotlight right now load first.
+  const order = new Map(state.games.map((g, i) => [g.id, i]));
+  const n = state.games.length || 1;
+  const cur = spotPosition(state.spot, state.games, state.skew).index;
+  const dist = (id) => { const d = Math.abs((order.get(id) ?? 0) - cur); return Math.min(d, n - d); };
+  ids = [...ids].sort((a, b) => dist(a) - dist(b));
+  for (let i = 0; i < ids.length; i += 4) {
+    const batch = ids.slice(i, i + 4);
+    try {
+      Object.assign(state.images, await state.store.getImages(batch, 'image'));
+    } catch { /* retried on a later poll */ }
+    batch.forEach(id => loadingImg.delete(id));
+    renderLibrary(false);
+    renderBoard();
+    if (state.slide === 4) renderSpot(false);
+  }
+}
+
 async function pollGames() {
   try {
     const [games, t] = await Promise.all([state.store.listGames(), state.store.tally()]);
     const known = new Set(state.games.map(g => g.id));
     const fresh = games.filter(g => !known.has(g.id));
-    const needImg = games.filter(g => !(g.id in state.images)).map(g => g.id);
-    if (needImg.length) Object.assign(state.images, await state.store.getImages(needImg, 'image'));
+    const needImg = games.filter(g => !(g.id in state.images) && !loadingImg.has(g.id)).map(g => g.id);
+    if (needImg.length && !state.first && needImg.length <= 3) {
+      // A fresh upload or two: wait so the "new launch" toast has its poster.
+      Object.assign(state.images, await state.store.getImages(needImg, 'image'));
+    }
+    // First load (or a big batch): show names now, fill posters in as they arrive.
+    const background = needImg.filter(id => !(id in state.images));
 
     const changed = fresh.length || games.length !== state.games.length;
     state.games = games;
     applyTally(t);
+    if (background.length) loadImagesInBackground(background);
 
     if (!state.first) fresh.forEach(g => queueToast(g));
     state.first = false;
@@ -359,7 +386,7 @@ function renderSpot(force) {
   const stage = $('spotStage');
   const games = state.games;
   const n = games.length;
-  const { index, progress } = spotPosition(state.spot, n, state.skew);
+  const { index, progress } = spotPosition(state.spot, games, state.skew);
   $('spotBar').style.width = state.spot.auto ? `${progress * 100}%` : '0%';
   const mode = $('spotMode');
   mode.className = `lp-pill ${state.spot.auto ? 'open' : 'paused'}`;

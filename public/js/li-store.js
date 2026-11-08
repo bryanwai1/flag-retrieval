@@ -77,7 +77,8 @@ async function liveStore(code) {
       return row.id;
     },
     deleteGame: (id, key) => rpc('li_delete_game', { p_game_id: id, p_host_key: key }),
-    tally: () => rpc('li_tally', { p_code: code }),
+    // _recv = when the reply arrived, so clock skew isn't thrown off by later work.
+    tally: () => rpc('li_tally', { p_code: code }).then(t => ({ ...t, _recv: Date.now() })),
     myVotes: (voterId) => rpc('li_my_votes', { p_code: code, p_voter_id: voterId }),
     castVote: (gameId, voterId) => rpc('li_cast_vote', { p_game_id: gameId, p_voter_id: voterId }),
     unvote: (gameId, voterId) => rpc('li_unvote', { p_game_id: gameId, p_voter_id: voterId }),
@@ -148,6 +149,7 @@ function demoStore(code) {
       const tally = {};
       db.votes.forEach(v => { tally[v.game_id] = (tally[v.game_id] || 0) + 1; });
       return {
+        _recv: Date.now(),
         now: new Date().toISOString(),
         voting_open: db.event.voting_open, slide: db.event.slide || 1,
         spot: db.event.spot || { auto: true, index: 0, seconds: 6, at: new Date(0).toISOString() },
@@ -186,20 +188,53 @@ export function slideChannel(code, demo) {
 }
 
 /**
- * Spotlight carousel position. While auto-swipe is on, the poster index
- * advances every `seconds` from `at`, so every screen lands on the same
- * poster. `skew` = server clock minus this device's clock (ms).
+ * Spotlight carousel position.
+ *
+ * `games` must be sorted by created_at ascending (as listGames returns),
+ * so a game's index never changes when new games are uploaded — they are
+ * only ever appended. While auto-swipe is on, the carousel steps forward
+ * one poster every `seconds` from `at`, wrapping to the first game after
+ * whichever game was last *at that moment*. Replaying that from the shared
+ * `at` timestamp means every screen lands on the same poster, and a new
+ * upload simply joins the end of the loop instead of reshuffling it.
+ * (The old `steps % count` maths jumped backwards on every upload.)
+ *
+ * `skew` = server clock minus this device's clock (ms).
  */
-export function spotPosition(spot, n, skew = 0) {
+export function spotPosition(spot, games, skew = 0) {
+  const n = games.length;
   if (!spot || !n) return { index: 0, progress: 0 };
-  let i = spot.index || 0, progress = 0;
-  if (spot.auto) {
-    const ms = Math.max(0, Date.now() + skew - Date.parse(spot.at));
-    const per = (spot.seconds || 6) * 1000;
-    i += Math.floor(ms / per);
-    progress = (ms % per) / per;
+  const start = spot.index > 0 ? spot.index % n : 0;
+  if (!spot.auto) return { index: start, progress: 0 };
+
+  const at = Date.parse(spot.at);
+  const per = (spot.seconds || 6) * 1000;
+  const elapsed = Math.max(0, Date.now() + skew - at);
+  const steps = Math.floor(elapsed / per);
+  const progress = (elapsed % per) / per;
+  const times = games.map(g => Date.parse(g.created_at));
+
+  // How many games existed when the carousel was (re)started.
+  let c = 0;
+  while (c < n && times[c] <= at) c++;
+  let len = Math.max(1, c, start + 1);
+  c = len;
+  let cur = start;
+  let done = 0;
+  while (done < steps) {
+    // Steps before the next upload appears see a fixed-length loop.
+    let limit = steps;
+    if (c < n) limit = Math.min(steps, Math.ceil((times[c] - at) / per) - 1);
+    if (limit > done) { cur = (cur + (limit - done)) % len; done = limit; }
+    if (done >= steps) break;
+    // The next step happens after one or more new uploads: grow the loop.
+    const t = at + (done + 1) * per;
+    while (c < n && times[c] <= t) c++;
+    len = Math.max(len, c);
+    cur = (cur + 1) % len;
+    done++;
   }
-  return { index: ((i % n) + n) % n, progress };
+  return { index: cur, progress };
 }
 
 export const hostKeyName = (code, demo) => `li_host_${demo ? 'demo_' : ''}${code}`;

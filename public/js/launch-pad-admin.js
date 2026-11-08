@@ -10,7 +10,7 @@
  * instantly when both are open in this browser, otherwise within ~2s via
  * the li_events.slide column.
  */
-import { makeStore, randomId, drawQr, startStarfield, esc, slideChannel, hostKeyName, spotPosition } from './li-store.js?v=20261108c';
+import { makeStore, randomId, drawQr, startStarfield, esc, slideChannel, hostKeyName, spotPosition } from './li-store.js?v=20261108d';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -231,7 +231,7 @@ async function poll() {
     state.tally = t.tally || {};
     state.voters = t.voters || 0;
     state.votingOpen = !!t.voting_open;
-    if (t.now) state.skew = Date.parse(t.now) - Date.now();
+    if (t.now) state.skew = Date.parse(t.now) - (t._recv || Date.now());
     state.spotSupported = !!(t.spot && t.spot.at);
     if (Date.now() > state.guardUntil) {
       if (state.spotSupported) { state.spot = t.spot; $('spotSpeed').value = String(t.spot.seconds); }
@@ -301,7 +301,7 @@ function renderList() {
 // Spotlight carousel
 // ------------------------------------------------------------------
 
-function spotNow() { return spotPosition(state.spot, state.games.length, state.skew); }
+function spotNow() { return spotPosition(state.spot, state.games, state.skew); }
 
 async function sendSpot({ auto, index, seconds }) {
   const n = state.games.length || 1;
