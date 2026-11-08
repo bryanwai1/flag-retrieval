@@ -503,3 +503,47 @@ button, input { font: inherit; color: inherit; }
   color: var(--muted); font-size: 14px; transition: opacity .6s; pointer-events: none;
 }
 .lp-fs-hint.gone { opacity: 0; }
+
+/* ---------- Slide 4: Spotlight carousel ---------- */
+.lp-spot { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lp-spot-stage { position: relative; flex: 1; min-height: 0; perspective: 1800px; overflow: hidden; }
+.lp-spot-card {
+  position: absolute; left: 50%; top: 50%;
+  width: var(--pw, 60%); aspect-ratio: 16 / 9;
+  border-radius: 22px; overflow: hidden; background: var(--panel-solid);
+  border: 1px solid var(--line);
+  transform: translate(-50%, -50%) translateX(var(--x, 0)) scale(var(--s, 1)) rotateY(var(--r, 0deg));
+  opacity: var(--o, 1); z-index: var(--z, 1);
+  transition: transform .9s cubic-bezier(.2,.8,.2,1), opacity .9s, box-shadow .6s, border-color .6s;
+  box-shadow: 0 20px 60px rgba(0,0,0,.55);
+}
+.lp-spot-card.jump { transition: none; }
+.lp-spot-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lp-spot-card.current {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 80px rgba(56,225,255,.35), 0 30px 80px rgba(0,0,0,.6);
+}
+.lp-spot-caption { text-align: center; padding: 2.2vh 0 1.2vh; flex: none; }
+.lp-spot-name {
+  font-family: var(--display); font-weight: 900; font-size: clamp(24px, 3.2vw, 60px); line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: lp-in .6s both;
+}
+.lp-spot-by { color: var(--muted); font-size: clamp(14px, 1.5vw, 28px); margin-top: .3em; animation: lp-in .6s .1s both; }
+.lp-spot-bar { flex: none; height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; margin: 0 auto; width: 40%; }
+.lp-spot-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+.lp-pill.paused { color: var(--gold); }
+
+/* Admin spotlight panel */
+.lp-spot-admin { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: center; margin-bottom: 14px; }
+.lp-spot-admin img { width: 150px; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #1a1f55; }
+.lp-spot-admin b { font-family: var(--display); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-spot-admin span { color: var(--muted); font-size: 13px; }
+.lp-spot-ctrl { display: grid; grid-template-columns: 56px 1fr 56px; gap: 10px; margin-bottom: 10px; }
+.lp-spot-ctrl .lp-btn { padding: 14px 8px; font-size: 13px; }
+.lp-spot-ctrl .lp-btn.ghost { font-size: 18px; }
+.lp-spot-speed { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.lp-spot-speed select { flex: 1; padding: 10px 12px; border-radius: 12px; background: rgba(4,6,20,.7); border: 1px solid var(--line); color: var(--text); font: inherit; }
+.lp-spot-admin-bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 8px; }
+.lp-spot-admin-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+.lp-mini.spot { color: var(--gold); border-color: rgba(251,191,36,.45); }

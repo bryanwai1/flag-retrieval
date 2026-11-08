@@ -11,8 +11,9 @@
  *
  * Slides: 1 Submit (big QR + steps) · 2 Game Galaxy (library + submit QR)
  *         3 Cosmic Vote (vote + submit QR, live ranked scoreboard)
+ *         4 Spotlight (poster carousel, auto-swipe or paused by the admin)
  */
-import { makeStore, drawQr, startStarfield, esc, slideChannel } from './li-store.js?v=20261108b';
+import { makeStore, drawQr, startStarfield, esc, slideChannel, spotPosition } from './li-store.js?v=20261108c';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -36,7 +37,12 @@ const state = {
   voters: 0,
   votingOpen: false,
   first: true,
-  prevVotes: {}
+  prevVotes: {},
+  spot: { auto: true, index: 0, seconds: 6, at: new Date().toISOString() },
+  skew: 0,
+  guardUntil: 0,     // ignore polled slide/spot briefly after a same-browser message
+  spotKey: '',
+  spotPrev: {}
 };
 
 const pageUrl = (file, extra = '') => {
@@ -94,7 +100,8 @@ async function startLive() {
   await pollGames();
   setInterval(pollGames, GAMES_MS);
   setInterval(pollSlide, SLIDE_MS);
-  addEventListener('resize', () => { renderLibrary(true); renderBoard(); });
+  setInterval(() => { if (state.slide === 4) renderSpot(false); }, 150);
+  addEventListener('resize', () => { renderLibrary(true); renderBoard(); renderSpot(true); });
 }
 
 function drawQrs() {
@@ -108,19 +115,23 @@ function drawQrs() {
 // ---------- Slides ----------
 
 function goTo(n) {
-  n = Math.max(1, Math.min(3, n | 0));
+  n = Math.max(1, Math.min(4, n | 0));
   if (n === state.slide) return;
   state.slide = n;
   $$('.lp-slide').forEach(s => s.classList.toggle('active', s.dataset.slide === String(n)));
   history.replaceState(null, '', `${location.pathname}${location.search}#${n}`);
   if (n === 2) renderLibrary(true);
   if (n === 3) renderBoard();
+  if (n === 4) renderSpot(true);
 }
 
 function wireControls() {
   // Same-browser admin → instant switch.
   slideChannel(code, demo).addEventListener('message', (e) => {
-    if (e.data && e.data.slide) goTo(e.data.slide);
+    const d = e.data || {};
+    state.guardUntil = Date.now() + 3000;
+    if (d.spot) { state.spot = d.spot; renderSpot(true); }
+    if (d.slide) goTo(d.slide);
   });
 
   addEventListener('keydown', (e) => {
@@ -128,7 +139,7 @@ function wireControls() {
     if (state.remote) return; // admin is in charge
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goTo(state.slide + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(state.slide - 1); }
-    else if (['1', '2', '3'].includes(e.key)) goTo(+e.key);
+    else if (['1', '2', '3', '4'].includes(e.key)) goTo(+e.key);
   });
   addEventListener('dblclick', toggleFs);
   setTimeout(() => $('fsHint').classList.add('gone'), 6000);
@@ -147,6 +158,9 @@ function applyTally(t) {
   state.voters = t.voters || 0;
   state.votingOpen = !!t.voting_open;
   state.remote = t.slide != null;
+  if (t.now) state.skew = Date.parse(t.now) - Date.now();
+  if (Date.now() < state.guardUntil) return;
+  if (t.spot && t.spot.at) state.spot = t.spot;
   if (state.remote) goTo(t.slide);
 }
 
@@ -337,6 +351,81 @@ function renderBoard() {
     state.prevVotes[r.id] = r.votes;
   });
   $('boardMore').textContent = rows.length > BOARD_MAX ? `+ ${rows.length - BOARD_MAX} more games in orbit` : '';
+}
+
+// ---------- Slide 4: Spotlight carousel ----------
+
+function renderSpot(force) {
+  const stage = $('spotStage');
+  const games = state.games;
+  const n = games.length;
+  const { index, progress } = spotPosition(state.spot, n, state.skew);
+  $('spotBar').style.width = state.spot.auto ? `${progress * 100}%` : '0%';
+  const mode = $('spotMode');
+  mode.className = `lp-pill ${state.spot.auto ? 'open' : 'paused'}`;
+  mode.textContent = state.spot.auto ? 'Auto-swipe' : 'Paused';
+
+  if (!n) {
+    if (!stage.querySelector('.lp-empty')) {
+      stage.innerHTML = `<div class="lp-empty"><div><span class="big">🔭</span>No games to spotlight yet.</div></div>`;
+      $('spotName').textContent = ''; $('spotBy').textContent = ''; $('spotPos').textContent = '0 / 0';
+      state.spotKey = '';
+    }
+    return;
+  }
+  const key = `${index}|${games.map(g => g.id).join(',')}|${Object.keys(state.images).length}`;
+  if (!force && key === state.spotKey) return;
+  state.spotKey = key;
+  stage.querySelector('.lp-empty')?.remove();
+
+  const W = stage.clientWidth, H = stage.clientHeight;
+  const pw = Math.max(200, Math.min(W * 0.6, H * 0.94 * 16 / 9));
+  stage.style.setProperty('--pw', `${pw}px`);
+
+  const existing = new Map(Array.from(stage.children).map(el => [el.dataset.id, el]));
+  const ids = new Set(games.map(g => g.id));
+  existing.forEach((el, id) => { if (!ids.has(id)) el.remove(); });
+
+  games.forEach((g, i) => {
+    let el = existing.get(g.id);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'lp-spot-card';
+      el.dataset.id = g.id;
+      el.innerHTML = '<img alt="">';
+      el.style.setProperty('--o', 0);
+      stage.appendChild(el);
+    }
+    const img = el.querySelector('img');
+    if (state.images[g.id] && img.getAttribute('src') !== state.images[g.id]) img.src = state.images[g.id];
+
+    // Shortest circular distance from the current poster.
+    let d = i - index;
+    if (d > n / 2) d -= n;
+    if (d < -n / 2) d += n;
+    const a = Math.abs(d);
+    const prev = state.spotPrev[g.id];
+    el.classList.toggle('jump', prev !== undefined && Math.abs(prev - d) > 2);
+    state.spotPrev[g.id] = d;
+    el.classList.toggle('current', d === 0);
+    el.style.setProperty('--x', `${d * pw * 0.74}px`);
+    el.style.setProperty('--s', a === 0 ? 1 : a === 1 ? 0.7 : 0.5);
+    el.style.setProperty('--r', `${-d * 24}deg`);
+    el.style.setProperty('--o', a === 0 ? 1 : a === 1 ? 0.5 : a === 2 ? 0.16 : 0);
+    el.style.setProperty('--z', 10 - Math.min(a, 9));
+  });
+
+  const g = games[index];
+  if ($('spotName').dataset.id !== g.id) {
+    $('spotName').dataset.id = g.id;
+    for (const id of ['spotName', 'spotBy']) {   // replay the caption animation
+      const el = $(id); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    }
+    $('spotName').textContent = g.game_name;
+    $('spotBy').textContent = `by ${g.author_name}`;
+    drawQr($('spotQr'), g.link);
+  }
+  $('spotPos').textContent = `${index + 1} / ${n}`;
 }
 
 // ---------- New-game toast ----------

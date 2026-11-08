@@ -4,7 +4,7 @@
  * launch-pad-play.html?e=<code>        → submit tab
  * launch-pad-play.html?e=<code>&v=1    → vote tab (2 votes per phone)
  */
-import { makeStore, randomId, startStarfield, esc, MAX_VOTES } from './li-store.js?v=20261108b';
+import { makeStore, randomId, startStarfield, esc, MAX_VOTES } from './li-store.js?v=20261108c';
 
 const $ = (id) => document.getElementById(id);
 const qs = new URLSearchParams(location.search);

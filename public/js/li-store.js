@@ -20,6 +20,9 @@ export function randomId(len = 24) {
 
 function errMsg(e) {
   const m = (e && (e.message || e.details)) || String(e);
+  if (/li_set_spotlight/i.test(m)) {
+    return 'Spotlight needs one more SQL step — run supabase/link-inserter-spotlight.sql in Supabase.';
+  }
   if (/li_set_slide/i.test(m)) {
     return 'Slide control needs one more SQL step — run supabase/link-inserter-slides.sql in Supabase.';
   }
@@ -56,6 +59,9 @@ async function liveStore(code) {
     checkHost: (key) => rpc('li_check_host', { p_code: code, p_host_key: key }),
     setVoting: (key, open) => rpc('li_set_voting', { p_code: code, p_host_key: key, p_open: open }),
     setSlide: (key, slide) => rpc('li_set_slide', { p_code: code, p_host_key: key, p_slide: slide }),
+    setSpotlight: (key, { auto, index, seconds }) => rpc('li_set_spotlight', {
+      p_code: code, p_host_key: key, p_auto: auto, p_index: index, p_seconds: seconds
+    }),
     listGames: () => q(sb.from('li_games')
       .select('id, author_name, game_name, link, created_at')
       .eq('event_code', code).order('created_at', { ascending: true })),
@@ -113,6 +119,11 @@ function demoStore(code) {
     checkHost: wrap((key) => { const db = load(); return !!db && db.event.host_key === key; }),
     setVoting: wrap((key, open) => { const db = need(); host(db, key); db.event.voting_open = open; save(db); }),
     setSlide: wrap((key, slide) => { const db = need(); host(db, key); db.event.slide = slide; save(db); }),
+    setSpotlight: wrap((key, { auto, index, seconds }) => {
+      const db = need(); host(db, key);
+      db.event.spot = { auto, index: Math.max(0, index), seconds: Math.max(2, Math.min(60, seconds)), at: new Date().toISOString() };
+      save(db);
+    }),
     listGames: wrap(() => need().games.map(({ image, thumb, ...g }) => g)),
     getImages: wrap((ids, field = 'image') => {
       const out = {};
@@ -136,7 +147,11 @@ function demoStore(code) {
       const db = need();
       const tally = {};
       db.votes.forEach(v => { tally[v.game_id] = (tally[v.game_id] || 0) + 1; });
-      return { voting_open: db.event.voting_open, slide: db.event.slide || 1, voters: new Set(db.votes.map(v => v.voter_id)).size, tally };
+      return {
+        now: new Date().toISOString(),
+        voting_open: db.event.voting_open, slide: db.event.slide || 1,
+        spot: db.event.spot || { auto: true, index: 0, seconds: 6, at: new Date(0).toISOString() },
+        voters: new Set(db.votes.map(v => v.voter_id)).size, tally };
     }),
     myVotes: wrap((voterId) => need().votes.filter(v => v.voter_id === voterId).map(v => v.game_id)),
     castVote: wrap((gameId, voterId) => {
@@ -168,6 +183,23 @@ function demoStore(code) {
 export function slideChannel(code, demo) {
   try { return new BroadcastChannel(`li_slide_${demo ? 'demo_' : ''}${code}`); }
   catch { return { postMessage() {}, addEventListener() {} }; }
+}
+
+/**
+ * Spotlight carousel position. While auto-swipe is on, the poster index
+ * advances every `seconds` from `at`, so every screen lands on the same
+ * poster. `skew` = server clock minus this device's clock (ms).
+ */
+export function spotPosition(spot, n, skew = 0) {
+  if (!spot || !n) return { index: 0, progress: 0 };
+  let i = spot.index || 0, progress = 0;
+  if (spot.auto) {
+    const ms = Math.max(0, Date.now() + skew - Date.parse(spot.at));
+    const per = (spot.seconds || 6) * 1000;
+    i += Math.floor(ms / per);
+    progress = (ms % per) / per;
+  }
+  return { index: ((i % n) + n) % n, progress };
 }
 
 export const hostKeyName = (code, demo) => `li_host_${demo ? 'demo_' : ''}${code}`;

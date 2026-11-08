@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/launch-pad.css?v=20261108b">
+  <link rel="stylesheet" href="css/launch-pad.css?v=20261108c">
 </head>
 <body>
   <div class="lp-cosmos"><canvas id="stars"></canvas></div>
@@ -62,12 +62,37 @@
     <div class="lp-admin-grid">
       <div class="lp-admin-col">
         <section class="lp-panel">
-          <h2 class="lp-h2">On the big screen <small>← → or 1 2 3</small></h2>
+          <h2 class="lp-h2">On the big screen <small>← → or 1 2 3 4</small></h2>
           <div class="lp-slide-btns">
             <button class="lp-slide-btn" data-slide="1"><span class="ico">📲</span><b>1 · Submit</b><small>Big QR + how-to steps</small></button>
             <button class="lp-slide-btn" data-slide="2"><span class="ico">🌌</span><b>2 · Game Galaxy</b><small>All games + submit QR</small></button>
             <button class="lp-slide-btn" data-slide="3"><span class="ico">🏆</span><b>3 · Cosmic Vote</b><small>Vote QR + live scoreboard</small></button>
+            <button class="lp-slide-btn" data-slide="4"><span class="ico">🔭</span><b>4 · Spotlight</b><small>Poster carousel, one game at a time</small></button>
           </div>
+        </section>
+
+        <section class="lp-panel">
+          <h2 class="lp-h2">Spotlight carousel <span class="lp-pill open" id="spotPill">Auto-swipe</span></h2>
+          <div class="lp-spot-admin">
+            <img id="spotThumb" alt="">
+            <div><b id="spotName">No games yet</b><span id="spotMeta"></span>
+              <div class="lp-spot-admin-bar"><div id="spotBar"></div></div>
+            </div>
+          </div>
+          <div class="lp-spot-ctrl">
+            <button class="lp-btn ghost" id="spotPrev" title="Previous poster">⏮</button>
+            <button class="lp-btn" id="spotToggle">⏸ Stop auto-swipe</button>
+            <button class="lp-btn ghost" id="spotNext" title="Next poster">⏭</button>
+          </div>
+          <label class="lp-spot-speed">Auto-swipe every
+            <select id="spotSpeed">
+              <option value="4">4 seconds</option>
+              <option value="6" selected>6 seconds</option>
+              <option value="8">8 seconds</option>
+              <option value="12">12 seconds</option>
+              <option value="20">20 seconds</option>
+            </select>
+          </label>
         </section>
 
         <section class="lp-panel">
@@ -111,6 +136,6 @@
 
   <script src="js/supabase-config.js?v=20260715a"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-  <script type="module" src="js/launch-pad-admin.js?v=20261108b"></script>
+  <script type="module" src="js/launch-pad-admin.js?v=20261108c"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/launch-pad.css?v=20261108b">
+  <link rel="stylesheet" href="css/launch-pad.css?v=20261108c">
 </head>
 <body>
   <div class="lp-cosmos"><canvas id="stars"></canvas><div class="lp-planet"></div></div>
@@ -113,6 +113,36 @@
       </div>
     </section>
 
+    <!-- Slide 4: Spotlight (poster carousel) -->
+    <section class="lp-slide" data-slide="4">
+      <header class="lp-head">
+        <div>
+          <span class="lp-eyebrow event-title">AI Game Jam</span>
+          <h1 class="lp-title">Spotlight</h1>
+        </div>
+        <div class="lp-head-stats">
+          <div class="lp-stat"><strong id="spotPos">0 / 0</strong><span>Game</span></div>
+          <div class="lp-stat" style="display:grid;place-items:center"><span class="lp-pill open" id="spotMode">Auto</span></div>
+        </div>
+      </header>
+      <div class="lp-s3-body">
+        <div class="lp-spot">
+          <div class="lp-spot-stage" id="spotStage"></div>
+          <div class="lp-spot-caption">
+            <div class="lp-spot-name" id="spotName"></div>
+            <div class="lp-spot-by" id="spotBy"></div>
+          </div>
+          <div class="lp-spot-bar"><div id="spotBar"></div></div>
+        </div>
+        <aside class="lp-rail">
+          <div>
+            <div class="lp-qr"><canvas id="spotQr"></canvas></div>
+            <div class="lp-qr-label">Scan to play</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <div class="lp-fs-hint" id="fsHint">Press <b>F</b> or double-click for fullscreen · slides are controlled from Mission Control</div>
 
     <div class="lp-brand">Launch Pad · code <b class="event-code"></b></div>
@@ -129,6 +159,6 @@
 
   <script src="js/supabase-config.js?v=20260715a"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-  <script type="module" src="js/launch-pad.js?v=20261108b"></script>
+  <script type="module" src="js/launch-pad.js?v=20261108c"></script>
 </body>
 </html>

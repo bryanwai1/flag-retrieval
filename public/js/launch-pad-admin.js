@@ -10,7 +10,7 @@
  * instantly when both are open in this browser, otherwise within ~2s via
  * the li_events.slide column.
  */
-import { makeStore, randomId, drawQr, startStarfield, esc, slideChannel, hostKeyName } from './li-store.js?v=20261108b';
+import { makeStore, randomId, drawQr, startStarfield, esc, slideChannel, hostKeyName, spotPosition } from './li-store.js?v=20261108c';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -24,7 +24,9 @@ startStarfield($('stars'), { density: 0.6 });
 const state = {
   store: null, event: null, hostKey: null,
   slide: 1, votingOpen: false, slideSynced: true,
-  games: [], thumbs: {}, tally: {}, voters: 0
+  games: [], thumbs: {}, tally: {}, voters: 0,
+  spot: { auto: true, index: 0, seconds: 6, at: new Date().toISOString() },
+  spotSupported: true, skew: 0, guardUntil: 0
 };
 const channel = code ? slideChannel(code, demo) : null;
 
@@ -132,6 +134,7 @@ async function startLive() {
   renderVoting();
   await poll();
   setInterval(poll, POLL_MS);
+  setInterval(renderSpot, 250);
 }
 
 function wire() {
@@ -140,7 +143,14 @@ function wire() {
     if (e.target.matches('input, textarea')) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); setSlide(state.slide + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); setSlide(state.slide - 1); }
-    else if (['1', '2', '3'].includes(e.key)) setSlide(+e.key);
+    else if (['1', '2', '3', '4'].includes(e.key)) setSlide(+e.key);
+    else if (e.key === ' ') { e.preventDefault(); spotToggle(); }
+  });
+  $('spotPrev').addEventListener('click', () => spotStep(-1));
+  $('spotNext').addEventListener('click', () => spotStep(1));
+  $('spotToggle').addEventListener('click', spotToggle);
+  $('spotSpeed').addEventListener('change', () => {
+    sendSpot({ auto: state.spot.auto, index: spotNow().index, seconds: +$('spotSpeed').value });
   });
   $('openProjector').addEventListener('click', () => {
     window.open(pageUrl('launch-pad.html'), 'launchpad_projector');
@@ -162,10 +172,15 @@ function wire() {
 }
 
 async function setSlide(n) {
-  n = Math.max(1, Math.min(3, n));
+  n = Math.max(1, Math.min(4, n));
   state.slide = n;
+  state.guardUntil = Date.now() + 3000;
   renderSlide();
   channel.postMessage({ slide: n });
+  if (n === 4 && !state.spotSupported) {
+    warn('Spotlight needs one more SQL step — run supabase/link-inserter-spotlight.sql in Supabase. Until then, the Spotlight slide only works when the projector is open in this same browser.');
+    return;
+  }
   try {
     await state.store.setSlide(state.hostKey, n);
     state.slideSynced = true;
@@ -216,6 +231,12 @@ async function poll() {
     state.tally = t.tally || {};
     state.voters = t.voters || 0;
     state.votingOpen = !!t.voting_open;
+    if (t.now) state.skew = Date.parse(t.now) - Date.now();
+    state.spotSupported = !!(t.spot && t.spot.at);
+    if (Date.now() > state.guardUntil) {
+      if (state.spotSupported) { state.spot = t.spot; $('spotSpeed').value = String(t.spot.seconds); }
+      if (t.slide) { state.slide = t.slide; renderSlide(); }
+    }
     if (t.slide == null && state.slideSynced) {
       warn('Slide control needs one more SQL step — run supabase/link-inserter-slides.sql in Supabase. Until then, slides only follow when the projector is open in this same browser.');
     }
@@ -258,8 +279,15 @@ function renderList() {
       <img alt="" src="${esc(state.thumbs[r.id] || '')}">
       <div class="lp-admin-item-text"><b>${esc(r.game_name)}</b><span>by ${esc(r.author_name)}</span></div>
       <span class="lp-admin-votes"><strong>${r.votes}</strong> votes</span>
+      <button class="lp-mini spot" title="Show this game in the Spotlight carousel">Spotlight</button>
       <a class="lp-mini" href="${esc(r.link)}" target="_blank" rel="noopener">Play ↗</a>
       <button class="lp-mini danger" title="Remove this game">Remove</button>`;
+    el.querySelector('.spot').addEventListener('click', () => {
+      const i = state.games.findIndex(g => g.id === r.id);
+      sendSpot({ auto: state.spot.auto, index: i, seconds: state.spot.seconds });
+      if (state.slide !== 4) setSlide(4);
+      snack(`Spotlight: ${r.game_name}`);
+    });
     el.querySelector('.danger').addEventListener('click', async () => {
       if (!confirm(`Remove “${r.game_name}” by ${r.author_name}? Its votes go too.`)) return;
       try { await state.store.deleteGame(r.id, state.hostKey); snack('Game removed'); renderList.sig = null; poll(); }
@@ -267,6 +295,53 @@ function renderList() {
     });
     list.appendChild(el);
   });
+}
+
+// ------------------------------------------------------------------
+// Spotlight carousel
+// ------------------------------------------------------------------
+
+function spotNow() { return spotPosition(state.spot, state.games.length, state.skew); }
+
+async function sendSpot({ auto, index, seconds }) {
+  const n = state.games.length || 1;
+  index = ((index % n) + n) % n;
+  // Stamp `at` in server time so every screen computes the same poster.
+  state.spot = { auto, index, seconds, at: new Date(Date.now() + state.skew).toISOString() };
+  state.guardUntil = Date.now() + 3000;
+  channel.postMessage({ spot: state.spot });
+  renderSpot();
+  if (!state.spotSupported) {
+    warn('Spotlight needs one more SQL step — run supabase/link-inserter-spotlight.sql in Supabase. Until then, the Spotlight slide only works when the projector is open in this same browser.');
+    return;
+  }
+  try { await state.store.setSpotlight(state.hostKey, { auto, index, seconds }); }
+  catch (e) { warn(e.message); }
+}
+
+function spotStep(delta) {
+  sendSpot({ auto: state.spot.auto, index: spotNow().index + delta, seconds: state.spot.seconds });
+}
+
+function spotToggle() {
+  const { index } = spotNow();
+  sendSpot({ auto: !state.spot.auto, index, seconds: state.spot.seconds });
+  snack(state.spot.auto ? 'Auto-swipe on' : 'Auto-swipe stopped');
+}
+
+function renderSpot() {
+  const n = state.games.length;
+  const { index, progress } = spotNow();
+  $('spotPill').className = `lp-pill ${state.spot.auto ? 'open' : 'paused'}`;
+  $('spotPill').textContent = state.spot.auto ? 'Auto-swipe' : 'Stopped';
+  $('spotToggle').textContent = state.spot.auto ? '⏸ Stop auto-swipe' : '▶ Start auto-swipe';
+  $('spotBar').style.width = state.spot.auto ? `${progress * 100}%` : '0%';
+  if (!n) { $('spotName').textContent = 'No games yet'; $('spotMeta').textContent = ''; $('spotThumb').removeAttribute('src'); return; }
+  const g = state.games[index];
+  $('spotName').textContent = g.game_name;
+  $('spotMeta').textContent = `by ${g.author_name} · ${index + 1} of ${n}`;
+  const src = state.thumbs[g.id] || '';
+  if ($('spotThumb').getAttribute('src') !== src) $('spotThumb').src = src;
 }
 
 if (code) startLive(); else setupScreen();
