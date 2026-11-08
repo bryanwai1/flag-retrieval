@@ -1,23 +1,26 @@
 /*
- * Launch Pad — projector.
+ * Launch Pad — projector (display only).
  *
- * launch-pad.html                → mission control (create / open an event)
- * launch-pad.html?e=<code>       → live 3-slide projector for that event
+ * launch-pad.html?e=<code>       → live 3-slide big-screen view
  *   &demo=1                      → localStorage-only rehearsal mode
- *   &k=<hostKey>                 → hand host controls to another laptop
+ *
+ * Slides are driven from Mission Control (launch-pad-admin.html): instantly
+ * when both pages are open in the same browser (BroadcastChannel), otherwise
+ * by polling li_events.slide every ~1.5s. F / double-click = fullscreen.
+ * If the slide-control SQL hasn't been run, ← → / 1 2 3 work locally.
  *
  * Slides: 1 Submit (big QR + steps) · 2 Game Galaxy (library + submit QR)
  *         3 Cosmic Vote (vote + submit QR, live ranked scoreboard)
- * Keys: ← → or 1/2/3 switch slides, F fullscreen.
  */
-import { makeStore, randomId, drawQr, startStarfield, esc } from './li-store.js?v=20261108a';
+import { makeStore, drawQr, startStarfield, esc, slideChannel } from './li-store.js?v=20261108b';
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const qs = new URLSearchParams(location.search);
 const demo = qs.get('demo') === '1';
 const code = (qs.get('e') || '').trim().toLowerCase();
-const POLL_MS = 3000;
+const GAMES_MS = 3000;
+const SLIDE_MS = 1500;
 const BOARD_MAX = 10;
 
 const stars = startStarfield($('stars'));
@@ -25,9 +28,8 @@ const stars = startStarfield($('stars'));
 const state = {
   store: null,
   event: null,
-  hostKey: null,
-  isHost: false,
-  slide: 1,
+  slide: 0,
+  remote: true,      // false when li_events.slide isn't available yet
   games: [],
   images: {},
   tally: {},
@@ -37,7 +39,6 @@ const state = {
   prevVotes: {}
 };
 
-const hostKeyName = (c) => `li_host_${demo ? 'demo_' : ''}${c}`;
 const pageUrl = (file, extra = '') => {
   const base = location.href.split(/[?#]/)[0].replace(/[^/]*$/, '');
   return `${base}${file}?e=${encodeURIComponent(code)}${demo ? '&demo=1' : ''}${extra}`;
@@ -53,27 +54,12 @@ function fail(title, detail) {
 }
 
 // ------------------------------------------------------------------
-// Mission control (no event code)
+// No event code: ask for one
 // ------------------------------------------------------------------
 
 function setupScreen() {
   show('screenSetup');
-  $('createForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    $('createErr').textContent = '';
-    $('createBtn').disabled = true;
-    try {
-      const newCode = randomId(5);
-      const key = randomId(24);
-      const store = await makeStore(newCode, demo);
-      await store.createEvent(key, $('createTitle').value.trim());
-      localStorage.setItem(hostKeyName(newCode), key);
-      location.href = `launch-pad.html?e=${newCode}${demo ? '&demo=1' : ''}`;
-    } catch (err) {
-      $('createErr').textContent = err.message;
-      $('createBtn').disabled = false;
-    }
-  });
+  if (demo) $('adminLink').href = 'launch-pad-admin.html?demo=1';
   $('openForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const c = $('openCode').value.trim().toLowerCase();
@@ -95,30 +81,19 @@ async function startLive() {
   }
   if (!state.event) { fail('Event not found', `No event with code “${code}”.`); return; }
 
-  // Host key: from ?k= (hand-off link) or this browser's storage.
-  const urlKey = qs.get('k');
-  if (urlKey) {
-    localStorage.setItem(hostKeyName(code), urlKey);
-    qs.delete('k');
-    history.replaceState(null, '', `${location.pathname}?${qs}${location.hash}`);
-  }
-  state.hostKey = localStorage.getItem(hostKeyName(code));
-  if (state.hostKey) {
-    try { state.isHost = !!(await state.store.checkHost(state.hostKey)); } catch { state.isHost = false; }
-  }
-  document.body.classList.toggle('is-host', state.isHost);
-
   $$('.event-title').forEach(el => { el.textContent = state.event.title; });
   $$('.event-code').forEach(el => { el.textContent = code; });
   document.title = `${state.event.title} — Launch Pad`;
-  $('modeBadge').textContent = demo ? 'Demo mode · this browser only' : (state.isHost ? '' : 'View only');
+  $('modeBadge').textContent = demo ? 'Demo mode · this browser only' : '';
 
   show('screenLive');
   drawQrs();
   wireControls();
-  goTo(parseInt(location.hash.slice(1), 10) || 1, false);
-  await poll();
-  setInterval(poll, POLL_MS);
+  state.remote = state.event.slide != null;
+  goTo(state.event.slide || parseInt(location.hash.slice(1), 10) || 1);
+  await pollGames();
+  setInterval(pollGames, GAMES_MS);
+  setInterval(pollSlide, SLIDE_MS);
   addEventListener('resize', () => { renderLibrary(true); renderBoard(); });
 }
 
@@ -132,55 +107,32 @@ function drawQrs() {
 
 // ---------- Slides ----------
 
-function goTo(n, user = true) {
-  n = Math.max(1, Math.min(3, n));
+function goTo(n) {
+  n = Math.max(1, Math.min(3, n | 0));
+  if (n === state.slide) return;
   state.slide = n;
   $$('.lp-slide').forEach(s => s.classList.toggle('active', s.dataset.slide === String(n)));
-  $$('#dock [data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === String(n)));
   history.replaceState(null, '', `${location.pathname}${location.search}#${n}`);
   if (n === 2) renderLibrary(true);
-  if (n === 3) {
-    renderBoard();
-    // First time the host lands on the vote slide, open voting automatically.
-    const flag = `li_autovote_${demo ? 'demo_' : ''}${code}`;
-    if (user && state.isHost && !state.votingOpen && !localStorage.getItem(flag)) {
-      localStorage.setItem(flag, '1');
-      setVoting(true);
-    }
-  }
+  if (n === 3) renderBoard();
 }
 
 function wireControls() {
-  $$('#dock [data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
-  $('fsBtn').addEventListener('click', toggleFs);
-  $('voteToggle').addEventListener('click', () => setVoting(!state.votingOpen));
-  $('resetVotes').addEventListener('click', async () => {
-    if (!confirm('Clear every vote for this event? This can’t be undone.')) return;
-    try { await state.store.resetVotes(state.hostKey); await poll(); } catch (e) { alert(e.message); }
-  });
-  $('hostLink').addEventListener('click', async () => {
-    const link = `${location.href.split(/[?#]/)[0]}?e=${code}${demo ? '&demo=1' : ''}&k=${state.hostKey}`;
-    try { await navigator.clipboard.writeText(link); $('hostLink').textContent = 'Copied!'; }
-    catch { prompt('Host link (keep it private):', link); }
-    setTimeout(() => { $('hostLink').textContent = 'Copy host link'; }, 2000);
+  // Same-browser admin → instant switch.
+  slideChannel(code, demo).addEventListener('message', (e) => {
+    if (e.data && e.data.slide) goTo(e.data.slide);
   });
 
   addEventListener('keydown', (e) => {
-    if (e.target.matches('input, textarea')) return;
+    if (e.key.toLowerCase() === 'f') { toggleFs(); return; }
+    if (state.remote) return; // admin is in charge
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); goTo(state.slide + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(state.slide - 1); }
     else if (['1', '2', '3'].includes(e.key)) goTo(+e.key);
-    else if (e.key.toLowerCase() === 'f') toggleFs();
   });
-
-  let idle;
-  const wake = () => {
-    $('dock').classList.remove('idle');
-    clearTimeout(idle);
-    idle = setTimeout(() => $('dock').classList.add('idle'), 3500);
-  };
-  addEventListener('mousemove', wake);
-  wake();
+  addEventListener('dblclick', toggleFs);
+  setTimeout(() => $('fsHint').classList.add('gone'), 6000);
+  document.addEventListener('fullscreenchange', () => $('fsHint').classList.add('gone'));
 }
 
 function toggleFs() {
@@ -188,17 +140,26 @@ function toggleFs() {
   else document.documentElement.requestFullscreen().catch(() => {});
 }
 
-async function setVoting(open) {
-  try {
-    await state.store.setVoting(state.hostKey, open);
-    state.votingOpen = open;
-    renderVoteState();
-  } catch (e) { alert(e.message); }
-}
-
 // ---------- Polling ----------
 
-async function poll() {
+function applyTally(t) {
+  state.tally = t.tally || {};
+  state.voters = t.voters || 0;
+  state.votingOpen = !!t.voting_open;
+  state.remote = t.slide != null;
+  if (state.remote) goTo(t.slide);
+}
+
+async function pollSlide() {
+  try {
+    applyTally(await state.store.tally());
+    renderCounts();
+    renderVoteState();
+    if (state.slide === 3) renderBoard();
+  } catch { /* pollGames reports errors */ }
+}
+
+async function pollGames() {
   try {
     const [games, t] = await Promise.all([state.store.listGames(), state.store.tally()]);
     const known = new Set(state.games.map(g => g.id));
@@ -208,9 +169,7 @@ async function poll() {
 
     const changed = fresh.length || games.length !== state.games.length;
     state.games = games;
-    state.tally = t.tally || {};
-    state.voters = t.voters || 0;
-    state.votingOpen = !!t.voting_open;
+    applyTally(t);
 
     if (!state.first) fresh.forEach(g => queueToast(g));
     state.first = false;
@@ -219,7 +178,7 @@ async function poll() {
     renderVoteState();
     if (changed) renderLibrary(false);
     renderBoard();
-    $('modeBadge').textContent = demo ? 'Demo mode · this browser only' : (state.isHost ? '' : 'View only');
+    $('modeBadge').textContent = demo ? 'Demo mode · this browser only' : '';
   } catch (err) {
     $('modeBadge').textContent = `⚠ ${err.message}`;
   }
@@ -238,9 +197,6 @@ function renderVoteState() {
   const pill = $('votePill');
   pill.className = `lp-pill ${state.votingOpen ? 'open' : 'closed'}`;
   pill.textContent = state.votingOpen ? 'Voting open' : 'Voting closed';
-  const t = $('voteToggle');
-  t.textContent = state.votingOpen ? 'Close voting' : 'Open voting';
-  t.classList.toggle('open', state.votingOpen);
 }
 
 // ---------- Slide 2: library grid ----------
@@ -286,20 +242,12 @@ function renderLibrary(layoutOnly) {
         el.dataset.id = g.id;
         el.style.animationDelay = state.first ? `${Math.min(i, 20) * 40}ms` : '0ms';
         el.innerHTML = `
-          <button class="lp-card-del" title="Remove">✕</button>
           <img class="lp-card-img" alt="">
           <div class="lp-card-cap">
             <div class="lp-card-name">${esc(g.game_name)}</div>
             <div class="lp-card-by">by ${esc(g.author_name)}</div>
           </div>`;
-        el.addEventListener('click', (e) => {
-          if (e.target.closest('.lp-card-del')) return;
-          window.open(g.link, '_blank', 'noopener');
-        });
-        el.querySelector('.lp-card-del').addEventListener('click', async () => {
-          if (!confirm(`Remove “${g.game_name}” by ${g.author_name}?`)) return;
-          try { await state.store.deleteGame(g.id, state.hostKey); await poll(); } catch (err) { alert(err.message); }
-        });
+        el.addEventListener('click', () => window.open(g.link, '_blank', 'noopener'));
       }
       const img = el.querySelector('img');
       if (state.images[g.id] && img.getAttribute('src') !== state.images[g.id]) img.src = state.images[g.id];

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch Pad &mdash; Mission Control</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/launch-pad.css?v=20261108b">
+</head>
+<body>
+  <div class="lp-cosmos"><canvas id="stars"></canvas></div>
+
+  <!-- Setup: no ?e= -->
+  <section class="lp-setup" id="screenSetup" hidden>
+    <div class="lp-setup-card">
+      <span class="lp-eyebrow">Mission control</span>
+      <h1 class="lp-title">Launch Pad</h1>
+      <p>Run this on your laptop. Put the projector page on the big screen, then change slides, open voting and remove entries from here.</p>
+      <form id="createForm">
+        <label class="lp-field"><span>Event title</span>
+          <input class="lp-input" id="createTitle" maxlength="80" value="AI Game Jam" required>
+        </label>
+        <button class="lp-btn" id="createBtn">🚀 Start new launch</button>
+        <p class="lp-err" id="createErr"></p>
+      </form>
+      <div id="recentWrap" hidden>
+        <hr>
+        <div class="lp-field"><span>Your recent events</span></div>
+        <div class="lp-recent" id="recentList"></div>
+      </div>
+      <p class="lp-hint" style="margin-top:18px">Tip: add <code>?demo=1</code> to rehearse without the database (same browser only).</p>
+    </div>
+  </section>
+
+  <section class="lp-setup" id="screenError" hidden>
+    <div class="lp-setup-card">
+      <span class="lp-eyebrow">Houston, we have a problem</span>
+      <h1 class="lp-title" id="errTitle">Error</h1>
+      <p id="errDetail"></p>
+      <a class="lp-btn ghost" href="launch-pad-admin.html" style="text-decoration:none">Back to mission control</a>
+    </div>
+  </section>
+
+  <main class="lp-admin" id="screenLive" hidden>
+    <header class="lp-admin-top">
+      <div>
+        <span class="lp-eyebrow">Mission control</span>
+        <h1 class="lp-title" id="eventTitle">AI Game Jam</h1>
+      </div>
+      <div class="lp-admin-actions">
+        <span class="lp-chip">Code <b id="eventCode"></b></span>
+        <button class="lp-btn" id="openProjector">📽 Open projector</button>
+        <button class="lp-btn ghost" id="copyHost" title="Lets another laptop control this event">Copy admin link</button>
+        <a class="lp-btn ghost" href="launch-pad-admin.html" id="switchEvent">Switch event</a>
+      </div>
+    </header>
+    <p class="lp-admin-warn" id="warn" hidden></p>
+
+    <div class="lp-admin-grid">
+      <div class="lp-admin-col">
+        <section class="lp-panel">
+          <h2 class="lp-h2">On the big screen <small>← → or 1 2 3</small></h2>
+          <div class="lp-slide-btns">
+            <button class="lp-slide-btn" data-slide="1"><span class="ico">📲</span><b>1 · Submit</b><small>Big QR + how-to steps</small></button>
+            <button class="lp-slide-btn" data-slide="2"><span class="ico">🌌</span><b>2 · Game Galaxy</b><small>All games + submit QR</small></button>
+            <button class="lp-slide-btn" data-slide="3"><span class="ico">🏆</span><b>3 · Cosmic Vote</b><small>Vote QR + live scoreboard</small></button>
+          </div>
+        </section>
+
+        <section class="lp-panel">
+          <h2 class="lp-h2">Voting <span class="lp-pill closed" id="votePill">Closed</span></h2>
+          <p class="lp-hint" style="margin:0 0 14px">Voting opens automatically the first time you go to slide 3. Each phone gets 2 votes.</p>
+          <div class="lp-row-btns">
+            <button class="lp-btn" id="voteToggle">Open voting</button>
+            <button class="lp-btn ghost" id="resetVotes">Reset votes</button>
+          </div>
+        </section>
+
+        <section class="lp-panel">
+          <h2 class="lp-h2">Player links</h2>
+          <div class="lp-linkrow">
+            <canvas class="qr-submit"></canvas>
+            <div><b>Submit a game</b><code id="submitUrl"></code><button class="lp-mini" data-copy="submitUrl">Copy</button></div>
+          </div>
+          <div class="lp-linkrow">
+            <canvas class="qr-vote"></canvas>
+            <div><b>Vote</b><code id="voteUrl"></code><button class="lp-mini" data-copy="voteUrl">Copy</button></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="lp-admin-col">
+        <div class="lp-admin-stats">
+          <div class="lp-stat"><strong id="sGames">0</strong><span>Games</span></div>
+          <div class="lp-stat"><strong id="sMakers">0</strong><span>Makers</span></div>
+          <div class="lp-stat"><strong id="sVotes">0</strong><span>Votes</span></div>
+          <div class="lp-stat"><strong id="sVoters">0</strong><span>Voters</span></div>
+        </div>
+        <section class="lp-panel">
+          <h2 class="lp-h2">Games &amp; ranking <small id="lastSync"></small></h2>
+          <div class="lp-admin-list" id="gameList"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="lp-snack" id="snack"></div>
+
+  <script src="js/supabase-config.js?v=20260715a"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script type="module" src="js/launch-pad-admin.js?v=20261108b"></script>
+</body>
+</html>

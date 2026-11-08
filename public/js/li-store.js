@@ -20,6 +20,9 @@ export function randomId(len = 24) {
 
 function errMsg(e) {
   const m = (e && (e.message || e.details)) || String(e);
+  if (/li_set_slide/i.test(m)) {
+    return 'Slide control needs one more SQL step — run supabase/link-inserter-slides.sql in Supabase.';
+  }
   if (/function .*li_|relation .*li_|schema cache/i.test(m)) {
     return 'Launch Pad tables are missing — run supabase/link-inserter-schema.sql in Supabase.';
   }
@@ -52,6 +55,7 @@ async function liveStore(code) {
     createEvent: (key, title) => rpc('li_create_event', { p_code: code, p_host_key: key, p_title: title }),
     checkHost: (key) => rpc('li_check_host', { p_code: code, p_host_key: key }),
     setVoting: (key, open) => rpc('li_set_voting', { p_code: code, p_host_key: key, p_open: open }),
+    setSlide: (key, slide) => rpc('li_set_slide', { p_code: code, p_host_key: key, p_slide: slide }),
     listGames: () => q(sb.from('li_games')
       .select('id, author_name, game_name, link, created_at')
       .eq('event_code', code).order('created_at', { ascending: true })),
@@ -98,7 +102,7 @@ function demoStore(code) {
     mode: 'demo',
     getEvent: wrap(() => {
       const db = load();
-      return db ? { code, title: db.event.title, voting_open: db.event.voting_open } : null;
+      return db ? { code, title: db.event.title, voting_open: db.event.voting_open, slide: db.event.slide || 1 } : null;
     }),
     createEvent: wrap((key, title) => {
       const db = load();
@@ -108,6 +112,7 @@ function demoStore(code) {
     }),
     checkHost: wrap((key) => { const db = load(); return !!db && db.event.host_key === key; }),
     setVoting: wrap((key, open) => { const db = need(); host(db, key); db.event.voting_open = open; save(db); }),
+    setSlide: wrap((key, slide) => { const db = need(); host(db, key); db.event.slide = slide; save(db); }),
     listGames: wrap(() => need().games.map(({ image, thumb, ...g }) => g)),
     getImages: wrap((ids, field = 'image') => {
       const out = {};
@@ -131,7 +136,7 @@ function demoStore(code) {
       const db = need();
       const tally = {};
       db.votes.forEach(v => { tally[v.game_id] = (tally[v.game_id] || 0) + 1; });
-      return { voting_open: db.event.voting_open, voters: new Set(db.votes.map(v => v.voter_id)).size, tally };
+      return { voting_open: db.event.voting_open, slide: db.event.slide || 1, voters: new Set(db.votes.map(v => v.voter_id)).size, tally };
     }),
     myVotes: wrap((voterId) => need().votes.filter(v => v.voter_id === voterId).map(v => v.game_id)),
     castVote: wrap((gameId, voterId) => {
@@ -158,6 +163,14 @@ function demoStore(code) {
 // ------------------------------------------------------------------
 // Shared bits
 // ------------------------------------------------------------------
+
+/** Same-browser instant slide sync (admin + projector on one laptop). */
+export function slideChannel(code, demo) {
+  try { return new BroadcastChannel(`li_slide_${demo ? 'demo_' : ''}${code}`); }
+  catch { return { postMessage() {}, addEventListener() {} }; }
+}
+
+export const hostKeyName = (code, demo) => `li_host_${demo ? 'demo_' : ''}${code}`;
 
 /** Draw a QR code for `text` onto `canvas` (needs qrcode-generator loaded). */
 export function drawQr(canvas, text, { dark = '#05060f', light = '#ffffff' } = {}) {
