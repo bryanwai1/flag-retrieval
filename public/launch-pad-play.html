@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#04050d">
+  <title>Launch Pad</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/launch-pad.css?v=20261108a">
+</head>
+<body>
+  <div class="lp-cosmos"><canvas id="stars"></canvas></div>
+
+  <main class="lp-phone">
+    <header class="lp-phone-head">
+      <span class="lp-eyebrow" id="eventTitle">Launch Pad</span>
+      <h1 class="lp-title" id="headTitle">Submit your game</h1>
+      <p id="headSub">Send your AI Studio game to the big screen</p>
+    </header>
+
+    <div id="screenError" class="lp-panel lp-locked" hidden>
+      <span class="big">🛰️</span>
+      <h2 id="errTitle">Lost signal</h2>
+      <p id="errDetail"></p>
+    </div>
+
+    <div id="screenApp" hidden>
+      <nav class="lp-tabs">
+        <button data-tab="submit" class="on">🚀 Submit</button>
+        <button data-tab="vote">💗 Vote</button>
+      </nav>
+
+      <!-- Submit -->
+      <section id="tabSubmit">
+        <form class="lp-panel" id="submitForm" novalidate>
+          <label class="lp-field"><span>Your name</span>
+            <input class="lp-input" id="fName" maxlength="60" autocomplete="name" required>
+          </label>
+          <label class="lp-field"><span>Game name</span>
+            <input class="lp-input" id="fGame" maxlength="80" required>
+          </label>
+          <label class="lp-field"><span>Game link</span>
+            <input class="lp-input" id="fLink" type="url" inputmode="url" placeholder="https://aistudio.google.com/apps/…" autocapitalize="off" autocorrect="off" required>
+            <small class="lp-hint">In AI Studio open your app → <b>Share</b> → copy the link. Make sure anyone with the link can open it.</small>
+          </label>
+          <div class="lp-field"><span>Cover image (16:9)</span>
+            <label class="lp-drop" id="drop">
+              <input type="file" id="fImage" accept="image/*">
+              <img id="preview" alt="" hidden>
+              <div class="lp-drop-msg"><span class="ico">🖼️</span>Tap to upload a landscape screenshot<br><small>We’ll crop it to 16:9</small></div>
+            </label>
+          </div>
+          <button class="lp-btn" id="submitBtn">🚀 Launch my game</button>
+          <p class="lp-err" id="submitErr"></p>
+        </form>
+
+        <div class="lp-panel lp-done" id="submitDone" hidden>
+          <span class="rocket">🚀</span>
+          <h2>Launched!</h2>
+          <p>Your game is now orbiting on the big screen.</p>
+          <article class="lp-card" style="--fs:18px">
+            <img class="lp-card-img" id="doneImg" alt="">
+            <div class="lp-card-cap">
+              <div class="lp-card-name" id="doneName"></div>
+              <div class="lp-card-by" id="doneBy"></div>
+            </div>
+          </article>
+          <button class="lp-btn ghost" id="againBtn">Submit another game</button>
+        </div>
+      </section>
+
+      <!-- Vote -->
+      <section id="tabVote" hidden>
+        <div class="lp-panel lp-locked" id="voteLocked">
+          <span class="big">🔒</span>
+          <h2>Voting opens soon</h2>
+          <p>Keep this page open — it unlocks automatically when the host starts the vote.</p>
+        </div>
+        <div id="voteOpen" hidden>
+          <div class="lp-votes-left">
+            <div><b id="votesLeftText">2 votes left</b><div class="lp-hint" style="margin:2px 0 0">Tap a game to vote · tap again to undo</div></div>
+            <div class="dots"><span class="dot"></span><span class="dot"></span></div>
+          </div>
+          <div class="lp-vote-list" id="voteList"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="lp-snack" id="snack"></div>
+
+  <script src="js/supabase-config.js?v=20260715a"></script>
+  <script type="module" src="js/launch-pad-play.js?v=20261108a"></script>
+</body>
+</html>

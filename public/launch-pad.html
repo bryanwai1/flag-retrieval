@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch Pad &mdash; Projector</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/launch-pad.css?v=20261108a">
+</head>
+<body>
+  <div class="lp-cosmos"><canvas id="stars"></canvas><div class="lp-planet"></div></div>
+
+  <!-- Setup: no ?e= in URL -->
+  <section class="lp-setup" id="screenSetup" hidden>
+    <div class="lp-setup-card">
+      <span class="lp-eyebrow">Mission control</span>
+      <h1 class="lp-title">Launch Pad</h1>
+      <p>Players scan a QR, drop in their Google AI Studio game link and a 16:9 screenshot, then everyone votes for their favourites.</p>
+      <form id="createForm">
+        <label class="lp-field"><span>Event title</span>
+          <input class="lp-input" id="createTitle" maxlength="80" value="AI Game Jam" required>
+        </label>
+        <button class="lp-btn" id="createBtn">🚀 Start new launch</button>
+        <p class="lp-err" id="createErr"></p>
+      </form>
+      <hr>
+      <form id="openForm">
+        <label class="lp-field"><span>Re-open an event code</span>
+          <input class="lp-input" id="openCode" placeholder="e.g. k7m2x" autocapitalize="off" required>
+        </label>
+        <button class="lp-btn ghost">Open projector</button>
+      </form>
+      <p class="lp-hint" style="margin-top:18px">Tip: add <code>?demo=1</code> to rehearse without the database (same browser only).</p>
+    </div>
+  </section>
+
+  <section class="lp-setup" id="screenError" hidden>
+    <div class="lp-setup-card">
+      <span class="lp-eyebrow">Houston, we have a problem</span>
+      <h1 class="lp-title" id="errTitle">Error</h1>
+      <p id="errDetail"></p>
+      <a class="lp-btn ghost" href="launch-pad.html" style="text-decoration:none">Back to mission control</a>
+    </div>
+  </section>
+
+  <main class="lp-proj" id="screenLive" hidden>
+
+    <!-- Slide 1: Submit -->
+    <section class="lp-slide lp-s1" data-slide="1">
+      <div class="lp-s1-qr">
+        <div class="lp-qr"><canvas class="qr-submit"></canvas></div>
+        <div class="lp-qr-url qr-submit-url"></div>
+      </div>
+      <div class="lp-s1-copy">
+        <span class="lp-eyebrow event-title">AI Game Jam</span>
+        <h1 class="lp-title">Submit<br>your game</h1>
+        <p class="lp-s1-sub">Launch your Google AI Studio creation into the galaxy.</p>
+        <ol class="lp-steps">
+          <li><div><b>Build your game</b> in Google AI Studio<small>Make sure it runs from start to finish</small></div></li>
+          <li><div><b>Share &amp; copy the app link</b><small>Set it so anyone with the link can play</small></div></li>
+          <li><div><b>Screenshot your game</b> in 16:9 landscape<small>This becomes your cover art on the big screen</small></div></li>
+          <li><div><b>Scan the QR</b> &mdash; add your name, game name, link &amp; image<small>Hit launch and watch it land in the galaxy</small></div></li>
+        </ol>
+        <div class="lp-s1-count"><strong class="count-games">0</strong>games in orbit</div>
+      </div>
+    </section>
+
+    <!-- Slide 2: Library -->
+    <section class="lp-slide" data-slide="2">
+      <header class="lp-head">
+        <div>
+          <span class="lp-eyebrow event-title">AI Game Jam</span>
+          <h1 class="lp-title">Game Galaxy</h1>
+        </div>
+        <div class="lp-head-stats">
+          <div class="lp-stat"><strong class="count-games">0</strong><span>Games</span></div>
+          <div class="lp-stat"><strong class="count-makers">0</strong><span>Makers</span></div>
+        </div>
+      </header>
+      <div class="lp-s2-body">
+        <div class="lp-library" id="library"></div>
+        <aside class="lp-rail">
+          <div>
+            <div class="lp-qr"><canvas class="qr-submit"></canvas></div>
+            <div class="lp-qr-label">Submit your game</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Slide 3: Vote -->
+    <section class="lp-slide" data-slide="3">
+      <header class="lp-head">
+        <div>
+          <span class="lp-eyebrow event-title">AI Game Jam</span>
+          <h1 class="lp-title">Cosmic Vote</h1>
+        </div>
+        <div class="lp-head-stats">
+          <div class="lp-stat"><strong id="countVotes">0</strong><span>Votes</span></div>
+          <div class="lp-stat"><strong id="countVoters">0</strong><span>Voters</span></div>
+          <div class="lp-stat" style="display:grid;place-items:center"><span class="lp-pill closed" id="votePill">Closed</span></div>
+        </div>
+      </header>
+      <div class="lp-s3-body">
+        <aside class="lp-rail lp-rail-two">
+          <div class="lp-vote-qr">
+            <div class="lp-qr"><canvas class="qr-vote"></canvas></div>
+            <div class="lp-qr-label">Vote &middot; 2 picks each</div>
+          </div>
+          <div>
+            <div class="lp-qr"><canvas class="qr-submit"></canvas></div>
+            <div class="lp-qr-label">Submit your game</div>
+          </div>
+        </aside>
+        <div class="lp-board">
+          <div class="lp-board-list" id="board"></div>
+          <div class="lp-board-more" id="boardMore"></div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="lp-dock" id="dock">
+      <button data-go="1">1 · Submit</button>
+      <button data-go="2">2 · Galaxy</button>
+      <button data-go="3">3 · Vote</button>
+      <span class="sep host-only"></span>
+      <button class="host-only vote-toggle" id="voteToggle">Open voting</button>
+      <button class="host-only" id="resetVotes">Reset votes</button>
+      <button class="host-only" id="hostLink" title="Copy a link that lets another laptop control this event">Copy host link</button>
+      <span class="sep"></span>
+      <button id="fsBtn" title="Fullscreen (F)">⛶</button>
+    </nav>
+
+    <div class="lp-brand">Launch Pad · code <b class="event-code"></b></div>
+    <div class="lp-mode-badge" id="modeBadge"></div>
+
+    <div class="lp-toast" id="toast">
+      <img alt="">
+      <div>
+        <div class="lp-toast-k">🚀 New launch</div>
+        <div class="lp-toast-t"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/supabase-config.js?v=20260715a"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script type="module" src="js/launch-pad.js?v=20261108a"></script>
+</body>
+</html>
