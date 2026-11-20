@@ -2419,6 +2419,33 @@ ${error.message}`)
             </button>
           </div>
 
+          {/* Full all-teams scoreboard on players' phones. Players always keep
+              their own points and completed count; this only gates the ranking. */}
+          <div className="mt-5 flex items-center justify-between gap-4 p-4 rounded-lg border border-white/10 bg-gray-900/50">
+            <div>
+              <p className="text-sm font-bold text-white">Show scoreboard on players' phones</p>
+              <p className="text-xs text-gray-500 mt-0.5">OFF (default): players only see their own team's points and completed count — the full ranking stays on the projector until you reveal it. ON: players and observers get the 🏆 Scoreboard button with every team's standing.</p>
+            </div>
+            <button
+              onClick={() => {
+                if (!currentBoard) return
+                updateBoardSettings({ show_scoreboard: currentBoard.show_scoreboard !== true })
+              }}
+              disabled={timerSaving}
+              role="switch"
+              aria-checked={currentBoard?.show_scoreboard === true}
+              className={`relative shrink-0 w-14 h-8 rounded-full transition-colors disabled:opacity-40 ${
+                currentBoard?.show_scoreboard === true ? 'bg-violet-500' : 'bg-gray-600'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                  currentBoard?.show_scoreboard === true ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
         </section>
 
         {/* ── Board Note (shown below the bingo board on the player page) ──── */}

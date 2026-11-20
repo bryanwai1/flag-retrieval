@@ -403,6 +403,7 @@ function BoardScreen({
   boardNote,
   boardNoteEvery,
   tileDisplay,
+  showScoreboard,
   onLeave,
 }: {
   team: { id: string; name: string }
@@ -413,6 +414,8 @@ function BoardScreen({
   boardNote: string
   boardNoteEvery: number
   tileDisplay: TileDisplay
+  /** Per-board admin switch: when off, players keep their own points but not the all-teams ranking. */
+  showScoreboard: boolean
   onLeave: () => void
 }) {
   const navigate = useNavigate()
@@ -425,6 +428,11 @@ function BoardScreen({
   const gridTaskIds = new Set(gridTasks.map(t => t.id))
   const completedCount = scans.filter(s => s.completed && gridTaskIds.has(s.task_id)).length
   const standings = useBingoStandings(sectionId, true)
+
+  // The team's own total (tile points + duel wins, same maths as the projector,
+  // without the award-ceremony bonus). Always shown, even when the all-teams
+  // scoreboard is switched off for this board.
+  const myPoints = standings.loading ? null : (standings.rows.find(r => r.team.id === team.id)?.points ?? 0)
 
   const getStatus = (taskId: string): TileStatus => {
     const scan = scans.find(s => s.task_id === taskId)
@@ -528,6 +536,9 @@ function BoardScreen({
             <h1 className="text-white text-xl font-black tracking-tight leading-tight">{team.name}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-green-400 text-xs font-bold">{completedCount}/{gridTasks.length} completed</span>
+              {myPoints !== null && (
+                <span className="text-amber-300 text-xs font-black tabular-nums">· {myPoints} pts</span>
+              )}
               {lettersEarned && (
                 <span className="text-purple-300 text-xs font-black tracking-widest">{lettersEarned}!</span>
               )}
@@ -593,7 +604,7 @@ function BoardScreen({
             </div>
           )}
 
-          {gridTasks.length > 0 && (
+          {showScoreboard && gridTasks.length > 0 && (
             <div className="mt-8">
               <button
                 type="button"
@@ -835,6 +846,7 @@ export function BingoDashHome() {
         boardNote={boardNote}
         boardNoteEvery={boardNoteEvery}
         tileDisplay={normalizeTileDisplay(section?.tile_display)}
+        showScoreboard={section?.show_scoreboard === true}
         onLeave={leaveTeam}
       />
       {/* Another team can challenge us at any moment — the banner has to reach
